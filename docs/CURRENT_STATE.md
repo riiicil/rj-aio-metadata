@@ -33,7 +33,7 @@ Phase 1 execution is in progress. The foundation has been established with `Stor
 | **Manifest V3 Config** | `src/manifest.json` | `DONE` | MV3 configuration, permissions & icons |
 | **Storage Engine** | `src/services/StorageService.js` | `DONE` | Full schema, file reader, keyword priority |
 | **Background Worker** | `src/background/service_worker.js` | `DONE` | Dynamic model fetcher & tab router |
-| **Popup UI** | `src/popup/` | `IN_PROGRESS` | Platform-adaptive settings UI |
+| **Popup UI** | `src/popup/` | `DONE` | Platform-adaptive settings UI & Raycast design |
 | **Draggable Overlay HUD**| `src/overlay/` | `PENDING` | Scheduled for Phase 2 |
 | **Universal Vision Engine**| `src/services/` | `PENDING` | Scheduled for Phase 3 |
 | **Platform Adapters** | `src/adapters/` | `PENDING` | Scheduled for Phase 4 |
@@ -42,4 +42,4 @@ Phase 1 execution is in progress. The foundation has been established with `Stor
 
 ## 4. Immediate Blockers & Active Focus
 - **Current Blocker**: None.
-- **Active Focus**: Scope 3 — Platform-adaptive Popup UI (`popup.html`, `popup.css`, `popup.js`) with Raycast Dark Precision aesthetics.
+- **Active Focus**: Scope 4 — End-to-end verification and documentation wrap-up.

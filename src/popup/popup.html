@@ -5,24 +5,253 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RJ AIO Metadata Settings</title>
   <link rel="stylesheet" href="../styles/variables.css">
+  <link rel="stylesheet" href="../styles/components.css">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="popup-container">
+    <!-- Top Header Bar -->
     <header class="popup-header">
-      <div class="brand-title">
-        <span class="logo-accent">RJ</span> AIO Metadata
+      <div class="brand-group">
+        <div class="brand-title">
+          <span class="logo-badge">RJ</span>
+          <span>AIO Metadata</span>
+        </div>
+        <span class="version-tag">v0.1.0</span>
       </div>
-      <span class="version-badge">v0.1.0</span>
+      <button id="btnLaunchOverlay" class="rj-btn rj-btn-secondary rj-btn-sm" title="Launch Floating In-Page Overlay">
+        <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="3" y1="9" x2="21" y2="9"></line>
+          <line x1="9" y1="21" x2="9" y2="9"></line>
+        </svg>
+        <span>Open HUD</span>
+      </button>
     </header>
-    <main class="popup-body">
-      <p class="desc-text">AI Metadata Assistant for Microstock Contributors</p>
-      <div class="status-card" id="platformStatus">
-        <span class="status-indicator"></span>
-        <span class="status-label">Detecting active platform...</span>
-      </div>
+
+    <!-- Main Content Area -->
+    <main class="popup-content">
+      <!-- Section 1: Target Platform Selector & Live Detector -->
+      <section class="rj-card">
+        <div class="rj-card-title">
+          <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+          <span>Target Microstock Platform</span>
+        </div>
+
+        <div class="rj-field-group">
+          <div class="rj-input-with-action">
+            <select id="platformSelect" class="rj-select">
+              <option value="adobestock">Adobe Stock Contributor</option>
+              <option value="shutterstock">Shutterstock Contributor</option>
+              <option value="freepik">Freepik Contributor</option>
+              <option value="vecteezy">Vecteezy Contributor</option>
+              <option value="dreamstime">Dreamstime Upload</option>
+              <option value="depositphotos">Depositphotos Unfinished</option>
+              <option value="miricanvas">MiriCanvas DesignHub</option>
+            </select>
+            <span id="platformStatusBadge" class="rj-status-badge rj-status-unmatched" title="Tab match status">
+              <svg id="statusIcon" class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <span id="statusText">Checking</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Mismatch Helper Alert -->
+        <div id="platformWarningBanner" class="rj-platform-warning" style="display: none;">
+          <span id="warningMessage">You are not on the selected platform page.</span>
+          <a id="btnNavigatePlatform" class="rj-platform-link">Open Page</a>
+        </div>
+      </section>
+
+      <!-- Section 2: AI Provider & Model Configuration -->
+      <section class="rj-card">
+        <div class="rj-card-title">
+          <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+          </svg>
+          <span>AI Vision Provider</span>
+        </div>
+
+        <!-- Provider Selector -->
+        <div class="rj-field-group">
+          <label class="rj-field-label" for="providerSelect">
+            <span>Provider Engine</span>
+          </label>
+          <select id="providerSelect" class="rj-select">
+            <option value="gemini">Google Gemini (OpenAI Protocol)</option>
+            <option value="mistral">Mistral AI (Pixtral Vision)</option>
+            <option value="openai">OpenAI (GPT-5 / GPT-4o)</option>
+            <option value="openrouter">OpenRouter (Unified Endpoint)</option>
+            <option value="custom">Custom OpenAI-Compatible Endpoint</option>
+          </select>
+        </div>
+
+        <!-- Base URL -->
+        <div class="rj-field-group">
+          <label class="rj-field-label" for="baseUrlInput">
+            <span>Base URL Endpoint</span>
+          </label>
+          <input type="text" id="baseUrlInput" class="rj-input" placeholder="https://api.openai.com/v1">
+        </div>
+
+        <!-- API Key with Show/Hide & File Import -->
+        <div class="rj-field-group">
+          <label class="rj-field-label" for="apiKeyInput">
+            <span>API Key</span>
+            <span class="rj-field-hint">Stored locally in Chrome</span>
+          </label>
+          <div class="rj-input-with-action">
+            <input type="password" id="apiKeyInput" class="rj-input" placeholder="Enter or import API key...">
+            <button type="button" id="btnToggleApiKey" class="rj-btn-icon" title="Show / Hide API Key">
+              <svg id="eyeIcon" class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+            <button type="button" id="btnBrowseApiKey" class="rj-file-btn" title="Import API Key from .txt file">
+              <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <span>.txt File</span>
+            </button>
+            <input type="file" id="apiKeyFileInput" accept=".txt" style="display: none;">
+          </div>
+        </div>
+
+        <!-- Model Selection + Fetch Models Button -->
+        <div class="rj-field-group">
+          <label class="rj-field-label" for="modelSelect">
+            <span>Vision Model</span>
+            <span class="rj-field-hint" id="modelCountLabel">Default models loaded</span>
+          </label>
+          <div class="rj-input-with-action">
+            <select id="modelSelect" class="rj-select">
+              <!-- Dynamically populated -->
+            </select>
+            <button type="button" id="btnFetchModels" class="rj-btn-icon" title="Fetch live models from provider (/v1/models)">
+              <svg id="fetchIcon" class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Model Override (Optional) -->
+        <div class="rj-field-group">
+          <label class="rj-field-label" for="customModelInput">
+            <span>Custom Model Override</span>
+            <span class="rj-field-hint">Optional</span>
+          </label>
+          <input type="text" id="customModelInput" class="rj-input" placeholder="e.g. gpt-5-nano, qwen-2.5-vl-72b">
+        </div>
+      </section>
+
+      <!-- Section 3: Platform-Adaptive Metadata Settings -->
+      <section class="rj-card">
+        <div class="rj-card-title">
+          <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="4" y1="21" x2="4" y2="14"></line>
+            <line x1="4" y1="10" x2="4" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12" y2="3"></line>
+            <line x1="20" y1="21" x2="20" y2="16"></line>
+            <line x1="20" y1="12" x2="20" y2="3"></line>
+            <line x1="1" y1="14" x2="7" y2="14"></line>
+            <line x1="9" y1="8" x2="15" y2="8"></line>
+            <line x1="17" y1="16" x2="23" y2="16"></line>
+          </svg>
+          <span id="platformSettingsHeaderTitle">Metadata Settings</span>
+        </div>
+
+        <!-- Universal: Keyword Count (Number field, min 8) -->
+        <div class="rj-field-group">
+          <label class="rj-field-label" for="keywordCountInput">
+            <span>Target Keyword Count</span>
+            <span class="rj-field-hint" id="keywordCountLimitHint">Min 8, Max 50</span>
+          </label>
+          <input type="number" id="keywordCountInput" class="rj-input" min="8" max="50" value="50">
+        </div>
+
+        <!-- Universal: Add Specific Keywords (Prepend & Prioritize) -->
+        <div class="rj-field-group">
+          <label class="rj-field-label" for="specificKeywordsInput">
+            <span>Add Specific Keywords (Mandatory)</span>
+            <span class="rj-field-hint">Placed at index 0</span>
+          </label>
+          <input type="text" id="specificKeywordsInput" class="rj-input" placeholder="e.g. train, station, transit (comma-separated)">
+        </div>
+
+        <!-- Universal: Auto-Save Draft Toggle -->
+        <div class="rj-switch-row">
+          <div class="rj-switch-info">
+            <span class="rj-switch-title">Auto-Save Draft</span>
+            <span class="rj-switch-desc">Save metadata after injecting into form</span>
+          </div>
+          <label class="rj-switch">
+            <input type="checkbox" id="autoSaveDraftToggle" checked>
+            <span class="rj-slider"></span>
+          </label>
+        </div>
+
+        <!-- Universal: Generative AI Declaration Toggle -->
+        <div class="rj-switch-row">
+          <div class="rj-switch-info">
+            <span class="rj-switch-title">AI / Generative Declaration</span>
+            <span class="rj-switch-desc">Declare asset created with AI tool</span>
+          </div>
+          <label class="rj-switch">
+            <input type="checkbox" id="isAiGeneratedToggle">
+            <span class="rj-slider"></span>
+          </label>
+        </div>
+
+        <!-- Dynamic Platform-Specific Form Fields Container -->
+        <div id="platformSpecificContainer" style="margin-top: 10px; border-top: 1px solid var(--rj-border-hairline); padding-top: 10px;">
+          <!-- Dynamically populated based on active platform -->
+        </div>
+      </section>
     </main>
+
+    <!-- Footer Action Bar -->
+    <footer class="popup-footer">
+      <button type="button" id="btnSaveSettings" class="rj-btn rj-btn-secondary">
+        <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+          <polyline points="17 21 17 13 7 13 7 21"></polyline>
+          <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+        <span>Save Settings</span>
+      </button>
+
+      <button type="button" id="btnToggleAutomation" class="rj-btn rj-btn-accent">
+        <svg id="automationIcon" class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+        <span id="automationBtnText">Start Automation</span>
+      </button>
+    </footer>
+
+    <!-- Toast Notification -->
+    <div id="toastNotification" class="rj-toast">
+      <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span id="toastMessage">Settings saved successfully</span>
+    </div>
   </div>
+
   <script src="popup.js" type="module"></script>
 </body>
 </html>
