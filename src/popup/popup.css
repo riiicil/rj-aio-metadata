@@ -1,0 +1,72 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--rj-font-sans);
+  background-color: var(--rj-bg-canvas);
+  color: var(--rj-text-body);
+  width: 360px;
+  overflow: hidden;
+}
+
+.popup-container {
+  padding: 16px;
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--rj-border-hairline);
+  padding-bottom: 12px;
+}
+
+.brand-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--rj-text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.logo-accent {
+  background: linear-gradient(135deg, var(--rj-accent-cyan), #3b82f6);
+  color: #000;
+  font-weight: 800;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: var(--rj-radius-sm);
+}
+
+.version-badge {
+  font-size: 11px;
+  color: var(--rj-text-muted);
+  background-color: var(--rj-bg-elevated);
+  padding: 2px 8px;
+  border-radius: var(--rj-radius-pill);
+  border: 1px solid var(--rj-border-hairline);
+}
+
+.desc-text {
+  font-size: 12px;
+  color: var(--rj-text-muted);
+  margin: 12px 0 16px;
+}
+
+.status-card {
+  background-color: var(--rj-bg-card);
+  border: 1px solid var(--rj-border-hairline);
+  border-radius: var(--rj-radius-md);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--rj-radius-pill);
+  background-color: var(--rj-accent-yellow);
+}

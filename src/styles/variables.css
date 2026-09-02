@@ -1,0 +1,42 @@
+/**
+ * RJ AIO Metadata Extension — Design Tokens (Raycast Dark Precision)
+ * Reference: DESIGN.md
+ */
+
+:root {
+  /* Surface colors */
+  --rj-bg-canvas: #07080a;
+  --rj-bg-surface: #0d0d0d;
+  --rj-bg-elevated: #101111;
+  --rj-bg-card: #121212;
+  --rj-bg-input: #18191a;
+
+  /* Borders & Dividers */
+  --rj-border-hairline: #242728;
+  --rj-border-soft: rgba(255, 255, 255, 0.08);
+  --rj-border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Typography */
+  --rj-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --rj-text-primary: #ffffff;
+  --rj-text-body: #cdcdcd;
+  --rj-text-muted: #9c9c9d;
+  --rj-text-ash: #6a6b6c;
+
+  /* Accent Colors */
+  --rj-accent-cyan: #57c1ff;
+  --rj-accent-cyan-soft: rgba(87, 193, 255, 0.15);
+  --rj-accent-green: #59d499;
+  --rj-accent-green-soft: rgba(89, 212, 153, 0.15);
+  --rj-accent-yellow: #ffc533;
+  --rj-accent-yellow-soft: rgba(255, 197, 51, 0.15);
+  --rj-accent-red: #ff6161;
+  --rj-accent-red-soft: rgba(255, 97, 97, 0.15);
+
+  /* Elevation & Blur */
+  --rj-radius-sm: 6px;
+  --rj-radius-md: 8px;
+  --rj-radius-lg: 12px;
+  --rj-radius-pill: 9999px;
+  --rj-shadow-overlay: 0 12px 32px -4px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+}

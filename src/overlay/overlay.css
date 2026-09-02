@@ -1,0 +1,18 @@
+/**
+ * RJ AIO Metadata Extension — Floating Overlay Styles
+ */
+.rj-overlay-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 380px;
+  background-color: rgba(13, 13, 13, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--rj-border-hairline);
+  border-radius: var(--rj-radius-lg);
+  box-shadow: var(--rj-shadow-overlay);
+  z-index: 999999999;
+  font-family: var(--rj-font-sans);
+  color: var(--rj-text-body);
+}
