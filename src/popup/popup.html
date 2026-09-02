@@ -166,13 +166,26 @@
           <span id="platformSettingsHeaderTitle">Metadata Settings</span>
         </div>
 
-        <!-- Universal: Keyword Count (Number field, min 8) -->
+        <!-- Universal: Keyword Count (Custom Stepper, min 8) -->
         <div class="rj-field-group">
           <label class="rj-field-label" for="keywordCountInput">
             <span>Target Keyword Count</span>
             <span class="rj-field-hint" id="keywordCountLimitHint">Min 8, Max 50</span>
           </label>
-          <input type="number" id="keywordCountInput" class="rj-input" min="8" max="50" value="50">
+          <div class="rj-stepper-control">
+            <button type="button" class="rj-stepper-btn" id="btnDecKeywordCount" title="Decrease keyword count">
+              <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+            <input type="number" id="keywordCountInput" class="rj-input rj-stepper-input" min="8" max="50" value="50">
+            <button type="button" class="rj-stepper-btn" id="btnIncKeywordCount" title="Increase keyword count">
+              <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <!-- Universal: Add Specific Keywords (Prepend & Prioritize) -->

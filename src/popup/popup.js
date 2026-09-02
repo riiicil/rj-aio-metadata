@@ -5,6 +5,7 @@
  */
 
 import { StorageService, DEFAULT_CONFIG } from '../services/StorageService.js';
+import { CustomSelect } from './custom_select.js';
 
 let currentConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 let activeTabInfo = null;
@@ -34,6 +35,8 @@ const modelCountLabel = document.getElementById('modelCountLabel');
 
 const platformSettingsHeaderTitle = document.getElementById('platformSettingsHeaderTitle');
 const keywordCountInput = document.getElementById('keywordCountInput');
+const btnDecKeywordCount = document.getElementById('btnDecKeywordCount');
+const btnIncKeywordCount = document.getElementById('btnIncKeywordCount');
 const keywordCountLimitHint = document.getElementById('keywordCountLimitHint');
 const specificKeywordsInput = document.getElementById('specificKeywordsInput');
 const autoSaveDraftToggle = document.getElementById('autoSaveDraftToggle');
@@ -113,6 +116,8 @@ function updateModelDropdownState(provider) {
     modelSelect.disabled = true;
     modelSelect.innerHTML = '<option value="" disabled selected>Input API key first</option>';
     modelCountLabel.textContent = 'API key required';
+    CustomSelect.enhance(modelSelect);
+    CustomSelect.refresh(modelSelect);
     return;
   }
 
@@ -120,6 +125,8 @@ function updateModelDropdownState(provider) {
     modelSelect.disabled = true;
     modelSelect.innerHTML = '<option value="" disabled selected>Please fetch models first</option>';
     modelCountLabel.textContent = 'Fetch models required';
+    CustomSelect.enhance(modelSelect);
+    CustomSelect.refresh(modelSelect);
     return;
   }
 
@@ -137,6 +144,8 @@ function updateModelDropdownState(provider) {
   }
 
   modelCountLabel.textContent = `${provider.models.length} models loaded`;
+  CustomSelect.enhance(modelSelect);
+  CustomSelect.refresh(modelSelect);
 }
 
 /**
@@ -151,6 +160,9 @@ function renderProviderFields(providerId) {
 
   const keys = StorageService.parseApiKeys(provider.apiKey || '');
   apiKeyInput.value = keys.join(', ');
+
+  CustomSelect.enhance(providerSelect);
+  CustomSelect.refresh(providerSelect);
 
   updateModelDropdownState(provider);
 }
@@ -300,6 +312,7 @@ function renderPlatformSpecificFields(platformId) {
   }
 
   platformSpecificContainer.innerHTML = html;
+  CustomSelect.initAll(platformSpecificContainer);
 }
 
 /**
@@ -387,11 +400,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     updateTabMatchStatus();
     renderPlatformSpecificFields(platformSelect.value);
+    CustomSelect.enhance(platformSelect);
+    CustomSelect.refresh(platformSelect);
   });
 
   // 3. Set Initial Provider UI
   providerSelect.value = currentConfig.activeProvider || 'gemini';
   renderProviderFields(providerSelect.value);
+
+  // Initialize all custom selects
+  CustomSelect.initAll();
 
   // Event: Platform dropdown changed
   platformSelect.addEventListener('change', () => {
@@ -497,6 +515,29 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   });
+
+  // Event: Stepper Buttons for Keyword Count
+  if (btnDecKeywordCount) {
+    btnDecKeywordCount.addEventListener('click', () => {
+      const min = Number(keywordCountInput.min) || 8;
+      let val = Number(keywordCountInput.value) || min;
+      if (val > min) {
+        keywordCountInput.value = val - 1;
+        saveCurrentSettings();
+      }
+    });
+  }
+
+  if (btnIncKeywordCount) {
+    btnIncKeywordCount.addEventListener('click', () => {
+      const max = Number(keywordCountInput.max) || 50;
+      let val = Number(keywordCountInput.value) || max;
+      if (val < max) {
+        keywordCountInput.value = val + 1;
+        saveCurrentSettings();
+      }
+    });
+  }
 
   // Event: Save Settings
   btnSaveSettings.addEventListener('click', () => {
