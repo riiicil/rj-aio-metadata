@@ -77,17 +77,26 @@ function parseModelList(json) {
  */
 async function fetchProviderModels({ baseUrl, apiKey }) {
   if (!baseUrl) throw new Error('Base URL is required to fetch models.');
-  const keys = String(apiKey || '').split(/[\r\n,]+/).map(k => k.trim()).filter(Boolean);
+  const keys = String(apiKey || '')
+    .split(/[\r\n,\s\t]+/)
+    .map(k => k.trim().replace(/^['\"]|['\"]$/g, ''))
+    .filter(Boolean);
   const activeKey = keys[0];
   if (!activeKey) throw new Error('API Key is required to fetch models.');
 
   const cleanBase = baseUrl.replace(/\/+$/, '');
-  const endpoint = `${cleanBase}/models`;
+  let endpoint = `${cleanBase}/models`;
+
+  // For Google Gemini API, support both query param and header authorization
+  if (cleanBase.includes('generativelanguage.googleapis.com')) {
+    endpoint = `${cleanBase}/models?key=${encodeURIComponent(activeKey)}`;
+  }
 
   const response = await fetch(endpoint, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${activeKey}`,
+      'x-goog-api-key': activeKey,
       'Content-Type': 'application/json'
     }
   });

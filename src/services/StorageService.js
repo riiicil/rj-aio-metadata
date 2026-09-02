@@ -186,8 +186,8 @@ export class StorageService {
   static parseApiKeys(rawKeyStr = '') {
     if (!rawKeyStr) return [];
     return String(rawKeyStr)
-      .split(/[\r\n,]+/)
-      .map(k => k.trim())
+      .split(/[\r\n,\s\t]+/)
+      .map(k => k.trim().replace(/^['"]|['"]$/g, ''))
       .filter(k => k.length > 0);
   }
 
@@ -223,7 +223,7 @@ export class StorageService {
           reject(new Error('No valid API keys found in file'));
           return;
         }
-        resolve(keys.join('\n'));
+        resolve(keys.join(', '));
       };
       reader.onerror = () => reject(new Error('Failed to read file'));
       reader.readAsText(file);

@@ -97,7 +97,7 @@ function updateTabMatchStatus() {
  * Updates the Model dropdown state dynamically based on API key and model cache.
  */
 function updateModelDropdownState(provider) {
-  const rawKey = apiKeyInput.value.trim();
+  const rawKey = apiKeyInput.value.trim() || provider.apiKey || '';
   const keys = StorageService.parseApiKeys(rawKey);
 
   // Update API key count hint
@@ -149,7 +149,8 @@ function renderProviderFields(providerId) {
   // Preset providers have disabled baseUrl; Custom endpoint is editable
   baseUrlInput.disabled = (providerId !== 'custom');
 
-  apiKeyInput.value = provider.apiKey || '';
+  const keys = StorageService.parseApiKeys(provider.apiKey || '');
+  apiKeyInput.value = keys.join(', ');
 
   updateModelDropdownState(provider);
 }
@@ -316,7 +317,8 @@ async function saveCurrentSettings() {
   if (activeProvId === 'custom') {
     currentConfig.providers[activeProvId].baseUrl = baseUrlInput.value.trim();
   }
-  currentConfig.providers[activeProvId].apiKey = apiKeyInput.value.trim();
+  const keys = StorageService.parseApiKeys(apiKeyInput.value.trim());
+  currentConfig.providers[activeProvId].apiKey = keys.join(', ');
   currentConfig.providers[activeProvId].selectedModel = modelSelect.value || '';
 
   // 2. Update Platform settings
@@ -465,9 +467,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Event: Fetch models from provider (/v1/models)
   btnFetchModels.addEventListener('click', () => {
-    const baseUrl = baseUrlInput.value.trim();
-    const apiKey = apiKeyInput.value.trim();
     const activeProvId = providerSelect.value;
+    const provider = currentConfig.providers[activeProvId] || {};
+    const baseUrl = baseUrlInput.value.trim();
+    const apiKey = (apiKeyInput.value.trim() || provider.apiKey || '').trim();
 
     if (!baseUrl || !apiKey) {
       showToast('Please enter Base URL & API Key first', true);
