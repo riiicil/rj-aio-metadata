@@ -104,27 +104,55 @@ export const DEFAULT_CONFIG = {
   preferences: {
     enableOverlayOnLoad: true,
     autoSanitizeKeywords: true
-  }
+  },
+  _schemaVersion: 2
 };
 
 export class StorageService {
   /**
    * Retrieves full configuration merged with defaults.
+   * Resets legacy pre-cached hardcoded models if schema version is older.
    * @returns {Promise<typeof DEFAULT_CONFIG>}
    */
   static async getConfig() {
     return new Promise(resolve => {
       chrome.storage.sync.get(null, stored => {
-        if (chrome.runtime.lastError || !stored || Object.keys(stored).length === 0) {
-          // Fallback to local storage if sync is empty or failed
+        let rawData = stored;
+        if (chrome.runtime.lastError || !rawData || Object.keys(rawData).length === 0) {
           chrome.storage.local.get(null, localStored => {
-            resolve(StorageService._deepMerge(DEFAULT_CONFIG, localStored || {}));
+            rawData = localStored || {};
+            const config = StorageService._processLoadedConfig(rawData);
+            resolve(config);
           });
           return;
         }
-        resolve(StorageService._deepMerge(DEFAULT_CONFIG, stored));
+        const config = StorageService._processLoadedConfig(rawData);
+        resolve(config);
       });
     });
+  }
+
+  /**
+   * Processes and migrates loaded configuration.
+   * @private
+   */
+  static _processLoadedConfig(rawData) {
+    let merged = StorageService._deepMerge(DEFAULT_CONFIG, rawData);
+
+    // If loaded config has old schema or legacy pre-populated models, reset model arrays
+    if (merged._schemaVersion !== DEFAULT_CONFIG._schemaVersion) {
+      if (merged.providers) {
+        Object.keys(merged.providers).forEach(provKey => {
+          merged.providers[provKey].models = [];
+          merged.providers[provKey].selectedModel = '';
+        });
+      }
+      merged._schemaVersion = DEFAULT_CONFIG._schemaVersion;
+      // Persist migrated clean config
+      StorageService.saveConfig(merged);
+    }
+
+    return merged;
   }
 
   /**
@@ -134,6 +162,10 @@ export class StorageService {
    */
   static async saveConfig(data) {
     return new Promise(resolve => {
+      if (typeof chrome === 'undefined' || !chrome.storage) {
+        resolve(true);
+        return;
+      }
       chrome.storage.sync.set(data, () => {
         if (chrome.runtime.lastError) {
           // Fallback to local if sync quota exceeded
