@@ -77,7 +77,9 @@ function parseModelList(json) {
  */
 async function fetchProviderModels({ baseUrl, apiKey }) {
   if (!baseUrl) throw new Error('Base URL is required to fetch models.');
-  if (!apiKey) throw new Error('API Key is required to fetch models.');
+  const keys = String(apiKey || '').split(/[\r\n,]+/).map(k => k.trim()).filter(Boolean);
+  const activeKey = keys[0];
+  if (!activeKey) throw new Error('API Key is required to fetch models.');
 
   const cleanBase = baseUrl.replace(/\/+$/, '');
   const endpoint = `${cleanBase}/models`;
@@ -85,7 +87,7 @@ async function fetchProviderModels({ baseUrl, apiKey }) {
   const response = await fetch(endpoint, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      'Authorization': `Bearer ${activeKey}`,
       'Content-Type': 'application/json'
     }
   });

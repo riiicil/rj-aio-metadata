@@ -1,6 +1,7 @@
 /**
  * StorageService — Comprehensive Persistent Storage Engine
- * Manages configuration, multi-provider credentials, platform-adaptive preferences, and file-based API key import.
+ * Manages configuration, multi-provider credentials (single/multi-line round-robin),
+ * dynamic model lists, and platform-adaptive preferences.
  */
 
 export const DEFAULT_CONFIG = {
@@ -10,64 +11,35 @@ export const DEFAULT_CONFIG = {
       name: 'Google Gemini',
       baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
       apiKey: '',
-      defaultModel: 'gemini-2.5-flash-lite',
-      customModel: '',
-      models: [
-        'gemini-2.5-flash-lite',
-        'gemini-2.5-flash',
-        'gemini-2.5-pro',
-        'gemini-2.0-flash',
-        'gemini-1.5-flash',
-        'gemini-1.5-pro'
-      ]
+      selectedModel: '',
+      models: []
     },
     mistral: {
       name: 'Mistral AI',
       baseUrl: 'https://api.mistral.ai/v1',
       apiKey: '',
-      defaultModel: 'mistral-small-latest',
-      customModel: '',
-      models: [
-        'mistral-small-latest',
-        'pixtral-12b-2409',
-        'pixtral-large-latest',
-        'mistral-large-latest'
-      ]
+      selectedModel: '',
+      models: []
     },
     openai: {
       name: 'OpenAI',
       baseUrl: 'https://api.openai.com/v1',
       apiKey: '',
-      defaultModel: 'gpt-5-nano',
-      customModel: '',
-      models: [
-        'gpt-5-nano',
-        'gpt-5-mini',
-        'gpt-5',
-        'gpt-4o',
-        'gpt-4o-mini'
-      ]
+      selectedModel: '',
+      models: []
     },
     openrouter: {
       name: 'OpenRouter',
       baseUrl: 'https://openrouter.ai/api/v1',
       apiKey: '',
-      defaultModel: 'openai/gpt-5-nano',
-      customModel: '',
-      models: [
-        'openai/gpt-5-nano',
-        'google/gemini-2.5-flash-lite',
-        'google/gemini-flash-1.5',
-        'anthropic/claude-3.5-sonnet',
-        'meta-llama/llama-3.2-11b-vision-instruct'
-      ]
+      selectedModel: '',
+      models: []
     },
     custom: {
-      name: 'Custom OpenAI-Compatible Endpoint',
+      name: 'Custom Endpoint',
       baseUrl: '',
       apiKey: '',
-      defaultModel: '',
-      customModel: '',
+      selectedModel: '',
       models: []
     }
   },
@@ -175,9 +147,35 @@ export class StorageService {
   }
 
   /**
-   * Reads API key from an uploaded .txt file.
+   * Splits multi-line or comma-separated API key string into clean array of individual keys.
+   * @param {string} rawKeyStr 
+   * @returns {string[]}
+   */
+  static parseApiKeys(rawKeyStr = '') {
+    if (!rawKeyStr) return [];
+    return String(rawKeyStr)
+      .split(/[\r\n,]+/)
+      .map(k => k.trim())
+      .filter(k => k.length > 0);
+  }
+
+  /**
+   * Returns a round-robin API key based on the asset processing index.
+   * @param {string} rawKeyStr 
+   * @param {number} assetIndex 
+   * @returns {string}
+   */
+  static getRoundRobinApiKey(rawKeyStr = '', assetIndex = 0) {
+    const keys = StorageService.parseApiKeys(rawKeyStr);
+    if (keys.length === 0) return '';
+    const index = Math.abs(assetIndex) % keys.length;
+    return keys[index];
+  }
+
+  /**
+   * Reads API keys from an uploaded .txt file (supports single or multi-line keys).
    * @param {File} file 
-   * @returns {Promise<string>}
+   * @returns {Promise<string>} Clean newline-delimited keys string
    */
   static async readApiKeyFromFile(file) {
     return new Promise((resolve, reject) => {
@@ -187,10 +185,13 @@ export class StorageService {
       }
       const reader = new FileReader();
       reader.onload = event => {
-        const rawKey = event.target?.result || '';
-        // Trim whitespace, newlines, and potential trailing tokens
-        const cleanKey = String(rawKey).trim().replace(/[\r\n\t]/g, '');
-        resolve(cleanKey);
+        const rawText = event.target?.result || '';
+        const keys = StorageService.parseApiKeys(rawText);
+        if (keys.length === 0) {
+          reject(new Error('No valid API keys found in file'));
+          return;
+        }
+        resolve(keys.join('\n'));
       };
       reader.onerror = () => reject(new Error('Failed to read file'));
       reader.readAsText(file);

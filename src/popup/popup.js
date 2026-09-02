@@ -1,6 +1,6 @@
 /**
  * RJ AIO Metadata Extension — Popup Controller
- * Manages multi-provider settings, file-based API key import, dynamic model fetching,
+ * Manages multi-provider settings, multi-key round-robin support, dynamic model fetching,
  * active tab platform matching, and platform-adaptive dynamic form rendering.
  */
 
@@ -23,6 +23,7 @@ const btnLaunchOverlay = document.getElementById('btnLaunchOverlay');
 const providerSelect = document.getElementById('providerSelect');
 const baseUrlInput = document.getElementById('baseUrlInput');
 const apiKeyInput = document.getElementById('apiKeyInput');
+const apiKeyCountHint = document.getElementById('apiKeyCountHint');
 const btnToggleApiKey = document.getElementById('btnToggleApiKey');
 const btnBrowseApiKey = document.getElementById('btnBrowseApiKey');
 const apiKeyFileInput = document.getElementById('apiKeyFileInput');
@@ -30,7 +31,6 @@ const modelSelect = document.getElementById('modelSelect');
 const btnFetchModels = document.getElementById('btnFetchModels');
 const fetchIcon = document.getElementById('fetchIcon');
 const modelCountLabel = document.getElementById('modelCountLabel');
-const customModelInput = document.getElementById('customModelInput');
 
 const platformSettingsHeaderTitle = document.getElementById('platformSettingsHeaderTitle');
 const keywordCountInput = document.getElementById('keywordCountInput');
@@ -94,32 +94,64 @@ function updateTabMatchStatus() {
 }
 
 /**
+ * Updates the Model dropdown state dynamically based on API key and model cache.
+ */
+function updateModelDropdownState(provider) {
+  const rawKey = apiKeyInput.value.trim();
+  const keys = StorageService.parseApiKeys(rawKey);
+
+  // Update API key count hint
+  if (keys.length > 1) {
+    apiKeyCountHint.textContent = `${keys.length} API keys loaded (round-robin)`;
+  } else if (keys.length === 1) {
+    apiKeyCountHint.textContent = '1 API key loaded';
+  } else {
+    apiKeyCountHint.textContent = 'Supports single or multi-line keys';
+  }
+
+  if (keys.length === 0) {
+    modelSelect.disabled = true;
+    modelSelect.innerHTML = '<option value="" disabled selected>Input API key first</option>';
+    modelCountLabel.textContent = 'API key required';
+    return;
+  }
+
+  if (!provider.models || provider.models.length === 0) {
+    modelSelect.disabled = true;
+    modelSelect.innerHTML = '<option value="" disabled selected>Please fetch models first</option>';
+    modelCountLabel.textContent = 'Fetch models required';
+    return;
+  }
+
+  // Populate models
+  modelSelect.disabled = false;
+  modelSelect.innerHTML = '';
+  for (const modelId of provider.models) {
+    const opt = document.createElement('option');
+    opt.value = modelId;
+    opt.textContent = modelId;
+    if (modelId === provider.selectedModel || (!provider.selectedModel && modelId === provider.models[0])) {
+      opt.selected = true;
+    }
+    modelSelect.appendChild(opt);
+  }
+
+  modelCountLabel.textContent = `${provider.models.length} models loaded`;
+}
+
+/**
  * Populates the UI with active provider data.
  */
 function renderProviderFields(providerId) {
   const provider = currentConfig.providers[providerId] || currentConfig.providers.gemini;
   
   baseUrlInput.value = provider.baseUrl || '';
+  // Preset providers have disabled baseUrl; Custom endpoint is editable
+  baseUrlInput.disabled = (providerId !== 'custom');
+
   apiKeyInput.value = provider.apiKey || '';
-  customModelInput.value = provider.customModel || '';
 
-  // Populate model dropdown
-  modelSelect.innerHTML = '';
-  const models = provider.models && provider.models.length > 0
-    ? provider.models
-    : [provider.defaultModel || 'default'];
-
-  for (const modelId of models) {
-    const opt = document.createElement('option');
-    opt.value = modelId;
-    opt.textContent = modelId;
-    if (modelId === (provider.defaultModel || provider.models[0])) {
-      opt.selected = true;
-    }
-    modelSelect.appendChild(opt);
-  }
-
-  modelCountLabel.textContent = `${models.length} models available`;
+  updateModelDropdownState(provider);
 }
 
 /**
@@ -281,10 +313,11 @@ async function saveCurrentSettings() {
     currentConfig.providers[activeProvId] = {};
   }
   currentConfig.activeProvider = activeProvId;
-  currentConfig.providers[activeProvId].baseUrl = baseUrlInput.value.trim();
+  if (activeProvId === 'custom') {
+    currentConfig.providers[activeProvId].baseUrl = baseUrlInput.value.trim();
+  }
   currentConfig.providers[activeProvId].apiKey = apiKeyInput.value.trim();
-  currentConfig.providers[activeProvId].defaultModel = modelSelect.value;
-  currentConfig.providers[activeProvId].customModel = customModelInput.value.trim();
+  currentConfig.providers[activeProvId].selectedModel = modelSelect.value || '';
 
   // 2. Update Platform settings
   currentConfig.activePlatform = activePlatId;
@@ -377,6 +410,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderProviderFields(providerSelect.value);
   });
 
+  // Event: API Key typing listener
+  apiKeyInput.addEventListener('input', () => {
+    const activeProvId = providerSelect.value;
+    const provider = currentConfig.providers[activeProvId] || {};
+    provider.apiKey = apiKeyInput.value;
+    updateModelDropdownState(provider);
+  });
+
   // Event: Toggle API Key Visibility (Show/Hide)
   btnToggleApiKey.addEventListener('click', () => {
     if (apiKeyInput.type === 'password') {
@@ -407,9 +448,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const file = event.target.files && event.target.files[0];
     if (file) {
       try {
-        const key = await StorageService.readApiKeyFromFile(file);
-        apiKeyInput.value = key;
-        showToast('API key imported from file');
+        const rawKeys = await StorageService.readApiKeyFromFile(file);
+        apiKeyInput.value = rawKeys;
+        const activeProvId = providerSelect.value;
+        const provider = currentConfig.providers[activeProvId] || {};
+        provider.apiKey = rawKeys;
+        updateModelDropdownState(provider);
+        const parsed = StorageService.parseApiKeys(rawKeys);
+        showToast(`Imported ${parsed.length} API key(s) from file`);
         saveCurrentSettings();
       } catch (err) {
         showToast(`Failed to read key: ${err.message}`, true);
@@ -438,15 +484,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response && response.success && response.models) {
         // Save to current config
         currentConfig.providers[activeProvId].models = response.models;
+        currentConfig.providers[activeProvId].selectedModel = response.models[0];
         // Re-render select
-        modelSelect.innerHTML = '';
-        response.models.forEach(m => {
-          const opt = document.createElement('option');
-          opt.value = m;
-          opt.textContent = m;
-          modelSelect.appendChild(opt);
-        });
-        modelCountLabel.textContent = `${response.models.length} models fetched`;
+        updateModelDropdownState(currentConfig.providers[activeProvId]);
         showToast(`Fetched ${response.models.length} models successfully`);
         saveCurrentSettings();
       } else {

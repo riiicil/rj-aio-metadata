@@ -33,35 +33,35 @@
     <main class="popup-content">
       <!-- Section 1: Target Platform Selector & Live Detector -->
       <section class="rj-card">
-        <div class="rj-card-title">
-          <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-            <polyline points="2 17 12 22 22 17"></polyline>
-            <polyline points="2 12 12 17 22 12"></polyline>
-          </svg>
-          <span>Target Microstock Platform</span>
+        <div class="rj-card-title rj-card-title-split">
+          <div class="rj-title-text">
+            <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+            <span>Target Microstock Platform</span>
+          </div>
+          <span id="platformStatusBadge" class="rj-status-badge rj-status-unmatched" title="Tab match status">
+            <svg id="statusIcon" class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span id="statusText">Checking</span>
+          </span>
         </div>
 
         <div class="rj-field-group">
-          <div class="rj-input-with-action">
-            <select id="platformSelect" class="rj-select">
-              <option value="adobestock">Adobe Stock Contributor</option>
-              <option value="shutterstock">Shutterstock Contributor</option>
-              <option value="freepik">Freepik Contributor</option>
-              <option value="vecteezy">Vecteezy Contributor</option>
-              <option value="dreamstime">Dreamstime Upload</option>
-              <option value="depositphotos">Depositphotos Unfinished</option>
-              <option value="miricanvas">MiriCanvas DesignHub</option>
-            </select>
-            <span id="platformStatusBadge" class="rj-status-badge rj-status-unmatched" title="Tab match status">
-              <svg id="statusIcon" class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <line x1="12" y1="8" x2="12" y2="12"></line>
-                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-              </svg>
-              <span id="statusText">Checking</span>
-            </span>
-          </div>
+          <select id="platformSelect" class="rj-select">
+            <option value="adobestock">Adobe Stock Contributor</option>
+            <option value="shutterstock">Shutterstock Contributor</option>
+            <option value="freepik">Freepik Contributor</option>
+            <option value="vecteezy">Vecteezy Contributor</option>
+            <option value="dreamstime">Dreamstime Upload</option>
+            <option value="depositphotos">Depositphotos Unfinished</option>
+            <option value="miricanvas">MiriCanvas DesignHub</option>
+          </select>
         </div>
 
         <!-- Mismatch Helper Alert -->
@@ -77,7 +77,7 @@
           <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
           </svg>
-          <span>AI Vision Provider</span>
+          <span>AI Provider</span>
         </div>
 
         <!-- Provider Selector -->
@@ -86,11 +86,11 @@
             <span>Provider Engine</span>
           </label>
           <select id="providerSelect" class="rj-select">
-            <option value="gemini">Google Gemini (OpenAI Protocol)</option>
-            <option value="mistral">Mistral AI (Pixtral Vision)</option>
-            <option value="openai">OpenAI (GPT-5 / GPT-4o)</option>
-            <option value="openrouter">OpenRouter (Unified Endpoint)</option>
-            <option value="custom">Custom OpenAI-Compatible Endpoint</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="mistral">Mistral AI</option>
+            <option value="openai">OpenAI</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="custom">Custom Endpoint</option>
           </select>
         </div>
 
@@ -102,21 +102,21 @@
           <input type="text" id="baseUrlInput" class="rj-input" placeholder="https://api.openai.com/v1">
         </div>
 
-        <!-- API Key with Show/Hide & File Import -->
+        <!-- API Key with Show/Hide & File Import (Single or Multi-key) -->
         <div class="rj-field-group">
           <label class="rj-field-label" for="apiKeyInput">
             <span>API Key</span>
-            <span class="rj-field-hint">Stored locally in Chrome</span>
+            <span class="rj-field-hint" id="apiKeyCountHint">Supports single or multi-line keys</span>
           </label>
           <div class="rj-input-with-action">
-            <input type="password" id="apiKeyInput" class="rj-input" placeholder="Enter or import API key...">
+            <input type="password" id="apiKeyInput" class="rj-input" placeholder="Enter key(s) or import .txt file...">
             <button type="button" id="btnToggleApiKey" class="rj-btn-icon" title="Show / Hide API Key">
               <svg id="eyeIcon" class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                 <circle cx="12" cy="12" r="3"></circle>
               </svg>
             </button>
-            <button type="button" id="btnBrowseApiKey" class="rj-file-btn" title="Import API Key from .txt file">
+            <button type="button" id="btnBrowseApiKey" class="rj-file-btn" title="Import API Key(s) from .txt file">
               <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                 <polyline points="17 8 12 3 7 8"></polyline>
@@ -131,12 +131,12 @@
         <!-- Model Selection + Fetch Models Button -->
         <div class="rj-field-group">
           <label class="rj-field-label" for="modelSelect">
-            <span>Vision Model</span>
-            <span class="rj-field-hint" id="modelCountLabel">Default models loaded</span>
+            <span>Model</span>
+            <span class="rj-field-hint" id="modelCountLabel">Fetch models required</span>
           </label>
           <div class="rj-input-with-action">
-            <select id="modelSelect" class="rj-select">
-              <!-- Dynamically populated -->
+            <select id="modelSelect" class="rj-select" disabled>
+              <option value="" disabled selected>Input API key first</option>
             </select>
             <button type="button" id="btnFetchModels" class="rj-btn-icon" title="Fetch live models from provider (/v1/models)">
               <svg id="fetchIcon" class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -146,15 +146,6 @@
               </svg>
             </button>
           </div>
-        </div>
-
-        <!-- Custom Model Override (Optional) -->
-        <div class="rj-field-group">
-          <label class="rj-field-label" for="customModelInput">
-            <span>Custom Model Override</span>
-            <span class="rj-field-hint">Optional</span>
-          </label>
-          <input type="text" id="customModelInput" class="rj-input" placeholder="e.g. gpt-5-nano, qwen-2.5-vl-72b">
         </div>
       </section>
 
