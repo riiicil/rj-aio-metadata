@@ -8,8 +8,8 @@
 
 **RJ AIO Metadata** is a Manifest V3 browser extension built with native Vanilla JavaScript (ES Modules). It extracts uploaded thumbnails from microstock contributor dashboards, generates high-converting titles, descriptions, categories, tags, and AI declarations via **Universal OpenAI-Compatible Vision APIs**, and injects the metadata automatically into the host platform's DOM.
 
-- **Current Milestone**: Phase 0 Complete (Governance, Architecture, Documentation Suite, and Scaffolding).
-- **Next Milestone**: Phase 1 (Manifest V3 Scaffold, Storage Service & Popup Settings UI).
+- **Current Milestone**: Phase 1 Complete (Manifest V3 Foundation, Storage Service & Platform-Adaptive Popup UI).
+- **Next Milestone**: Phase 2 (In-Page Draggable Floating Overlay HUD).
 
 ---
 

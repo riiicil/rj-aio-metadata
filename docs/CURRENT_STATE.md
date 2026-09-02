@@ -7,7 +7,7 @@
 ---
 
 ## 1. Overall Project Status
-Phase 1 execution is in progress. The foundation has been established with `StorageService.js` (supporting Gemini `gemini-2.5-flash-lite`, Mistral `mistral-small-latest`, OpenAI `gpt-5-nano`, OpenRouter `openai/gpt-5-nano`, and Custom endpoints), API key `.txt` file reader, keyword priority engine, and packaged icon assets in `src/icons/`.
+Phase 1 (Manifest V3 Foundation, Storage Service & Platform-Adaptive Popup UI) is **100% COMPLETE**. The extension features a comprehensive multi-provider settings engine, API key file import, dynamic `/v1/models` fetching, real-time tab platform matching, and platform-adaptive dynamic settings adhering strictly to the Raycast Dark Precision design system.
 
 ---
 
@@ -42,4 +42,4 @@ Phase 1 execution is in progress. The foundation has been established with `Stor
 
 ## 4. Immediate Blockers & Active Focus
 - **Current Blocker**: None.
-- **Active Focus**: Scope 4 — End-to-end verification and documentation wrap-up.
+- **Active Focus**: Ready to merge `task/popup-storage` into `dev` and proceed to Phase 2: In-Page Draggable Floating Overlay HUD (`task/draggable-overlay-ui`).
