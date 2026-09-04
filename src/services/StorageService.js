@@ -49,55 +49,45 @@ export const DEFAULT_CONFIG = {
       keywordCount: 49,
       specificKeywords: '',
       language: 'en',
-      autoSaveDraft: true,
       isAiGenerated: false
     },
     shutterstock: {
       keywordCount: 50,
       specificKeywords: '',
-      mediaType: 'image',
       isEditorial: false,
-      editorialPrefix: '',
-      autoSaveDraft: true,
-      isAiGenerated: false
+      editorialPrefix: ''
     },
-    dreamstime: {
+    freepik: {
       keywordCount: 50,
       specificKeywords: '',
-      mode: 'save_draft',
-      autoSaveDraft: true,
-      isAiGenerated: false
+      isAiGenerated: false,
+      aiModel: 'Adobe Firefly',
+      customAiModel: ''
     },
     vecteezy: {
       keywordCount: 50,
       specificKeywords: '',
       licenseType: 'free',
-      aiToolName: '',
-      autoSaveDraft: true,
-      isAiGenerated: false
+      isAiGenerated: false,
+      aiToolName: ''
     },
-    freepik: {
-      keywordCount: 50,
+    dreamstime: {
+      keywordCount: 70,
       specificKeywords: '',
-      aiModel: 'Adobe Firefly',
-      autoSaveDraft: true,
+      mode: 'save_draft',
+      isEditorial: false,
       isAiGenerated: false
     },
     depositphotos: {
       keywordCount: 50,
       specificKeywords: '',
       isEditorial: false,
-      countryCode: '',
-      cityName: '',
-      autoSaveDraft: true,
-      isAiGenerated: false
+      countryCode: ''
     },
     miricanvas: {
-      keywordCount: 30,
+      keywordCount: 25,
       specificKeywords: '',
-      contentType: 'BITMAP',
       contentTier: 'PREMIUM',
-      autoSaveDraft: true,
       isAiGenerated: false
     }
   },
@@ -105,7 +95,7 @@ export const DEFAULT_CONFIG = {
     enableOverlayOnLoad: true,
     autoSanitizeKeywords: true
   },
-  _schemaVersion: 2
+  _schemaVersion: 3
 };
 
 export class StorageService {
@@ -138,15 +128,63 @@ export class StorageService {
    */
   static _processLoadedConfig(rawData) {
     let merged = StorageService._deepMerge(DEFAULT_CONFIG, rawData);
+    const loadedSchema = Number(rawData._schemaVersion) || 1;
 
-    // If loaded config has old schema or legacy pre-populated models, reset model arrays
-    if (merged._schemaVersion !== DEFAULT_CONFIG._schemaVersion) {
+    // Schema < 2: reset legacy pre-populated models
+    if (loadedSchema < 2) {
       if (merged.providers) {
         Object.keys(merged.providers).forEach(provKey => {
           merged.providers[provKey].models = [];
           merged.providers[provKey].selectedModel = '';
         });
       }
+    }
+
+    // Schema < 3: clean legacy platform settings and clamp keyword counts
+    if (loadedSchema < 3) {
+      const obsoleteKeys = ['autoSaveDraft', 'mediaType', 'contentType', 'cityName'];
+      const limits = {
+        adobestock: { min: 8, max: 49 },
+        dreamstime: { min: 8, max: 70 },
+        miricanvas: { min: 8, max: 25 },
+        shutterstock: { min: 8, max: 50 },
+        freepik: { min: 8, max: 50 },
+        vecteezy: { min: 8, max: 50 },
+        depositphotos: { min: 8, max: 50 }
+      };
+
+      if (merged.platformSettings) {
+        Object.keys(merged.platformSettings).forEach(platKey => {
+          const plat = merged.platformSettings[platKey];
+          if (plat && typeof plat === 'object') {
+            // Purge deleted keys
+            obsoleteKeys.forEach(obKey => {
+              delete plat[obKey];
+            });
+
+            // Clamp existing keywordCount to new limits
+            const limit = limits[platKey] || { min: 8, max: 50 };
+            const currentVal = Number(plat.keywordCount) || limit.max;
+            plat.keywordCount = Math.max(limit.min, Math.min(limit.max, currentVal));
+          }
+        });
+      }
+    }
+
+    // Always ensure obsolete keys are stripped from platformSettings
+    if (merged.platformSettings) {
+      const obsoleteKeys = ['autoSaveDraft', 'mediaType', 'contentType', 'cityName'];
+      Object.keys(merged.platformSettings).forEach(platKey => {
+        const plat = merged.platformSettings[platKey];
+        if (plat && typeof plat === 'object') {
+          obsoleteKeys.forEach(obKey => {
+            delete plat[obKey];
+          });
+        }
+      });
+    }
+
+    if (merged._schemaVersion !== DEFAULT_CONFIG._schemaVersion) {
       merged._schemaVersion = DEFAULT_CONFIG._schemaVersion;
       // Persist migrated clean config
       StorageService.saveConfig(merged);

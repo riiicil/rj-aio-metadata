@@ -166,65 +166,8 @@
           <span id="platformSettingsHeaderTitle">Metadata Settings</span>
         </div>
 
-        <!-- Universal: Keyword Count (Custom Stepper, min 8) -->
-        <div class="rj-field-group">
-          <label class="rj-field-label" for="keywordCountInput">
-            <span>Target Keyword Count</span>
-            <span class="rj-field-hint" id="keywordCountLimitHint">Min 8, Max 50</span>
-          </label>
-          <div class="rj-stepper-control">
-            <button type="button" class="rj-stepper-btn" id="btnDecKeywordCount" title="Decrease keyword count">
-              <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-            </button>
-            <input type="number" id="keywordCountInput" class="rj-input rj-stepper-input" min="8" max="50" value="50">
-            <button type="button" class="rj-stepper-btn" id="btnIncKeywordCount" title="Increase keyword count">
-              <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Universal: Add Specific Keywords (Prepend & Prioritize) -->
-        <div class="rj-field-group">
-          <label class="rj-field-label" for="specificKeywordsInput">
-            <span>Add Specific Keywords (Mandatory)</span>
-            <span class="rj-field-hint">Placed at index 0</span>
-          </label>
-          <input type="text" id="specificKeywordsInput" class="rj-input" placeholder="e.g. train, station, transit (comma-separated)">
-        </div>
-
-        <!-- Universal: Auto-Save Draft Toggle -->
-        <div class="rj-switch-row">
-          <div class="rj-switch-info">
-            <span class="rj-switch-title">Auto-Save Draft</span>
-            <span class="rj-switch-desc">Save metadata after injecting into form</span>
-          </div>
-          <label class="rj-switch">
-            <input type="checkbox" id="autoSaveDraftToggle" checked>
-            <span class="rj-slider"></span>
-          </label>
-        </div>
-
-        <!-- Universal: Generative AI Declaration Toggle -->
-        <div class="rj-switch-row">
-          <div class="rj-switch-info">
-            <span class="rj-switch-title">AI / Generative Declaration</span>
-            <span class="rj-switch-desc">Declare asset created with AI tool</span>
-          </div>
-          <label class="rj-switch">
-            <input type="checkbox" id="isAiGeneratedToggle">
-            <span class="rj-slider"></span>
-          </label>
-        </div>
-
-        <!-- Dynamic Platform-Specific Form Fields Container -->
-        <div id="platformSpecificContainer" style="margin-top: 10px; border-top: 1px solid var(--rj-border-hairline); padding-top: 10px;">
-          <!-- Dynamically populated based on active platform -->
-        </div>
+        <!-- Fully Dynamic Form Container (Zero hardcoded fields, no hairline divider) -->
+        <div id="platformDynamicForm"></div>
       </section>
     </main>
 

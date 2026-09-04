@@ -8,33 +8,32 @@
 
 - **Current Milestone**: Phase 1 Complete (Manifest V3 Foundation, Storage Service & Platform-Adaptive Popup UI)
 - **Active Branch**: `task/popup-storage`
-- **Latest Commit**: `85e1125` `fix(ui): add smart dropup bounds detection and refine legible disabled field contrast`
-- **Working Tree**: Clean working tree (ready for merge)
-- **Build / Test State**: Verified healthy (syntax validated, unit tests passing, manifest valid)
+- **Latest Commit**: `feat(popup): implement modular platform dynamic form renderer and clean schema`
+- **Working Tree**: Clean working tree (local branch, awaiting user merge approval)
+- **Build / Test State**: Verified healthy (syntax validated, schema 3 migration tests passing, zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 1 scope is **100% complete and thoroughly verified**. The extension features a comprehensive multi-provider settings engine, API key file importer with multi-key round-robin distribution, dynamic `/v1/models` live fetching with Gemini query authentication, real-time active tab platform detection, platform-adaptive dynamic forms across all 7 supported microstock platforms, custom number stepper controls, and zero-dependency floating custom dropdowns (`CustomSelect`) strictly adhering to the Raycast Dark Precision design system.
+Card 3 (*"Platform Settings"*) in the Popup UI has been completely refactored from a semi-static HTML structure into a **100% Modular Platform-Dynamic Form Renderer**. Redundant controls (`autoSaveDraft`, `mediaType`, `contentType`, `cityName`) were removed from configuration and DOM. Platform-specific keyword limits are strictly enforced (Adobe Stock 49, Dreamstime 70, MiriCanvas 25, others 50). Full conditional show/hide behavior is implemented for Editorial caption prefix (Shutterstock), AI models and custom generator inputs (Freepik, Vecteezy), and Editorial country location (Depositphotos).
 
-The user has reviewed and approved the Phase 1 UI. We are ready to merge `task/popup-storage` into dev and kick off **Phase 2: In-Page Draggable Floating Overlay HUD**.
+Depositphotos now supports all 237 ISO countries via `src/popup/depositphotos_countries.js` integrated into `CustomSelect`. In-memory state preservation (`collectActiveFormValues()`) ensures switching between platforms in the dropdown never discards unsaved inputs. Storage schema version was cleanly bumped to `3` with automated migration in `StorageService._processLoadedConfig()` that purges legacy keys, clamps keyword counts, and preserves all user credentials and custom models.
 
 ---
 
 ## 3. Recommended Next Steps for Incoming Agent
 
-1. **Step 1 (Merge Phase 1 into Dev)**:
+1. **Step 1 (User Review & Browser Verification)**:
+   - Load unpacked `src/` in Chromium browser (`chrome://extensions/`).
+   - Open popup and verify dynamic form rendering, stepper bounds, conditional fields, and Depositphotos 237 countries dropdown.
+2. **Step 2 (Merge Phase 1 into Dev upon User Instruction)**:
    - Verify working tree is clean.
    - Switch to `dev`: `git checkout dev`.
    - Merge with non-fast-forward: `git merge --no-ff task/popup-storage -m "merge 'task/popup-storage' into dev"`.
-2. **Step 2 (Create Phase 2 Feature Branch)**:
+3. **Step 3 (Kick off Phase 2: In-Page Draggable Overlay HUD)**:
    - Branch off `dev`: `git checkout -b task/draggable-overlay-ui`.
-3. **Step 3 (Implement In-Page Draggable Overlay HUD)**:
-   - Create `src/overlay/overlay.html`, `overlay.css`, `overlay.js`.
-   - Implement draggable floating HUD injected via `src/content/content_main.js` into active microstock contributor tabs.
-   - Wire overlay activation toggle to the popup's "Open HUD" button (`TOGGLE_OVERLAY_HUD`).
-   - Ensure all controls in the overlay use the Raycast Dark Precision design system with zero native emojis.
+   - Implement `src/overlay/overlay.html`, `overlay.css`, `overlay.js` injected via `src/content/content_main.js`.
 
 ---
 
@@ -84,7 +83,8 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| 11 | 2026-09-04 | `task/popup-storage` | `85e1125` | Smart dropup bounds detection, elevated stacking context, legible disabled field styling | Merge to `dev`, start Phase 2 |
+| 12 | 2026-09-05 | `task/popup-storage` | `pending` | Modular dynamic form renderer, 237 Depositphotos countries catalog, schema version 3 migration | User review of Phase 1 popup, merge to dev |
+| 11 | 2026-09-04 | `task/popup-storage` | `a0c9ed9` | Smart dropup bounds detection, elevated stacking context, legible disabled field styling | Modular platform dynamic forms |
 | 10 | 2026-09-04 | `task/popup-storage` | `986db5e` | Formalized DOCS_STYLE.md, restructured HANDOFF and agent logs | Finalize Phase 1 UI polish |
 | 09 | 2026-09-02 | `task/popup-storage` | `8246c07` | Custom dropdown enhancer, stepper control, flexbox truncation | Finalize docs & user review |
 | 08 | 2026-09-02 | `task/popup-storage` | `d80ad1a` | Fixed Gemini ?key= auth and multi-key single-line comma formatting | Custom select UX polish |

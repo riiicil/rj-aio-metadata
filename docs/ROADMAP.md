@@ -35,7 +35,7 @@ gantt
 
 ---
 
-### Phase 1: Manifest V3 Scaffold, Storage Service & Popup Settings UI `[COMPLETED]`
+### Phase 1: Manifest V3 Scaffold, Storage Service & Popup Settings UI `[IN_PROGRESS]`
 - [x] Implement `src/manifest.json` with permissions (`storage`, `activeTab`, `scripting`) and icons (`src/icons/`).
 - [x] Implement `src/services/StorageService.js` for API keys, custom `baseUrl`, model presets, keyword prioritization, and `.txt` file reader.
 - [x] Implement `src/background/service_worker.js` with dynamic model fetcher (`/v1/models`) and active tab routing.

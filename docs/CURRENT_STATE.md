@@ -1,7 +1,7 @@
 # Current Project State — RJ AIO Metadata Extension
 
-*Last Updated: 2026-09-04*  
-*Active Branch: `task/popup-storage`*  
+*Last Updated: 2026-09-05*<br>
+*Active Branch: `task/popup-storage`*<br>
 *Current Milestone: Phase 1 (Manifest V3 Foundation, Storage Service & Platform-Adaptive Popup UI)*
 
 ---
@@ -9,7 +9,7 @@
 ## 1. Current Phase Progress
 
 - **Phase 0 — Governance & Research**: [COMPLETE] (Repository governance, design system, reference analyses)
-- **Phase 1 — Storage & Popup UI**: [IN_PROGRESS] (Storage engine, background worker, platform-adaptive popup UI)
+- **Phase 1 — Storage & Popup UI**: [IN_PROGRESS] (Storage engine, background worker, modular platform-dynamic popup UI)
 - **Phase 2 — In-Page Draggable Overlay HUD**: [PLANNED] (Next milestone)
 - **Phase 3 — Universal Vision Service**: [PLANNED] (OpenAI-compatible client & prompts)
 - **Phase 4 — Platform Adapters**: [PLANNED] (DOM injectors for 7 platforms)
@@ -61,18 +61,20 @@
   - `docs/HANDOFF.md` — Operational continuity guide, gotchas, and recent session log.
   - `docs/ROADMAP.md` — Phase execution roadmap and milestone checklists.
   - `docs/agent-logs/2026-09-02.md` — Session Entries 1 through 9 (newest on top).
-  - `docs/agent-logs/2026-09-04.md` — Session Entry 1 (Documentation refactor).
+  - `docs/agent-logs/2026-09-04.md` — Session Entries 1 and 2 (Docs and UI bounds detection).
+  - `docs/agent-logs/2026-09-05.md` — Session Entry 1 (Modular dynamic form renderer & clean schema).
   - `docs/references/` — 8 technical reference analyses for Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas, and Vision APIs.
 - **Source Code (`src/`):**
   - `src/manifest.json` — Chromium Manifest V3 configuration, permissions, icons, action, service worker.
   - `src/icons/` — Extension icons (`icon16.png`, `icon48.png`, `icon128.png`).
-  - `src/services/StorageService.js` — Storage engine with multi-provider config, schema version migration, multi-key round-robin, and keyword priority.
+  - `src/services/StorageService.js` — Storage engine with multi-provider config, schema version 3 migration, multi-key round-robin, and keyword priority.
   - `src/background/service_worker.js` — Dynamic `/v1/models` fetcher with Gemini query auth, active tab evaluator, platform navigator, overlay relay.
   - `src/styles/components.css` — Raycast Dark Precision form components, interactive states, custom stepper control, floating custom select styles.
-  - `src/popup/popup.html` — Platform-adaptive toolbar popup interface adhering to `DESIGN.md`.
+  - `src/popup/popup.html` — Platform-adaptive toolbar popup interface with modular dynamic platform settings container adhering to `DESIGN.md`.
   - `src/popup/popup.css` — 380px dark canvas popup styling with sticky header/footer.
-  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, and platform-adaptive forms.
+  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, and 100% modular platform-dynamic form rendering.
   - `src/popup/custom_select.js` — Zero-dependency progressive dropdown enhancer replacing native OS selects.
+  - `src/popup/depositphotos_countries.js` — Complete 237 ISO countries catalog extracted for Depositphotos editorial location settings.
   - `src/content/content_main.js` — Content script stub ready for overlay injection.
 
 ---
@@ -90,7 +92,8 @@
 ## 6. Testing & Build Verification Status
 
 - Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `styles/`).
-- Storage schema version migration and model reset tested and verified in Node.js.
+- Storage schema version 3 migration tested and verified in Node.js (obsolete keys purged, platform keyword limits clamped, legacy models handled).
+- Depositphotos 237 country catalog and custom select progressive enhancement verified.
 - Multi-API key round-robin distribution tested and verified across multi-line inputs.
 - Google Gemini query param (`?key=`) and header (`x-goog-api-key`) authentication verified.
 - CustomSelect progressive enhancement tested with simulated DOM environments without reference errors.

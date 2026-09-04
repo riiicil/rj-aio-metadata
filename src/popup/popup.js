@@ -1,15 +1,28 @@
 /**
  * RJ AIO Metadata Extension — Popup Controller
  * Manages multi-provider settings, multi-key round-robin support, dynamic model fetching,
- * active tab platform matching, and platform-adaptive dynamic form rendering.
+ * active tab platform matching, and 100% modular platform-dynamic form rendering.
  */
 
 import { StorageService, DEFAULT_CONFIG } from '../services/StorageService.js';
 import { CustomSelect } from './custom_select.js';
+import { DEPOSITPHOTOS_COUNTRIES } from './depositphotos_countries.js';
 
 let currentConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 let activeTabInfo = null;
+let currentActivePlatformId = null;
 let isAutomationRunning = false;
+
+// Platform Keyword Count Constraints & Hints
+const PLATFORM_LIMITS = {
+  adobestock: { min: 8, max: 49, hint: 'Min 8, Max 49 (Adobe limit)' },
+  dreamstime: { min: 8, max: 70, hint: 'Min 8, Max 70 (Dreamstime limit)' },
+  miricanvas: { min: 8, max: 25, hint: 'Min 8, Max 25 (MiriCanvas limit)' },
+  shutterstock: { min: 8, max: 50, hint: 'Min 8, Max 50' },
+  freepik: { min: 8, max: 50, hint: 'Min 8, Max 50' },
+  vecteezy: { min: 8, max: 50, hint: 'Min 8, Max 50' },
+  depositphotos: { min: 8, max: 50, hint: 'Min 8, Max 50' }
+};
 
 // DOM Elements
 const platformSelect = document.getElementById('platformSelect');
@@ -34,14 +47,7 @@ const fetchIcon = document.getElementById('fetchIcon');
 const modelCountLabel = document.getElementById('modelCountLabel');
 
 const platformSettingsHeaderTitle = document.getElementById('platformSettingsHeaderTitle');
-const keywordCountInput = document.getElementById('keywordCountInput');
-const btnDecKeywordCount = document.getElementById('btnDecKeywordCount');
-const btnIncKeywordCount = document.getElementById('btnIncKeywordCount');
-const keywordCountLimitHint = document.getElementById('keywordCountLimitHint');
-const specificKeywordsInput = document.getElementById('specificKeywordsInput');
-const autoSaveDraftToggle = document.getElementById('autoSaveDraftToggle');
-const isAiGeneratedToggle = document.getElementById('isAiGeneratedToggle');
-const platformSpecificContainer = document.getElementById('platformSpecificContainer');
+const platformDynamicForm = document.getElementById('platformDynamicForm');
 
 const btnSaveSettings = document.getElementById('btnSaveSettings');
 const btnToggleAutomation = document.getElementById('btnToggleAutomation');
@@ -49,6 +55,19 @@ const automationIcon = document.getElementById('automationIcon');
 const automationBtnText = document.getElementById('automationBtnText');
 const toastNotification = document.getElementById('toastNotification');
 const toastMessage = document.getElementById('toastMessage');
+
+/**
+ * HTML String Sanitizer for Input Values
+ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
 
 /**
  * Toast Notification Utility
@@ -168,151 +187,428 @@ function renderProviderFields(providerId) {
 }
 
 /**
- * Renders platform-specific dynamic form fields.
+ * Collects active form inputs from the dynamic container and persists into in-memory state.
+ * @param {string} platformId
  */
-function renderPlatformSpecificFields(platformId) {
-  const settings = currentConfig.platformSettings[platformId] || {};
-  platformSettingsHeaderTitle.textContent = `${platformSelect.options[platformSelect.selectedIndex].text} Settings`;
+function collectActiveFormValues(platformId) {
+  if (!platformId || !platformDynamicForm) return;
+  if (!currentConfig.platformSettings[platformId]) {
+    currentConfig.platformSettings[platformId] = {};
+  }
+  const settings = currentConfig.platformSettings[platformId];
+  const limits = PLATFORM_LIMITS[platformId] || { min: 8, max: 50 };
 
-  // Keyword count limits
-  if (platformId === 'adobestock') {
-    keywordCountInput.max = 49;
-    keywordCountLimitHint.textContent = 'Min 8, Max 49 (Adobe limit)';
-    if (Number(keywordCountInput.value) > 49) keywordCountInput.value = 49;
-  } else if (platformId === 'miricanvas') {
-    keywordCountInput.max = 30;
-    keywordCountLimitHint.textContent = 'Min 8, Max 30 (MiriCanvas limit)';
-    if (Number(keywordCountInput.value) > 30) keywordCountInput.value = 30;
-  } else {
-    keywordCountInput.max = 50;
-    keywordCountLimitHint.textContent = 'Min 8, Max 50';
+  // 1. Universal Target Keyword Count
+  const countInput = platformDynamicForm.querySelector('#keywordCountInput');
+  if (countInput) {
+    const parsedVal = Number(countInput.value) || limits.max;
+    settings.keywordCount = Math.max(limits.min, Math.min(limits.max, parsedVal));
   }
 
-  keywordCountInput.value = settings.keywordCount || (platformId === 'adobestock' ? 49 : platformId === 'miricanvas' ? 30 : 50);
-  specificKeywordsInput.value = settings.specificKeywords || '';
-  autoSaveDraftToggle.checked = settings.autoSaveDraft !== false;
-  isAiGeneratedToggle.checked = Boolean(settings.isAiGenerated);
+  // 2. Universal Specific Keywords
+  const specificInput = platformDynamicForm.querySelector('#specificKeywordsInput');
+  if (specificInput) {
+    settings.specificKeywords = specificInput.value.trim();
+  }
 
-  // Platform specific HTML inject
-  let html = '';
-
+  // 3. Platform-Specific Controls
   if (platformId === 'adobestock') {
-    html = `
+    const lang = platformDynamicForm.querySelector('#adobestock_language');
+    const ai = platformDynamicForm.querySelector('#adobestock_isAiGenerated');
+    if (lang) settings.language = lang.value;
+    if (ai) settings.isAiGenerated = ai.checked;
+  } else if (platformId === 'shutterstock') {
+    const isEd = platformDynamicForm.querySelector('#shutterstock_isEditorial');
+    const ep = platformDynamicForm.querySelector('#shutterstock_editorialPrefix');
+    if (isEd) settings.isEditorial = isEd.checked;
+    if (ep) settings.editorialPrefix = ep.value.trim();
+  } else if (platformId === 'freepik') {
+    const ai = platformDynamicForm.querySelector('#freepik_isAiGenerated');
+    const model = platformDynamicForm.querySelector('#freepik_aiModel');
+    const customModel = platformDynamicForm.querySelector('#freepik_customAiModel');
+    if (ai) settings.isAiGenerated = ai.checked;
+    if (model) settings.aiModel = model.value;
+    if (customModel) settings.customAiModel = customModel.value.trim();
+  } else if (platformId === 'vecteezy') {
+    const lt = platformDynamicForm.querySelector('#vecteezy_licenseType');
+    const ai = platformDynamicForm.querySelector('#vecteezy_isAiGenerated');
+    const tool = platformDynamicForm.querySelector('#vecteezy_aiToolName');
+    if (lt) settings.licenseType = lt.value;
+    if (ai) settings.isAiGenerated = ai.checked;
+    if (tool) settings.aiToolName = tool.value.trim();
+  } else if (platformId === 'dreamstime') {
+    const mode = platformDynamicForm.querySelector('#dreamstime_mode');
+    const isEd = platformDynamicForm.querySelector('#dreamstime_isEditorial');
+    const ai = platformDynamicForm.querySelector('#dreamstime_isAiGenerated');
+    if (mode) settings.mode = mode.value;
+    if (isEd) settings.isEditorial = isEd.checked;
+    if (ai) settings.isAiGenerated = ai.checked;
+  } else if (platformId === 'depositphotos') {
+    const isEd = platformDynamicForm.querySelector('#depositphotos_isEditorial');
+    const cc = platformDynamicForm.querySelector('#depositphotos_countryCode');
+    if (isEd) settings.isEditorial = isEd.checked;
+    if (cc) settings.countryCode = cc.value;
+  } else if (platformId === 'miricanvas') {
+    const tier = platformDynamicForm.querySelector('#miricanvas_contentTier');
+    const ai = platformDynamicForm.querySelector('#miricanvas_isAiGenerated');
+    if (tier) settings.contentTier = tier.value;
+    if (ai) settings.isAiGenerated = ai.checked;
+  }
+}
+
+/**
+ * 100% Modular Platform-Dynamic Form Renderer
+ * Injects platform-adaptive inputs with specific limits, layout order, and conditional visibility.
+ * @param {string} platformId
+ */
+function renderPlatformDynamicForm(platformId) {
+  if (!platformDynamicForm) return;
+
+  const platOption = platformSelect.options[platformSelect.selectedIndex];
+  const platName = platOption ? platOption.text : 'Platform';
+  platformSettingsHeaderTitle.textContent = `${platName} Settings`;
+
+  const settings = currentConfig.platformSettings[platformId] || {};
+  const limits = PLATFORM_LIMITS[platformId] || { min: 8, max: 50 };
+  const currentCount = (typeof settings.keywordCount === 'number') ? settings.keywordCount : limits.max;
+
+  // Universal Controls: Stepper (1) & Specific Keywords (2)
+  let html = `
+    <!-- Target Keyword Count (Stepper) -->
+    <div class="rj-field-group">
+      <label class="rj-field-label" for="keywordCountInput">
+        <span>Target Keyword Count</span>
+        <span class="rj-field-hint" id="keywordCountLimitHint">${limits.hint}</span>
+      </label>
+      <div class="rj-stepper-control">
+        <button type="button" class="rj-stepper-btn" id="btnDecKeywordCount" title="Decrease keyword count">
+          <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+        <input type="number" id="keywordCountInput" class="rj-input rj-stepper-input" min="${limits.min}" max="${limits.max}" value="${currentCount}">
+        <button type="button" class="rj-stepper-btn" id="btnIncKeywordCount" title="Increase keyword count">
+          <svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Add Specific Keywords -->
+    <div class="rj-field-group">
+      <label class="rj-field-label" for="specificKeywordsInput">
+        <span>Add Specific Keywords (Mandatory)</span>
+        <span class="rj-field-hint">Placed at index 0</span>
+      </label>
+      <input type="text" id="specificKeywordsInput" class="rj-input" placeholder="e.g. train, station, transit (comma-separated)" value="${escapeHtml(settings.specificKeywords || '')}">
+    </div>
+  `;
+
+  // Platform-Specific Layout Order & Field Injections
+  if (platformId === 'adobestock') {
+    const lang = settings.language || 'en';
+    html += `
       <div class="rj-field-group">
-        <label class="rj-field-label">Metadata Language</label>
+        <label class="rj-field-label" for="adobestock_language">
+          <span>Metadata Language</span>
+        </label>
         <select id="adobestock_language" class="rj-select">
-          <option value="en" ${settings.language === 'en' ? 'selected' : ''}>English (Recommended)</option>
-          <option value="ja" ${settings.language === 'ja' ? 'selected' : ''}>Japanese (日本語)</option>
-          <option value="de" ${settings.language === 'de' ? 'selected' : ''}>German (Deutsch)</option>
-          <option value="fr" ${settings.language === 'fr' ? 'selected' : ''}>French (Français)</option>
-          <option value="es" ${settings.language === 'es' ? 'selected' : ''}>Spanish (Español)</option>
-          <option value="ko" ${settings.language === 'ko' ? 'selected' : ''}>Korean (한국어)</option>
+          <option value="en" ${lang === 'en' ? 'selected' : ''}>English (Recommended)</option>
+          <option value="ja" ${lang === 'ja' ? 'selected' : ''}>Japanese (日本語)</option>
+          <option value="de" ${lang === 'de' ? 'selected' : ''}>German (Deutsch)</option>
+          <option value="fr" ${lang === 'fr' ? 'selected' : ''}>French (Français)</option>
+          <option value="es" ${lang === 'es' ? 'selected' : ''}>Spanish (Español)</option>
+          <option value="ko" ${lang === 'ko' ? 'selected' : ''}>Korean (한국어)</option>
         </select>
+      </div>
+
+      <div class="rj-switch-row">
+        <div class="rj-switch-info">
+          <span class="rj-switch-title">AI / Generative Declaration</span>
+          <span class="rj-switch-desc">Declare asset created with AI tool</span>
+        </div>
+        <label class="rj-switch">
+          <input type="checkbox" id="adobestock_isAiGenerated" ${settings.isAiGenerated ? 'checked' : ''}>
+          <span class="rj-slider"></span>
+        </label>
       </div>
     `;
   } else if (platformId === 'shutterstock') {
-    html = `
-      <div class="rj-field-group">
-        <label class="rj-field-label">Media Format Category Mapping</label>
-        <select id="shutterstock_mediaType" class="rj-select">
-          <option value="image" ${settings.mediaType === 'image' ? 'selected' : ''}>Image (Photo / Vector — 26 Categories)</option>
-          <option value="video" ${settings.mediaType === 'video' ? 'selected' : ''}>Footage / Video (19 Categories)</option>
-        </select>
+    const isEditorial = Boolean(settings.isEditorial);
+    html += `
+      <div class="rj-switch-row">
+        <div class="rj-switch-info">
+          <span class="rj-switch-title">Editorial Content Asset</span>
+          <span class="rj-switch-desc">Mark asset as documentary editorial</span>
+        </div>
+        <label class="rj-switch">
+          <input type="checkbox" id="shutterstock_isEditorial" ${isEditorial ? 'checked' : ''}>
+          <span class="rj-slider"></span>
+        </label>
       </div>
-      <div class="rj-field-group">
-        <label class="rj-field-label">
+
+      <div id="shutterstock_editorialGroup" class="rj-field-group" style="display: ${isEditorial ? 'block' : 'none'};">
+        <label class="rj-field-label" for="shutterstock_editorialPrefix">
           <span>Editorial Caption Prefix</span>
           <span class="rj-field-hint">e.g. CITY, COUNTRY - DATE:</span>
         </label>
-        <input type="text" id="shutterstock_editorialPrefix" class="rj-input" placeholder="JAKARTA, INDONESIA - SEPTEMBER 2, 2026:" value="${settings.editorialPrefix || ''}">
-      </div>
-    `;
-  } else if (platformId === 'dreamstime') {
-    html = `
-      <div class="rj-field-group">
-        <label class="rj-field-label">Submission Workflow Mode</label>
-        <select id="dreamstime_mode" class="rj-select">
-          <option value="save_draft" ${settings.mode === 'save_draft' ? 'selected' : ''}>Mode A: Save Draft (With Loop Protection)</option>
-          <option value="submit_direct" ${settings.mode === 'submit_direct' ? 'selected' : ''}>Mode B: Submit Immediately</option>
-        </select>
-      </div>
-    `;
-  } else if (platformId === 'vecteezy') {
-    html = `
-      <div class="rj-field-group">
-        <label class="rj-field-label">License Type</label>
-        <select id="vecteezy_licenseType" class="rj-select">
-          <option value="free" ${settings.licenseType === 'free' ? 'selected' : ''}>Free License</option>
-          <option value="pro" ${settings.licenseType === 'pro' ? 'selected' : ''}>Pro (Subscriber Only)</option>
-          <option value="editorial" ${settings.licenseType === 'editorial' ? 'selected' : ''}>Editorial</option>
-        </select>
-      </div>
-      <div class="rj-field-group">
-        <label class="rj-field-label">AI Tool / Generator Name</label>
-        <input type="text" id="vecteezy_aiToolName" class="rj-input" placeholder="e.g. Midjourney v6, Flux.1" value="${settings.aiToolName || ''}">
+        <input type="text" id="shutterstock_editorialPrefix" class="rj-input" placeholder="JAKARTA, INDONESIA - SEPTEMBER 2, 2026:" value="${escapeHtml(settings.editorialPrefix || '')}">
       </div>
     `;
   } else if (platformId === 'freepik') {
-    html = `
-      <div class="rj-field-group">
-        <label class="rj-field-label">AI Base Model</label>
+    const isAi = Boolean(settings.isAiGenerated);
+    const aiModel = settings.aiModel || 'Adobe Firefly';
+    const showCustom = isAi && (aiModel === 'Custom');
+    html += `
+      <div class="rj-switch-row">
+        <div class="rj-switch-info">
+          <span class="rj-switch-title">AI / Generative Declaration</span>
+          <span class="rj-switch-desc">Declare asset created with AI tool</span>
+        </div>
+        <label class="rj-switch">
+          <input type="checkbox" id="freepik_isAiGenerated" ${isAi ? 'checked' : ''}>
+          <span class="rj-slider"></span>
+        </label>
+      </div>
+
+      <div id="freepik_aiModelGroup" class="rj-field-group" style="display: ${isAi ? 'block' : 'none'};">
+        <label class="rj-field-label" for="freepik_aiModel">
+          <span>AI Base Model</span>
+        </label>
         <select id="freepik_aiModel" class="rj-select">
-          <option value="Adobe Firefly" ${settings.aiModel === 'Adobe Firefly' ? 'selected' : ''}>Adobe Firefly</option>
-          <option value="Flux 1.0 Fast" ${settings.aiModel === 'Flux 1.0 Fast' ? 'selected' : ''}>Flux 1.0 Fast</option>
-          <option value="Midjourney" ${settings.aiModel === 'Midjourney' ? 'selected' : ''}>Midjourney</option>
-          <option value="Stable Diffusion" ${settings.aiModel === 'Stable Diffusion' ? 'selected' : ''}>Stable Diffusion</option>
-          <option value="DALL-E 3" ${settings.aiModel === 'DALL-E 3' ? 'selected' : ''}>DALL-E 3</option>
-          <option value="Ideogram" ${settings.aiModel === 'Ideogram' ? 'selected' : ''}>Ideogram</option>
-          <option value="Custom" ${settings.aiModel === 'Custom' ? 'selected' : ''}>Other / Custom</option>
+          <option value="Adobe Firefly" ${aiModel === 'Adobe Firefly' ? 'selected' : ''}>Adobe Firefly</option>
+          <option value="Flux 1.0 Fast" ${aiModel === 'Flux 1.0 Fast' ? 'selected' : ''}>Flux 1.0 Fast</option>
+          <option value="Midjourney" ${aiModel === 'Midjourney' ? 'selected' : ''}>Midjourney</option>
+          <option value="Stable Diffusion" ${aiModel === 'Stable Diffusion' ? 'selected' : ''}>Stable Diffusion</option>
+          <option value="DALL-E 3" ${aiModel === 'DALL-E 3' ? 'selected' : ''}>DALL-E 3</option>
+          <option value="Ideogram" ${aiModel === 'Ideogram' ? 'selected' : ''}>Ideogram</option>
+          <option value="Custom" ${aiModel === 'Custom' ? 'selected' : ''}>Other / Custom</option>
         </select>
+      </div>
+
+      <div id="freepik_customAiModelGroup" class="rj-field-group" style="display: ${showCustom ? 'block' : 'none'};">
+        <input type="text" id="freepik_customAiModel" class="rj-input" placeholder="Enter custom AI model name..." value="${escapeHtml(settings.customAiModel || '')}">
+      </div>
+    `;
+  } else if (platformId === 'vecteezy') {
+    const license = settings.licenseType || 'free';
+    const isAi = Boolean(settings.isAiGenerated);
+    html += `
+      <div class="rj-field-group">
+        <label class="rj-field-label" for="vecteezy_licenseType">
+          <span>License Type</span>
+        </label>
+        <select id="vecteezy_licenseType" class="rj-select">
+          <option value="free" ${license === 'free' ? 'selected' : ''}>Free License</option>
+          <option value="pro" ${license === 'pro' ? 'selected' : ''}>Pro (Subscriber Only)</option>
+          <option value="editorial" ${license === 'editorial' ? 'selected' : ''}>Editorial</option>
+        </select>
+      </div>
+
+      <div class="rj-switch-row">
+        <div class="rj-switch-info">
+          <span class="rj-switch-title">AI / Generative Declaration</span>
+          <span class="rj-switch-desc">Declare asset created with AI tool</span>
+        </div>
+        <label class="rj-switch">
+          <input type="checkbox" id="vecteezy_isAiGenerated" ${isAi ? 'checked' : ''}>
+          <span class="rj-slider"></span>
+        </label>
+      </div>
+
+      <div id="vecteezy_aiToolGroup" class="rj-field-group" style="display: ${isAi ? 'block' : 'none'};">
+        <label class="rj-field-label" for="vecteezy_aiToolName">
+          <span>AI Tool / Generator Name</span>
+        </label>
+        <input type="text" id="vecteezy_aiToolName" class="rj-input" placeholder="e.g. Midjourney v6, Flux.1" value="${escapeHtml(settings.aiToolName || '')}">
+      </div>
+    `;
+  } else if (platformId === 'dreamstime') {
+    const mode = settings.mode || 'save_draft';
+    const isEditorial = Boolean(settings.isEditorial);
+    const isAi = Boolean(settings.isAiGenerated);
+    html += `
+      <div class="rj-field-group">
+        <label class="rj-field-label" for="dreamstime_mode">
+          <span>Submission Workflow Mode</span>
+        </label>
+        <select id="dreamstime_mode" class="rj-select">
+          <option value="save_draft" ${mode === 'save_draft' ? 'selected' : ''}>Mode A: Only Save Draft</option>
+          <option value="submit_direct" ${mode === 'submit_direct' ? 'selected' : ''}>Mode B: Submit Immediately</option>
+        </select>
+      </div>
+
+      <div class="rj-switch-row">
+        <div class="rj-switch-info">
+          <span class="rj-switch-title">Editorial Content Asset</span>
+          <span class="rj-switch-desc">Mark asset as documentary editorial</span>
+        </div>
+        <label class="rj-switch">
+          <input type="checkbox" id="dreamstime_isEditorial" ${isEditorial ? 'checked' : ''}>
+          <span class="rj-slider"></span>
+        </label>
+      </div>
+
+      <div class="rj-switch-row">
+        <div class="rj-switch-info">
+          <span class="rj-switch-title">AI / Generative Declaration</span>
+          <span class="rj-switch-desc">Declare asset created with AI tool</span>
+        </div>
+        <label class="rj-switch">
+          <input type="checkbox" id="dreamstime_isAiGenerated" ${isAi ? 'checked' : ''}>
+          <span class="rj-slider"></span>
+        </label>
       </div>
     `;
   } else if (platformId === 'depositphotos') {
-    html = `
-      <div class="rj-field-group">
-        <label class="rj-field-label">Editorial Location (Country)</label>
-        <select id="depositphotos_countryCode" class="rj-select">
-          <option value="">None (Commercial)</option>
-          <option value="ID" ${settings.countryCode === 'ID' ? 'selected' : ''}>ID - Indonesia</option>
-          <option value="US" ${settings.countryCode === 'US' ? 'selected' : ''}>US - United States</option>
-          <option value="GB" ${settings.countryCode === 'GB' ? 'selected' : ''}>GB - United Kingdom</option>
-          <option value="JP" ${settings.countryCode === 'JP' ? 'selected' : ''}>JP - Japan</option>
-          <option value="DE" ${settings.countryCode === 'DE' ? 'selected' : ''}>DE - Germany</option>
-          <option value="FR" ${settings.countryCode === 'FR' ? 'selected' : ''}>FR - France</option>
-          <option value="CA" ${settings.countryCode === 'CA' ? 'selected' : ''}>CA - Canada</option>
-          <option value="AU" ${settings.countryCode === 'AU' ? 'selected' : ''}>AU - Australia</option>
-        </select>
+    const isEditorial = Boolean(settings.isEditorial);
+    const countryCode = settings.countryCode || '';
+    html += `
+      <div class="rj-switch-row">
+        <div class="rj-switch-info">
+          <span class="rj-switch-title">Editorial Content Asset</span>
+          <span class="rj-switch-desc">Flag content as non-commercial editorial</span>
+        </div>
+        <label class="rj-switch">
+          <input type="checkbox" id="depositphotos_isEditorial" ${isEditorial ? 'checked' : ''}>
+          <span class="rj-slider"></span>
+        </label>
       </div>
-      <div class="rj-field-group">
-        <label class="rj-field-label">City Name (Optional)</label>
-        <input type="text" id="depositphotos_cityName" class="rj-input" placeholder="e.g. Jakarta, New York" value="${settings.cityName || ''}">
+
+      <div id="depositphotos_countryGroup" class="rj-field-group" style="display: ${isEditorial ? 'block' : 'none'};">
+        <label class="rj-field-label" for="depositphotos_countryCode">
+          <span>Editorial Location (Country)</span>
+        </label>
+        <select id="depositphotos_countryCode" class="rj-select">
+          ${DEPOSITPHOTOS_COUNTRIES.map(c => `
+            <option value="${c.code}" ${countryCode === c.code ? 'selected' : ''}>${c.code ? `${c.code} - ${c.name}` : c.name}</option>
+          `).join('')}
+        </select>
       </div>
     `;
   } else if (platformId === 'miricanvas') {
-    html = `
+    const tier = settings.contentTier || 'PREMIUM';
+    const isAi = Boolean(settings.isAiGenerated);
+    html += `
       <div class="rj-field-group">
-        <label class="rj-field-label">Content Format Type</label>
-        <select id="miricanvas_contentType" class="rj-select">
-          <option value="BITMAP" ${settings.contentType === 'BITMAP' ? 'selected' : ''}>PNG element (BITMAP)</option>
-          <option value="PICTURE" ${settings.contentType === 'PICTURE' ? 'selected' : ''}>Photo (PICTURE)</option>
-          <option value="REMOVE_BACKGROUND_PICTURE" ${settings.contentType === 'REMOVE_BACKGROUND_PICTURE' ? 'selected' : ''}>Photo Cut-out (Isolated)</option>
-          <option value="BACKGROUND_PICTURE" ${settings.contentType === 'BACKGROUND_PICTURE' ? 'selected' : ''}>Background (Wallpaper)</option>
-          <option value="VECTOR" ${settings.contentType === 'VECTOR' ? 'selected' : ''}>SVG element (VECTOR)</option>
-          <option value="GIF" ${settings.contentType === 'GIF' ? 'selected' : ''}>GIF Animation</option>
+        <label class="rj-field-label" for="miricanvas_contentTier">
+          <span>Pricing Tier</span>
+        </label>
+        <select id="miricanvas_contentTier" class="rj-select">
+          <option value="PREMIUM" ${tier === 'PREMIUM' ? 'selected' : ''}>Premium (Paid / Pro)</option>
+          <option value="STANDARD" ${tier === 'STANDARD' ? 'selected' : ''}>Standard (Free)</option>
         </select>
       </div>
-      <div class="rj-field-group">
-        <label class="rj-field-label">Pricing Tier</label>
-        <select id="miricanvas_contentTier" class="rj-select">
-          <option value="PREMIUM" ${settings.contentTier === 'PREMIUM' ? 'selected' : ''}>Premium (Paid / Pro)</option>
-          <option value="STANDARD" ${settings.contentTier === 'STANDARD' ? 'selected' : ''}>Standard (Free)</option>
-        </select>
+
+      <div class="rj-switch-row">
+        <div class="rj-switch-info">
+          <span class="rj-switch-title">AI / Generative Declaration</span>
+          <span class="rj-switch-desc">Declare asset created with AI tool</span>
+        </div>
+        <label class="rj-switch">
+          <input type="checkbox" id="miricanvas_isAiGenerated" ${isAi ? 'checked' : ''}>
+          <span class="rj-slider"></span>
+        </label>
       </div>
     `;
   }
 
-  platformSpecificContainer.innerHTML = html;
-  CustomSelect.initAll(platformSpecificContainer);
+  // Inject into dynamic container
+  platformDynamicForm.innerHTML = html;
+
+  // Bind Custom Stepper Controls
+  const btnDec = platformDynamicForm.querySelector('#btnDecKeywordCount');
+  const btnInc = platformDynamicForm.querySelector('#btnIncKeywordCount');
+  const countInput = platformDynamicForm.querySelector('#keywordCountInput');
+
+  if (btnDec && countInput) {
+    btnDec.addEventListener('click', () => {
+      let val = Number(countInput.value) || limits.min;
+      if (val > limits.min) {
+        countInput.value = val - 1;
+      }
+    });
+  }
+
+  if (btnInc && countInput) {
+    btnInc.addEventListener('click', () => {
+      let val = Number(countInput.value) || limits.max;
+      if (val < limits.max) {
+        countInput.value = val + 1;
+      }
+    });
+  }
+
+  if (countInput) {
+    countInput.addEventListener('change', () => {
+      let val = Number(countInput.value) || limits.min;
+      if (val < limits.min) val = limits.min;
+      if (val > limits.max) val = limits.max;
+      countInput.value = val;
+    });
+  }
+
+  // Bind Conditional Show/Hide Controls
+  if (platformId === 'shutterstock') {
+    const isEd = platformDynamicForm.querySelector('#shutterstock_isEditorial');
+    const group = platformDynamicForm.querySelector('#shutterstock_editorialGroup');
+    if (isEd && group) {
+      isEd.addEventListener('change', () => {
+        group.style.display = isEd.checked ? 'block' : 'none';
+      });
+    }
+  } else if (platformId === 'freepik') {
+    const aiToggle = platformDynamicForm.querySelector('#freepik_isAiGenerated');
+    const modelGroup = platformDynamicForm.querySelector('#freepik_aiModelGroup');
+    const modelSelect = platformDynamicForm.querySelector('#freepik_aiModel');
+    const customGroup = platformDynamicForm.querySelector('#freepik_customAiModelGroup');
+
+    if (aiToggle && modelGroup && modelSelect && customGroup) {
+      aiToggle.addEventListener('change', () => {
+        const checked = aiToggle.checked;
+        modelGroup.style.display = checked ? 'block' : 'none';
+        if (checked) {
+          CustomSelect.refresh(modelSelect);
+          customGroup.style.display = (modelSelect.value === 'Custom') ? 'block' : 'none';
+        } else {
+          customGroup.style.display = 'none';
+        }
+      });
+
+      modelSelect.addEventListener('change', () => {
+        if (aiToggle.checked) {
+          customGroup.style.display = (modelSelect.value === 'Custom') ? 'block' : 'none';
+        }
+      });
+    }
+  } else if (platformId === 'vecteezy') {
+    const aiToggle = platformDynamicForm.querySelector('#vecteezy_isAiGenerated');
+    const toolGroup = platformDynamicForm.querySelector('#vecteezy_aiToolGroup');
+    if (aiToggle && toolGroup) {
+      aiToggle.addEventListener('change', () => {
+        toolGroup.style.display = aiToggle.checked ? 'block' : 'none';
+      });
+    }
+  } else if (platformId === 'depositphotos') {
+    const isEd = platformDynamicForm.querySelector('#depositphotos_isEditorial');
+    const countryGroup = platformDynamicForm.querySelector('#depositphotos_countryGroup');
+    const countrySelect = platformDynamicForm.querySelector('#depositphotos_countryCode');
+
+    if (isEd && countryGroup && countrySelect) {
+      isEd.addEventListener('change', () => {
+        const checked = isEd.checked;
+        countryGroup.style.display = checked ? 'block' : 'none';
+        if (checked) {
+          CustomSelect.refresh(countrySelect);
+        }
+      });
+    }
+  }
+
+  // Initialize Custom Selects for Newly Rendered Elements
+  CustomSelect.initAll(platformDynamicForm);
 }
 
 /**
@@ -334,48 +630,9 @@ async function saveCurrentSettings() {
   currentConfig.providers[activeProvId].apiKey = keys.join(', ');
   currentConfig.providers[activeProvId].selectedModel = modelSelect.value || '';
 
-  // 2. Update Platform settings
+  // 2. Collect current dynamic form values into config
   currentConfig.activePlatform = activePlatId;
-  if (!currentConfig.platformSettings[activePlatId]) {
-    currentConfig.platformSettings[activePlatId] = {};
-  }
-  const platSettings = currentConfig.platformSettings[activePlatId];
-  platSettings.keywordCount = Number(keywordCountInput.value) || 50;
-  platSettings.specificKeywords = specificKeywordsInput.value.trim();
-  platSettings.autoSaveDraft = autoSaveDraftToggle.checked;
-  platSettings.isAiGenerated = isAiGeneratedToggle.checked;
-
-  // Read platform specific form inputs
-  if (activePlatId === 'adobestock') {
-    const lang = document.getElementById('adobestock_language');
-    if (lang) platSettings.language = lang.value;
-  } else if (activePlatId === 'shutterstock') {
-    const mt = document.getElementById('shutterstock_mediaType');
-    const ep = document.getElementById('shutterstock_editorialPrefix');
-    if (mt) platSettings.mediaType = mt.value;
-    if (ep) platSettings.editorialPrefix = ep.value.trim();
-  } else if (activePlatId === 'dreamstime') {
-    const dm = document.getElementById('dreamstime_mode');
-    if (dm) platSettings.mode = dm.value;
-  } else if (activePlatId === 'vecteezy') {
-    const lt = document.getElementById('vecteezy_licenseType');
-    const at = document.getElementById('vecteezy_aiToolName');
-    if (lt) platSettings.licenseType = lt.value;
-    if (at) platSettings.aiToolName = at.value.trim();
-  } else if (activePlatId === 'freepik') {
-    const fm = document.getElementById('freepik_aiModel');
-    if (fm) platSettings.aiModel = fm.value;
-  } else if (activePlatId === 'depositphotos') {
-    const cc = document.getElementById('depositphotos_countryCode');
-    const cn = document.getElementById('depositphotos_cityName');
-    if (cc) platSettings.countryCode = cc.value;
-    if (cn) platSettings.cityName = cn.value.trim();
-  } else if (activePlatId === 'miricanvas') {
-    const ct = document.getElementById('miricanvas_contentType');
-    const tr = document.getElementById('miricanvas_contentTier');
-    if (ct) platSettings.contentType = ct.value;
-    if (tr) platSettings.contentTier = tr.value;
-  }
+  collectActiveFormValues(activePlatId);
 
   // 3. Persist to storage
   await StorageService.saveConfig(currentConfig);
@@ -389,32 +646,43 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 1. Load Stored Config
   currentConfig = await StorageService.getConfig();
 
-  // 2. Query Background for Active Tab Info
+  // 2. Set Initial Platform & Dynamic Form
+  currentActivePlatformId = currentConfig.activePlatform || 'adobestock';
+  platformSelect.value = currentActivePlatformId;
+  renderPlatformDynamicForm(currentActivePlatformId);
+
+  // 3. Query Background for Active Tab Info
   chrome.runtime.sendMessage({ action: 'GET_ACTIVE_TAB_INFO' }, response => {
     activeTabInfo = response;
     // Auto-select platform if active tab matches a known microstock platform
     if (activeTabInfo && activeTabInfo.detectedPlatform) {
-      platformSelect.value = activeTabInfo.detectedPlatform;
-    } else {
-      platformSelect.value = currentConfig.activePlatform || 'adobestock';
+      if (currentActivePlatformId !== activeTabInfo.detectedPlatform) {
+        collectActiveFormValues(currentActivePlatformId);
+        currentActivePlatformId = activeTabInfo.detectedPlatform;
+        platformSelect.value = currentActivePlatformId;
+        renderPlatformDynamicForm(currentActivePlatformId);
+      }
     }
     updateTabMatchStatus();
-    renderPlatformSpecificFields(platformSelect.value);
     CustomSelect.enhance(platformSelect);
     CustomSelect.refresh(platformSelect);
   });
 
-  // 3. Set Initial Provider UI
+  // 4. Set Initial Provider UI
   providerSelect.value = currentConfig.activeProvider || 'gemini';
   renderProviderFields(providerSelect.value);
 
-  // Initialize all custom selects
+  // Initialize all custom selects outside dynamic form
   CustomSelect.initAll();
 
-  // Event: Platform dropdown changed
+  // Event: Platform dropdown changed (persists in-memory state before switching)
   platformSelect.addEventListener('change', () => {
+    if (currentActivePlatformId) {
+      collectActiveFormValues(currentActivePlatformId);
+    }
+    currentActivePlatformId = platformSelect.value;
     updateTabMatchStatus();
-    renderPlatformSpecificFields(platformSelect.value);
+    renderPlatformDynamicForm(currentActivePlatformId);
   });
 
   // Event: Navigate helper clicked
@@ -515,29 +783,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     });
   });
-
-  // Event: Stepper Buttons for Keyword Count
-  if (btnDecKeywordCount) {
-    btnDecKeywordCount.addEventListener('click', () => {
-      const min = Number(keywordCountInput.min) || 8;
-      let val = Number(keywordCountInput.value) || min;
-      if (val > min) {
-        keywordCountInput.value = val - 1;
-        saveCurrentSettings();
-      }
-    });
-  }
-
-  if (btnIncKeywordCount) {
-    btnIncKeywordCount.addEventListener('click', () => {
-      const max = Number(keywordCountInput.max) || 50;
-      let val = Number(keywordCountInput.value) || max;
-      if (val < max) {
-        keywordCountInput.value = val + 1;
-        saveCurrentSettings();
-      }
-    });
-  }
 
   // Event: Save Settings
   btnSaveSettings.addEventListener('click', () => {
