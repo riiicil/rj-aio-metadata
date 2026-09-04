@@ -83,11 +83,10 @@
 
 .rj-input:disabled,
 .rj-select:disabled {
-  background-color: #090a0c;
-  color: #55585a;
-  border-color: rgba(255, 255, 255, 0.04);
+  background-color: #131416;
+  color: #3d3e42;
+  border-color: rgba(255, 255, 255, 0.08);
   cursor: not-allowed;
-  opacity: 0.55;
   box-shadow: none;
 }
 
@@ -99,15 +98,23 @@
   user-select: none;
 }
 
+.rj-select-wrapper.open {
+  z-index: 1000;
+}
+
+.rj-card:has(.rj-select-wrapper.open) {
+  z-index: 500;
+  position: relative;
+}
+
 .rj-select-wrapper.disabled {
   pointer-events: none;
-  opacity: 0.55;
 }
 
 .rj-select-wrapper.disabled .rj-select-trigger {
-  background-color: #090a0c;
-  color: #55585a;
-  border-color: rgba(255, 255, 255, 0.04);
+  background-color: #131416;
+  color: #505256;
+  border-color: rgba(255, 255, 255, 0.08);
   cursor: not-allowed;
 }
 
@@ -185,25 +192,54 @@
 }
 
 @keyframes rj-menu-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .rj-select-wrapper.open .rj-select-dropdown {
   display: block;
 }
 
+.rj-select-dropdown.dropup {
+  top: auto;
+  bottom: calc(100% + 4px);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  animation: rj-menu-in-up 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes rj-menu-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Custom Slim Scrollbar for Dropdown Menu */
 .rj-select-dropdown::-webkit-scrollbar {
   width: 4px;
 }
+
 .rj-select-dropdown::-webkit-scrollbar-track {
   background: transparent;
 }
+
 .rj-select-dropdown::-webkit-scrollbar-thumb {
   background: var(--rj-border-hairline);
   border-radius: var(--rj-radius-pill);
 }
+
 .rj-select-dropdown::-webkit-scrollbar-thumb:hover {
   background: var(--rj-accent-cyan);
 }
@@ -260,6 +296,7 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
 input[type="number"] {
   -moz-appearance: textfield;
 }
@@ -520,12 +557,12 @@ input[type="number"] {
   border-radius: 50%;
 }
 
-.rj-switch input:checked + .rj-slider {
+.rj-switch input:checked+.rj-slider {
   background-color: var(--rj-accent-cyan);
   border-color: var(--rj-accent-cyan);
 }
 
-.rj-switch input:checked + .rj-slider:before {
+.rj-switch input:checked+.rj-slider:before {
   transform: translateX(16px);
   background-color: #000000;
 }
@@ -607,8 +644,13 @@ input[type="number"] {
 
 /* Animations */
 @keyframes rj-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .rj-rotating {

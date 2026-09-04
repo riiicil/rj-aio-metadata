@@ -175,6 +175,28 @@ export class CustomSelect {
     CustomSelect.closeAll();
     const instance = CustomSelect.instances.get(selectEl);
     if (!instance || selectEl.disabled) return;
+
+    const { trigger, dropdown } = instance;
+
+    // Smart viewport bounds check
+    if (typeof window !== 'undefined' && trigger && dropdown) {
+      const rect = trigger.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || 590;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      // If space below is less than 200px and space above is greater, flip to dropup
+      if (spaceBelow < 200 && spaceAbove > spaceBelow) {
+        dropdown.classList.add('dropup');
+        const maxH = Math.min(220, Math.max(100, Math.floor(spaceAbove - 16)));
+        dropdown.style.maxHeight = `${maxH}px`;
+      } else {
+        dropdown.classList.remove('dropup');
+        const maxH = Math.min(220, Math.max(100, Math.floor(spaceBelow - 16)));
+        dropdown.style.maxHeight = `${maxH}px`;
+      }
+    }
+
     instance.isOpen = true;
     instance.wrapper.classList.add('open');
   }
@@ -184,12 +206,18 @@ export class CustomSelect {
     if (!instance) return;
     instance.isOpen = false;
     instance.wrapper.classList.remove('open');
+    if (instance.dropdown) {
+      instance.dropdown.classList.remove('dropup');
+    }
   }
 
   static closeAll() {
     CustomSelect.instances.forEach(inst => {
       inst.isOpen = false;
       inst.wrapper.classList.remove('open');
+      if (inst.dropdown) {
+        inst.dropdown.classList.remove('dropup');
+      }
     });
   }
 

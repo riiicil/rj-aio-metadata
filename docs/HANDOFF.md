@@ -8,8 +8,8 @@
 
 - **Current Milestone**: Phase 1 Complete (Manifest V3 Foundation, Storage Service & Platform-Adaptive Popup UI)
 - **Active Branch**: `task/popup-storage`
-- **Latest Commit**: `8246c07` `feat(ui): add rich interactive field states and custom stepper component`
-- **Working Tree**: Documentation standardized, clean working tree
+- **Latest Commit**: `85e1125` `fix(ui): add smart dropup bounds detection and refine legible disabled field contrast`
+- **Working Tree**: Clean working tree (ready for merge)
 - **Build / Test State**: Verified healthy (syntax validated, unit tests passing, manifest valid)
 
 ---
@@ -84,7 +84,8 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| 10 | 2026-09-04 | `task/popup-storage` | Pending | Formalized DOCS_STYLE.md, restructured HANDOFF and agent logs | Merge to `dev`, start Phase 2 |
+| 11 | 2026-09-04 | `task/popup-storage` | `85e1125` | Smart dropup bounds detection, elevated stacking context, legible disabled field styling | Merge to `dev`, start Phase 2 |
+| 10 | 2026-09-04 | `task/popup-storage` | `986db5e` | Formalized DOCS_STYLE.md, restructured HANDOFF and agent logs | Finalize Phase 1 UI polish |
 | 09 | 2026-09-02 | `task/popup-storage` | `8246c07` | Custom dropdown enhancer, stepper control, flexbox truncation | Finalize docs & user review |
 | 08 | 2026-09-02 | `task/popup-storage` | `d80ad1a` | Fixed Gemini ?key= auth and multi-key single-line comma formatting | Custom select UX polish |
 | 07 | 2026-09-02 | `task/popup-storage` | `1715f1a` | Added schema migration (_schemaVersion: 2) to reset legacy cached models | Gemini multi-key verification |
