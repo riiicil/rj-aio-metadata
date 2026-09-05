@@ -55,7 +55,8 @@
     {
       "resources": [
         "overlay/*",
-        "styles/*"
+        "styles/*",
+        "icons/*"
       ],
       "matches": [
         "*://*/*"

@@ -1,16 +1,16 @@
 # Current Project State — RJ AIO Metadata Extension
 
 *Last Updated: 2026-09-05*<br>
-*Active Branch: `task/popup-storage`*<br>
-*Current Milestone: Phase 1 (Manifest V3 Foundation, Storage Service & Platform-Adaptive Popup UI)*
+*Active Branch: `task/draggable-overlay-ui`*<br>
+*Current Milestone: Phase 2 (In-Page Draggable Floating Overlay HUD)*
 
 ---
 
 ## 1. Current Phase Progress
 
 - **Phase 0 — Governance & Research**: [COMPLETE] (Repository governance, design system, reference analyses)
-- **Phase 1 — Storage & Popup UI**: [IN_PROGRESS] (Storage engine, background worker, modular platform-dynamic popup UI)
-- **Phase 2 — In-Page Draggable Overlay HUD**: [PLANNED] (Next milestone)
+- **Phase 1 — Storage & Popup UI**: [COMPLETE] (Storage engine, background worker, modular platform-dynamic popup UI merged to dev)
+- **Phase 2 — In-Page Draggable Overlay HUD**: [IN_PROGRESS] (Isolated Shadow DOM injection, draggable header, floating pill, persistent coordinates)
 - **Phase 3 — Universal Vision Service**: [PLANNED] (OpenAI-compatible client & prompts)
 - **Phase 4 — Platform Adapters**: [PLANNED] (DOM injectors for 7 platforms)
 - **Phase 5 — End-to-End Testing & Polish**: [PLANNED] (E2E live verification & packaging)
@@ -22,9 +22,8 @@
 | Branch | Status | Purpose |
 | :--- | :--- | :--- |
 | `main` | Clean (1 empty commit) | Stable production releases only |
-| `dev` | Integration (Phase 0 merged) | Development integration branch (Ready for Phase 1 merge) |
-| `task/popup-storage` | Active (Complete, verified) | Phase 1: Storage Service, Background Worker & Popup UI |
-| `task/draggable-overlay-ui` | Planned | Phase 2: In-Page Draggable Floating Overlay HUD |
+| `dev` | Integration (Phase 0 & 1 merged) | Active development integration branch |
+| `task/draggable-overlay-ui` | Active | Phase 2: In-Page Draggable Floating Overlay HUD |
 
 ---
 
@@ -62,10 +61,10 @@
   - `docs/ROADMAP.md` — Phase execution roadmap and milestone checklists.
   - `docs/agent-logs/2026-09-02.md` — Session Entries 1 through 9 (newest on top).
   - `docs/agent-logs/2026-09-04.md` — Session Entries 1 and 2 (Docs and UI bounds detection).
-  - `docs/agent-logs/2026-09-05.md` — Session Entry 1 (Modular dynamic form renderer & clean schema).
+  - `docs/agent-logs/2026-09-05.md` — Session Entries (newest on top).
   - `docs/references/` — 8 technical reference analyses for Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas, and Vision APIs.
 - **Source Code (`src/`):**
-  - `src/manifest.json` — Chromium Manifest V3 configuration, permissions, icons, action, service worker.
+  - `src/manifest.json` — Chromium Manifest V3 configuration, permissions, icons, action, service worker, web accessible resources.
   - `src/icons/` — Extension icons (`icon16.png`, `icon48.png`, `icon128.png`, `logo_rj.png` branding logo).
   - `src/services/StorageService.js` — Storage engine with multi-provider config, schema version 3 migration, multi-key round-robin, and keyword priority.
   - `src/background/service_worker.js` — Dynamic `/v1/models` fetcher with Gemini query auth, active tab evaluator, platform navigator, overlay relay.
@@ -76,13 +75,15 @@
   - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, and 100% modular platform-dynamic form rendering with smooth conditional visibility.
   - `src/popup/custom_select.js` — Zero-dependency progressive dropdown enhancer replacing native OS selects with emerald teal highlights.
   - `src/popup/depositphotos_countries.js` — Complete 237 ISO countries catalog extracted for Depositphotos editorial location settings (omitting commercial option).
-  - `src/content/content_main.js` — Content script stub ready for overlay injection.
+  - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed.
+  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, minimize/expand toggle, and `chrome.storage.local` coordinate persistence.
+  - `src/content/content_main.js` — Content script router importing OverlayHUD via dynamic import, auto-mounting HUD, and handling background toggle messages.
 
 ---
 
 ## 5. What Does NOT Exist Yet
 
-- `src/overlay/overlay.html`, `overlay.css`, `overlay.js` — In-Page Draggable Floating Overlay HUD (Phase 2).
+- In-Page HUD active form controls and bidirectional synchronization between Popup and Overlay HUD (Phase 2 Part 2).
 - `src/services/AIService.js` — Universal OpenAI-compatible multimodal vision client (Phase 3).
 - `src/services/PromptTemplates.js` — High-converting platform-optimized prompt templates (Phase 3).
 - `src/adapters/` — Platform DOM injector adapters (Adobe, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas) (Phase 4).
@@ -92,12 +93,13 @@
 
 ## 6. Testing & Build Verification Status
 
-- Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `styles/`).
+- Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `overlay/`, `styles/`).
 - Storage schema version 3 migration tested and verified in Node.js (obsolete keys purged, platform keyword limits clamped, legacy models handled).
+- Syntax validation passed for `src/overlay/overlay.js` and `src/content/content_main.js` via `node --check`.
+- Viewport boundary clamping and storage persistence logic verified.
 - Depositphotos 237 country catalog and custom select progressive enhancement verified.
 - Multi-API key round-robin distribution tested and verified across multi-line inputs.
 - Google Gemini query param (`?key=`) and header (`x-goog-api-key`) authentication verified.
-- CustomSelect progressive enhancement tested with simulated DOM environments without reference errors.
 - Strict flexbox truncation (`min-width: 0; max-width: 100%;`) verified in popup UI.
 - All documentation checked against Zero Native Emoji Policy and standardized under `docs/DOCS_STYLE.md`.
 
@@ -105,4 +107,4 @@
 
 ## 7. Immediate Next Step
 
-Merge `task/popup-storage` into `dev` using `git merge --no-ff` upon user confirmation, then branch off `task/draggable-overlay-ui` to begin **Phase 2: In-Page Draggable Floating Overlay HUD**.
+Wire active form fields and bidirectional synchronization between Toolbar Popup and In-Page Overlay HUD (Phase 2 Scope 1 Part 2).
