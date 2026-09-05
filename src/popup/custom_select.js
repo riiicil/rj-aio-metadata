@@ -199,6 +199,14 @@ export class CustomSelect {
 
     instance.isOpen = true;
     instance.wrapper.classList.add('open');
+
+    // Scroll active item into view
+    const selectedOpt = dropdown.querySelector('.rj-select-option.selected');
+    if (selectedOpt) {
+      setTimeout(() => {
+        selectedOpt.scrollIntoView({ block: 'nearest' });
+      }, 0);
+    }
   }
 
   static close(selectEl) {

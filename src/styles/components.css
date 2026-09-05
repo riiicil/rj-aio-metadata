@@ -52,7 +52,7 @@
 .rj-select:focus {
   background-color: #16181b;
   border-color: var(--rj-accent-cyan);
-  box-shadow: 0 0 0 3px rgba(87, 193, 255, 0.18), 0 2px 10px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 3px rgba(7, 145, 131, 0.22), 0 2px 10px rgba(0, 0, 0, 0.5);
   color: #ffffff;
 }
 
@@ -67,7 +67,7 @@
 }
 
 .rj-select:focus {
-  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2357c1ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23079183' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
 }
 
 .rj-select option {
@@ -146,8 +146,8 @@
 
 .rj-select-wrapper.open .rj-select-trigger {
   background-color: #16181b;
-  border-color: var(--rj-accent-cyan);
-  box-shadow: 0 0 0 3px rgba(87, 193, 255, 0.18), 0 2px 10px rgba(0, 0, 0, 0.5);
+  border-color: #079183;
+  box-shadow: 0 0 0 3px rgba(7, 145, 131, 0.22), 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
 .rj-select-trigger-text {
@@ -261,13 +261,13 @@
 }
 
 .rj-select-option:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: #141517;
   color: #ffffff;
 }
 
 .rj-select-option.selected {
-  background-color: rgba(87, 193, 255, 0.12);
-  color: var(--rj-accent-cyan);
+  background-color: rgba(7, 145, 131, 0.18);
+  color: #14b8a6;
   font-weight: 500;
 }
 
@@ -281,7 +281,7 @@
   width: 14px;
   height: 14px;
   opacity: 0;
-  color: var(--rj-accent-cyan);
+  color: #079183;
   flex-shrink: 0;
   margin-left: 8px;
 }
@@ -317,7 +317,7 @@ input[type="number"] {
 
 .rj-stepper-control:focus-within {
   border-color: var(--rj-accent-cyan);
-  box-shadow: 0 0 0 3px rgba(87, 193, 255, 0.18), 0 2px 10px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 3px rgba(7, 145, 131, 0.22), 0 2px 10px rgba(0, 0, 0, 0.5);
   background-color: #16181b;
 }
 
@@ -426,13 +426,18 @@ input[type="number"] {
 }
 
 .rj-btn-accent {
-  background-color: var(--rj-accent-cyan);
-  color: #000000;
+  background-color: #079183;
+  color: #ffffff;
   font-weight: 600;
 }
 
 .rj-btn-accent:hover {
-  background-color: #79d0ff;
+  background-color: #08a394;
+  color: #ffffff;
+}
+
+.rj-btn-accent:active {
+  background-color: #067e72;
 }
 
 .rj-btn-danger {
@@ -558,8 +563,8 @@ input[type="number"] {
 }
 
 .rj-switch input:checked+.rj-slider {
-  background-color: var(--rj-accent-cyan);
-  border-color: var(--rj-accent-cyan);
+  background-color: #079183;
+  border-color: #079183;
 }
 
 .rj-switch input:checked+.rj-slider:before {
@@ -600,12 +605,22 @@ input[type="number"] {
 .rj-status-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   font-size: 11px;
   font-weight: 500;
-  padding: 3px 8px;
+  line-height: 1;
+  padding: 4px 8px;
   border-radius: var(--rj-radius-pill);
   border: 1px solid transparent;
+  vertical-align: middle;
+}
+
+.rj-status-badge .rj-icon {
+  display: block;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
 }
 
 .rj-status-matched {
@@ -621,13 +636,12 @@ input[type="number"] {
 }
 
 .rj-platform-warning {
-  margin-top: 8px;
-  padding: 8px 10px;
-  border-radius: var(--rj-radius-md);
-  background-color: var(--rj-accent-red-soft);
-  border: 1px solid rgba(255, 97, 97, 0.3);
+  margin-top: 4px;
+  padding: 0;
+  background: transparent;
+  border: none;
   font-size: 11px;
-  color: #ff9999;
+  color: #ff8585;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -683,4 +697,34 @@ input[type="number"] {
 .rj-toast.rj-toast-visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+/* Smooth Slide-Down & Fade-In for Conditional Fields */
+.rj-conditional-field {
+  display: none;
+  position: relative;
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.rj-conditional-field.rj-visible {
+  display: block;
+  overflow: visible;
+  animation: rj-slide-down-fade 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.rj-conditional-field:has(.rj-select-wrapper.open) {
+  z-index: 1000;
+  position: relative;
+  overflow: visible;
+}
+
+@keyframes rj-slide-down-fade {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }

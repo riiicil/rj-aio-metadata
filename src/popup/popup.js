@@ -187,10 +187,10 @@ function renderProviderFields(providerId) {
 }
 
 /**
- * Collects active form inputs from the dynamic container and persists into in-memory state.
+ * Saves active dynamic form inputs into in-memory state.
  * @param {string} platformId
  */
-function collectActiveFormValues(platformId) {
+function saveActiveFormStateToMemory(platformId) {
   if (!platformId || !platformDynamicForm) return;
   if (!currentConfig.platformSettings[platformId]) {
     currentConfig.platformSettings[platformId] = {};
@@ -255,6 +255,7 @@ function collectActiveFormValues(platformId) {
     if (ai) settings.isAiGenerated = ai.checked;
   }
 }
+const collectActiveFormValues = saveActiveFormStateToMemory;
 
 /**
  * 100% Modular Platform-Dynamic Form Renderer
@@ -341,7 +342,7 @@ function renderPlatformDynamicForm(platformId) {
       <div class="rj-switch-row">
         <div class="rj-switch-info">
           <span class="rj-switch-title">Editorial Content Asset</span>
-          <span class="rj-switch-desc">Mark asset as documentary editorial</span>
+          <span class="rj-switch-desc">Mark as editorial &amp; set caption prefix</span>
         </div>
         <label class="rj-switch">
           <input type="checkbox" id="shutterstock_isEditorial" ${isEditorial ? 'checked' : ''}>
@@ -349,11 +350,7 @@ function renderPlatformDynamicForm(platformId) {
         </label>
       </div>
 
-      <div id="shutterstock_editorialGroup" class="rj-field-group" style="display: ${isEditorial ? 'block' : 'none'};">
-        <label class="rj-field-label" for="shutterstock_editorialPrefix">
-          <span>Editorial Caption Prefix</span>
-          <span class="rj-field-hint">e.g. CITY, COUNTRY - DATE:</span>
-        </label>
+      <div id="shutterstock_editorialGroup" class="rj-field-group rj-conditional-field ${isEditorial ? 'rj-visible' : ''}">
         <input type="text" id="shutterstock_editorialPrefix" class="rj-input" placeholder="JAKARTA, INDONESIA - SEPTEMBER 2, 2026:" value="${escapeHtml(settings.editorialPrefix || '')}">
       </div>
     `;
@@ -365,7 +362,7 @@ function renderPlatformDynamicForm(platformId) {
       <div class="rj-switch-row">
         <div class="rj-switch-info">
           <span class="rj-switch-title">AI / Generative Declaration</span>
-          <span class="rj-switch-desc">Declare asset created with AI tool</span>
+          <span class="rj-switch-desc">Declare AI generation &amp; select base model</span>
         </div>
         <label class="rj-switch">
           <input type="checkbox" id="freepik_isAiGenerated" ${isAi ? 'checked' : ''}>
@@ -373,10 +370,7 @@ function renderPlatformDynamicForm(platformId) {
         </label>
       </div>
 
-      <div id="freepik_aiModelGroup" class="rj-field-group" style="display: ${isAi ? 'block' : 'none'};">
-        <label class="rj-field-label" for="freepik_aiModel">
-          <span>AI Base Model</span>
-        </label>
+      <div id="freepik_aiModelGroup" class="rj-field-group rj-conditional-field ${isAi ? 'rj-visible' : ''}">
         <select id="freepik_aiModel" class="rj-select">
           <option value="Adobe Firefly" ${aiModel === 'Adobe Firefly' ? 'selected' : ''}>Adobe Firefly</option>
           <option value="Flux 1.0 Fast" ${aiModel === 'Flux 1.0 Fast' ? 'selected' : ''}>Flux 1.0 Fast</option>
@@ -388,7 +382,7 @@ function renderPlatformDynamicForm(platformId) {
         </select>
       </div>
 
-      <div id="freepik_customAiModelGroup" class="rj-field-group" style="display: ${showCustom ? 'block' : 'none'};">
+      <div id="freepik_customAiModelGroup" class="rj-field-group rj-conditional-field ${showCustom ? 'rj-visible' : ''}">
         <input type="text" id="freepik_customAiModel" class="rj-input" placeholder="Enter custom AI model name..." value="${escapeHtml(settings.customAiModel || '')}">
       </div>
     `;
@@ -410,7 +404,7 @@ function renderPlatformDynamicForm(platformId) {
       <div class="rj-switch-row">
         <div class="rj-switch-info">
           <span class="rj-switch-title">AI / Generative Declaration</span>
-          <span class="rj-switch-desc">Declare asset created with AI tool</span>
+          <span class="rj-switch-desc">Declare AI generation &amp; specify tool name</span>
         </div>
         <label class="rj-switch">
           <input type="checkbox" id="vecteezy_isAiGenerated" ${isAi ? 'checked' : ''}>
@@ -418,10 +412,7 @@ function renderPlatformDynamicForm(platformId) {
         </label>
       </div>
 
-      <div id="vecteezy_aiToolGroup" class="rj-field-group" style="display: ${isAi ? 'block' : 'none'};">
-        <label class="rj-field-label" for="vecteezy_aiToolName">
-          <span>AI Tool / Generator Name</span>
-        </label>
+      <div id="vecteezy_aiToolGroup" class="rj-field-group rj-conditional-field ${isAi ? 'rj-visible' : ''}">
         <input type="text" id="vecteezy_aiToolName" class="rj-input" placeholder="e.g. Midjourney v6, Flux.1" value="${escapeHtml(settings.aiToolName || '')}">
       </div>
     `;
@@ -469,7 +460,7 @@ function renderPlatformDynamicForm(platformId) {
       <div class="rj-switch-row">
         <div class="rj-switch-info">
           <span class="rj-switch-title">Editorial Content Asset</span>
-          <span class="rj-switch-desc">Flag content as non-commercial editorial</span>
+          <span class="rj-switch-desc">Flag as editorial &amp; select country location</span>
         </div>
         <label class="rj-switch">
           <input type="checkbox" id="depositphotos_isEditorial" ${isEditorial ? 'checked' : ''}>
@@ -477,13 +468,10 @@ function renderPlatformDynamicForm(platformId) {
         </label>
       </div>
 
-      <div id="depositphotos_countryGroup" class="rj-field-group" style="display: ${isEditorial ? 'block' : 'none'};">
-        <label class="rj-field-label" for="depositphotos_countryCode">
-          <span>Editorial Location (Country)</span>
-        </label>
+      <div id="depositphotos_countryGroup" class="rj-field-group rj-conditional-field ${isEditorial ? 'rj-visible' : ''}">
         <select id="depositphotos_countryCode" class="rj-select">
           ${DEPOSITPHOTOS_COUNTRIES.map(c => `
-            <option value="${c.code}" ${countryCode === c.code ? 'selected' : ''}>${c.code ? `${c.code} - ${c.name}` : c.name}</option>
+            <option value="${c.code}" ${(countryCode === c.code || (!countryCode && c.code === 'US')) ? 'selected' : ''}>${c.code} - ${c.name}</option>
           `).join('')}
         </select>
       </div>
@@ -556,7 +544,11 @@ function renderPlatformDynamicForm(platformId) {
     const group = platformDynamicForm.querySelector('#shutterstock_editorialGroup');
     if (isEd && group) {
       isEd.addEventListener('change', () => {
-        group.style.display = isEd.checked ? 'block' : 'none';
+        if (isEd.checked) {
+          group.classList.add('rj-visible');
+        } else {
+          group.classList.remove('rj-visible');
+        }
       });
     }
   } else if (platformId === 'freepik') {
@@ -568,18 +560,27 @@ function renderPlatformDynamicForm(platformId) {
     if (aiToggle && modelGroup && modelSelect && customGroup) {
       aiToggle.addEventListener('change', () => {
         const checked = aiToggle.checked;
-        modelGroup.style.display = checked ? 'block' : 'none';
         if (checked) {
+          modelGroup.classList.add('rj-visible');
           CustomSelect.refresh(modelSelect);
-          customGroup.style.display = (modelSelect.value === 'Custom') ? 'block' : 'none';
+          if (modelSelect.value === 'Custom') {
+            customGroup.classList.add('rj-visible');
+          } else {
+            customGroup.classList.remove('rj-visible');
+          }
         } else {
-          customGroup.style.display = 'none';
+          modelGroup.classList.remove('rj-visible');
+          customGroup.classList.remove('rj-visible');
         }
       });
 
       modelSelect.addEventListener('change', () => {
         if (aiToggle.checked) {
-          customGroup.style.display = (modelSelect.value === 'Custom') ? 'block' : 'none';
+          if (modelSelect.value === 'Custom') {
+            customGroup.classList.add('rj-visible');
+          } else {
+            customGroup.classList.remove('rj-visible');
+          }
         }
       });
     }
@@ -588,7 +589,11 @@ function renderPlatformDynamicForm(platformId) {
     const toolGroup = platformDynamicForm.querySelector('#vecteezy_aiToolGroup');
     if (aiToggle && toolGroup) {
       aiToggle.addEventListener('change', () => {
-        toolGroup.style.display = aiToggle.checked ? 'block' : 'none';
+        if (aiToggle.checked) {
+          toolGroup.classList.add('rj-visible');
+        } else {
+          toolGroup.classList.remove('rj-visible');
+        }
       });
     }
   } else if (platformId === 'depositphotos') {
@@ -598,10 +603,11 @@ function renderPlatformDynamicForm(platformId) {
 
     if (isEd && countryGroup && countrySelect) {
       isEd.addEventListener('change', () => {
-        const checked = isEd.checked;
-        countryGroup.style.display = checked ? 'block' : 'none';
-        if (checked) {
+        if (isEd.checked) {
+          countryGroup.classList.add('rj-visible');
           CustomSelect.refresh(countrySelect);
+        } else {
+          countryGroup.classList.remove('rj-visible');
         }
       });
     }

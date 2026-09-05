@@ -65,17 +65,15 @@ body::-webkit-scrollbar-thumb:hover {
   color: var(--rj-text-primary);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
-.logo-badge {
-  background: linear-gradient(135deg, var(--rj-accent-cyan), #2563eb);
-  color: #000000;
-  font-weight: 800;
-  font-size: 11px;
-  padding: 2px 5px;
+.brand-logo-img {
+  width: 24px;
+  height: 24px;
   border-radius: var(--rj-radius-sm);
-  letter-spacing: -0.5px;
+  object-fit: contain;
+  display: block;
 }
 
 .version-tag {

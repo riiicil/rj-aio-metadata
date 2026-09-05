@@ -66,15 +66,16 @@
   - `docs/references/` — 8 technical reference analyses for Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas, and Vision APIs.
 - **Source Code (`src/`):**
   - `src/manifest.json` — Chromium Manifest V3 configuration, permissions, icons, action, service worker.
-  - `src/icons/` — Extension icons (`icon16.png`, `icon48.png`, `icon128.png`).
+  - `src/icons/` — Extension icons (`icon16.png`, `icon48.png`, `icon128.png`, `logo_rj.png` branding logo).
   - `src/services/StorageService.js` — Storage engine with multi-provider config, schema version 3 migration, multi-key round-robin, and keyword priority.
   - `src/background/service_worker.js` — Dynamic `/v1/models` fetcher with Gemini query auth, active tab evaluator, platform navigator, overlay relay.
-  - `src/styles/components.css` — Raycast Dark Precision form components, interactive states, custom stepper control, floating custom select styles.
-  - `src/popup/popup.html` — Platform-adaptive toolbar popup interface with modular dynamic platform settings container adhering to `DESIGN.md`.
-  - `src/popup/popup.css` — 380px dark canvas popup styling with sticky header/footer.
-  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, and 100% modular platform-dynamic form rendering.
-  - `src/popup/custom_select.js` — Zero-dependency progressive dropdown enhancer replacing native OS selects.
-  - `src/popup/depositphotos_countries.js` — Complete 237 ISO countries catalog extracted for Depositphotos editorial location settings.
+  - `src/styles/variables.css` — Raycast Dark Precision design tokens with deep emerald teal (`#079183`) primary accent palette.
+  - `src/styles/components.css` — Raycast Dark Precision form components, emerald teal accent interactive states, custom stepper control, floating custom select styles, transparent warning banner, and smooth slide-down conditional field animations.
+  - `src/popup/popup.html` — Platform-adaptive toolbar popup interface with brand logo image integration and modular dynamic platform settings container adhering to `DESIGN.md`.
+  - `src/popup/popup.css` — 380px dark canvas popup styling with brand logo image styling and sticky header/footer.
+  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, and 100% modular platform-dynamic form rendering with smooth conditional visibility.
+  - `src/popup/custom_select.js` — Zero-dependency progressive dropdown enhancer replacing native OS selects with emerald teal highlights.
+  - `src/popup/depositphotos_countries.js` — Complete 237 ISO countries catalog extracted for Depositphotos editorial location settings (omitting commercial option).
   - `src/content/content_main.js` — Content script stub ready for overlay injection.
 
 ---

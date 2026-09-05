@@ -8,7 +8,7 @@
 
 - **Current Milestone**: Phase 1 Complete (Manifest V3 Foundation, Storage Service & Platform-Adaptive Popup UI)
 - **Active Branch**: `task/popup-storage`
-- **Latest Commit**: `feat(popup): implement modular platform dynamic form renderer and clean schema`
+- **Latest Commit**: `feat(ui): implement modular platform dynamic form renderer and design system polish`
 - **Working Tree**: Clean working tree (local branch, awaiting user merge approval)
 - **Build / Test State**: Verified healthy (syntax validated, schema 3 migration tests passing, zero emoji clean)
 
@@ -16,9 +16,9 @@
 
 ## 2. Active In-Flight Context
 
-Card 3 (*"Platform Settings"*) in the Popup UI has been completely refactored from a semi-static HTML structure into a **100% Modular Platform-Dynamic Form Renderer**. Redundant controls (`autoSaveDraft`, `mediaType`, `contentType`, `cityName`) were removed from configuration and DOM. Platform-specific keyword limits are strictly enforced (Adobe Stock 49, Dreamstime 70, MiriCanvas 25, others 50). Full conditional show/hide behavior is implemented for Editorial caption prefix (Shutterstock), AI models and custom generator inputs (Freepik, Vecteezy), and Editorial country location (Depositphotos).
+Card 3 (*"Metadata Settings"*) in the Popup UI has been completely refactored from a semi-static HTML structure into a **100% Modular Platform-Dynamic Form Renderer**. Redundant controls (`autoSaveDraft`, `mediaType`, `contentType`, `cityName`) were removed from configuration and DOM. Platform-specific keyword limits are strictly enforced (Adobe Stock 49, Dreamstime 70, MiriCanvas 25, others 50). Full conditional show/hide behavior with smooth slide-down and fade-in animations (`.rj-conditional-field`) is implemented for Editorial caption prefix (Shutterstock), AI models and custom generator inputs (Freepik, Vecteezy), and Editorial country location (Depositphotos).
 
-Depositphotos now supports all 237 ISO countries via `src/popup/depositphotos_countries.js` integrated into `CustomSelect`. In-memory state preservation (`collectActiveFormValues()`) ensures switching between platforms in the dropdown never discards unsaved inputs. Storage schema version was cleanly bumped to `3` with automated migration in `StorageService._processLoadedConfig()` that purges legacy keys, clamps keyword counts, and preserves all user credentials and custom models.
+Branding has been upgraded with the packaged `src/icons/logo_rj.png` image replacing the plain text badge. Global primary accent color was transformed from cyan (`#57c1ff`) to deep emerald teal (`#079183`) across buttons, active toggle sliders, focus rings, and custom select dropdown active states with crisp `#ffffff` text on `.rj-btn-accent`. The tab mismatch warning banner is streamlined with clean inline text and an accent action link, and status badge icons (`#platformStatusBadge`) are centered vertically. Depositphotos supports the complete 237 ISO countries catalog via `src/popup/depositphotos_countries.js` (omitting commercial option). In-memory state preservation (`saveActiveFormStateToMemory()`) ensures switching between platforms in the dropdown never discards unsaved inputs. Storage schema version was cleanly bumped to `3` with automated migration in `StorageService._processLoadedConfig()` that purges legacy keys, clamps keyword counts, and preserves all user credentials and custom models.
 
 ---
 
@@ -83,7 +83,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| 12 | 2026-09-05 | `task/popup-storage` | `pending` | Modular dynamic form renderer, 237 Depositphotos countries catalog, schema version 3 migration | User review of Phase 1 popup, merge to dev |
+| 12 | 2026-09-05 | `task/popup-storage` | `feat(ui)` | Modular dynamic form renderer, emerald teal (#079183) theme, logo asset, 237 Depositphotos countries, schema v3 | User review of Phase 1 popup, merge to dev |
 | 11 | 2026-09-04 | `task/popup-storage` | `a0c9ed9` | Smart dropup bounds detection, elevated stacking context, legible disabled field styling | Modular platform dynamic forms |
 | 10 | 2026-09-04 | `task/popup-storage` | `986db5e` | Formalized DOCS_STYLE.md, restructured HANDOFF and agent logs | Finalize Phase 1 UI polish |
 | 09 | 2026-09-02 | `task/popup-storage` | `8246c07` | Custom dropdown enhancer, stepper control, flexbox truncation | Finalize docs & user review |

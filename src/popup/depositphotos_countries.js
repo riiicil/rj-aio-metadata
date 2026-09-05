@@ -1,5 +1,4 @@
 export const DEPOSITPHOTOS_COUNTRIES = [
-  { code: "", name: "None (Commercial)" },
   { code: "AF", name: "Afghanistan" },
   { code: "AL", name: "Albania" },
   { code: "DZ", name: "Algeria" },
