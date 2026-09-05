@@ -7,6 +7,7 @@
 - [ADR-004: Universal OpenAI-Compatible Vision API Protocol](#adr-004-universal-openai-compatible-vision-api-protocol)
 - [ADR-005: Raycast Design System & Icon Policy](#adr-005-raycast-design-system--icon-policy)
 - [ADR-006: Permanent Technical Reference Tracking in `docs/references/`](#adr-006-permanent-technical-reference-tracking-in-docsreferences)
+- [ADR-007: Granular Multi-Commit Task Execution with Per-Commit Documentation Updates](#adr-007-granular-multi-commit-task-execution-with-per-commit-documentation-updates)
 
 ---
 
@@ -75,3 +76,15 @@
 - **Consequences**:
   - **Positive**: Permanent institutional knowledge, rapid onboarding for incoming agents, clear traceability of DOM selectors.
   - **Negative**: Minor increase in documentation volume.
+
+---
+
+## ADR-007: Granular Multi-Commit Task Execution with Per-Commit Documentation Updates
+- **Status**: `ACCEPTED`
+- **Date**: 2026-09-02
+- **Context**: Bundling an entire phase or large task into a single massive commit obscures the development history, complicates code review, and makes regressions harder to bisect.
+- **Decision**: Break each feature branch into well-defined logical scopes/commits. For every scope: complete the code implementation $\to$ update documentation (`docs/CURRENT_STATE.md`, `docs/HANDOFF.md`, `docs/agent-logs/YYYY-MM-DD.md`) $\to$ create the commit $\to$ proceed to the next scope.
+- **Consequences**:
+  - **Positive**: Clean, granular git history, documentation stays synchronized with every step, atomic commits.
+  - **Negative**: Requires discipline in updating docs per commit.
+

@@ -35,18 +35,21 @@ gantt
 
 ---
 
-### Phase 1: Manifest V3 Scaffold, Storage Service & Popup Settings UI
-- [ ] Implement `src/manifest.json` with declarative permissions (`storage`, `activeTab`, `scripting`).
-- [ ] Implement `src/services/StorageService.js` for API keys, custom `baseUrl`, model presets, and user preferences.
-- [ ] Build Toolbar Popup UI (`src/popup/popup.html`, `popup.css`, `popup.js`):
-  - API provider preset selector + custom endpoint configuration.
-  - API Key visibility toggles and credential tester.
-  - Active platform detection badge.
-  - Shortcut button to launch/focus In-Page Overlay.
+### Phase 1: Manifest V3 Scaffold, Storage Service & Popup Settings UI `[IN_PROGRESS]`
+- [x] Implement `src/manifest.json` with permissions (`storage`, `activeTab`, `scripting`) and icons (`src/icons/`).
+- [x] Implement `src/services/StorageService.js` for API keys, custom `baseUrl`, model presets, keyword prioritization, and `.txt` file reader.
+- [x] Implement `src/background/service_worker.js` with dynamic model fetcher (`/v1/models`) and active tab routing.
+- [x] Build Platform-Adaptive Toolbar Popup UI (`src/popup/popup.html`, `popup.css`, `popup.js`, `src/styles/components.css`):
+  - Active platform selector with real-time match indicator (Green check vs Red mismatch + navigation helper link).
+  - API provider configuration (Gemini, Mistral, OpenAI, OpenRouter, Custom) + API Key password toggle & `.txt` file import.
+  - Model dropdown + dynamic model fetching with refresh rotation animation.
+  - Universal settings: Keyword count (number field, min 8) + Specific custom keywords (index 0 priority).
+  - Dynamic platform-specific settings for Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas.
+  - Footer Action Bar: Save Settings + Start/Stop Automation toggle + Launch HUD button.
 
 ---
 
-### Phase 2: In-Page Draggable Floating Overlay HUD (Raycast Design System)
+### Phase 2: In-Page Draggable Floating Overlay HUD (Raycast Design System) `[NEXT]`
 - [ ] Build Draggable & Minimizable In-Page HUD (`src/overlay/`):
   - Glassmorphism backdrop blur and Raycast Dark Precision styling (`#07080a`, hairline `#242728`).
   - Drag-and-drop header handler.
