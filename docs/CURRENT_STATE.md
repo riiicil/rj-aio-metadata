@@ -75,8 +75,8 @@
   - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, and 100% modular platform-dynamic form rendering with smooth conditional visibility.
   - `src/popup/custom_select.js` — Zero-dependency progressive dropdown enhancer replacing native OS selects with emerald teal highlights.
   - `src/popup/depositphotos_countries.js` — Complete 237 ISO countries catalog extracted for Depositphotos editorial location settings (omitting commercial option).
-  - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed.
-  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, minimize/expand toggle, and `chrome.storage.local` coordinate persistence.
+  - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed, streamlined pill styling, and spring transition animations (`cubic-bezier(0.16, 1, 0.3, 1)`).
+  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, streamlined logo + Ready pill, and `chrome.storage.local` coordinate persistence.
   - `src/content/content_main.js` — Content script router importing OverlayHUD via dynamic import, auto-mounting HUD, and handling background toggle messages.
 
 ---

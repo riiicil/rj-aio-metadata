@@ -23,7 +23,6 @@
   user-select: none;
   box-sizing: border-box;
   filter: drop-shadow(0 14px 34px rgba(0, 0, 0, 0.65)) drop-shadow(0 4px 14px rgba(0, 0, 0, 0.45));
-  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .rj-hud-wrapper * {
@@ -39,6 +38,38 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transform-origin: top left;
+}
+
+/* Card Expand / Collapse Animations */
+.rj-anim-expanding {
+  animation: rj-card-expand 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.rj-anim-minimizing {
+  animation: rj-card-collapse 0.14s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes rj-card-expand {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes rj-card-collapse {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.88) translateY(-4px);
+  }
 }
 
 /* Draggable Header Bar */
@@ -171,22 +202,50 @@
   align-items: center;
   gap: 8px;
   cursor: grab;
+  transform-origin: top left;
 }
 
 .rj-hud-pill:active {
   cursor: grabbing;
 }
 
-.rj-hud-pill-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: #ffffff;
+/* Pill Expand / Collapse Animations */
+.rj-pill-entering {
+  animation: rj-pill-pop-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.rj-pill-exiting {
+  animation: rj-pill-pop-out 0.12s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes rj-pill-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rj-pill-pop-out {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
 }
 
 .rj-hud-pill-status {
-  font-size: 10px;
+  font-size: 11px;
   color: #079183;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  user-select: none;
 }
 
 /* Visibility Utilities */

@@ -15,6 +15,7 @@ export class OverlayHUD {
     this.isMinimized = false;
     this.isVisible = true;
     this.isDragging = false;
+    this.isTransitioning = false;
     this.startX = 0;
     this.startY = 0;
     this.initialLeft = 24;
@@ -126,7 +127,6 @@ export class OverlayHUD {
         <div class="rj-hud-pill rj-hidden" id="rjHudPill">
           <div class="rj-hud-brand" id="rjPillBrand" style="cursor: pointer;">
             <img class="rj-hud-logo" src="${logoUrl}" alt="RJ">
-            <span class="rj-hud-pill-title">RJ AIO</span>
             <span class="rj-hud-pill-status">Ready</span>
           </div>
           <div class="rj-hud-actions">
@@ -173,21 +173,21 @@ export class OverlayHUD {
     if (btnMinimize) {
       btnMinimize.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.setMinimized(true);
+        this.setMinimized(true, true, true);
       });
     }
 
     if (btnExpand) {
       btnExpand.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.setMinimized(false);
+        this.setMinimized(false, true, true);
       });
     }
 
     if (pillBrand) {
       pillBrand.addEventListener('dblclick', (e) => {
         e.stopPropagation();
-        this.setMinimized(false);
+        this.setMinimized(false, true, true);
       });
     }
 
@@ -287,29 +287,83 @@ export class OverlayHUD {
   }
 
   /**
-   * Toggles between Expanded HUD Card and Minimized Pill states.
+   * Toggles between Expanded HUD Card and Minimized Pill states with transition animation.
    * @param {boolean} minimized
    * @param {boolean} shouldSave
+   * @param {boolean} animate
    */
-  setMinimized(minimized, shouldSave = true) {
+  setMinimized(minimized, shouldSave = true, animate = true) {
     this.isMinimized = minimized;
 
-    if (this.isMinimized) {
-      this.cardEl.classList.add('rj-hidden');
-      this.pillEl.classList.remove('rj-hidden');
-    } else {
-      this.cardEl.classList.remove('rj-hidden');
-      this.pillEl.classList.add('rj-hidden');
+    if (!animate) {
+      if (this.isMinimized) {
+        this.cardEl.classList.add('rj-hidden');
+        this.pillEl.classList.remove('rj-hidden');
+      } else {
+        this.cardEl.classList.remove('rj-hidden');
+        this.pillEl.classList.add('rj-hidden');
+      }
+
+      requestAnimationFrame(() => {
+        const rect = this.wrapper.getBoundingClientRect();
+        this.clampAndSetPosition(rect.left, rect.top);
+        if (shouldSave) this.savePosition();
+      });
+      return;
     }
 
-    // Re-clamp position after dimensions shift
-    requestAnimationFrame(() => {
-      const rect = this.wrapper.getBoundingClientRect();
-      this.clampAndSetPosition(rect.left, rect.top);
-      if (shouldSave) {
-        this.savePosition();
-      }
-    });
+    if (this.isTransitioning) return;
+    this.isTransitioning = true;
+
+    if (this.isMinimized) {
+      // Animate Card out
+      this.cardEl.classList.remove('rj-anim-expanding');
+      this.cardEl.classList.add('rj-anim-minimizing');
+
+      setTimeout(() => {
+        this.cardEl.classList.add('rj-hidden');
+        this.cardEl.classList.remove('rj-anim-minimizing');
+
+        this.pillEl.classList.remove('rj-hidden');
+        this.pillEl.classList.remove('rj-pill-exiting');
+        this.pillEl.classList.add('rj-pill-entering');
+
+        requestAnimationFrame(() => {
+          const rect = this.wrapper.getBoundingClientRect();
+          this.clampAndSetPosition(rect.left, rect.top);
+          if (shouldSave) this.savePosition();
+        });
+
+        setTimeout(() => {
+          this.pillEl.classList.remove('rj-pill-entering');
+          this.isTransitioning = false;
+        }, 220);
+      }, 120);
+    } else {
+      // Animate Pill out
+      this.pillEl.classList.remove('rj-pill-entering');
+      this.pillEl.classList.add('rj-pill-exiting');
+
+      setTimeout(() => {
+        this.pillEl.classList.add('rj-hidden');
+        this.pillEl.classList.remove('rj-pill-exiting');
+
+        this.cardEl.classList.remove('rj-hidden');
+        this.cardEl.classList.remove('rj-anim-minimizing');
+        this.cardEl.classList.add('rj-anim-expanding');
+
+        requestAnimationFrame(() => {
+          const rect = this.wrapper.getBoundingClientRect();
+          this.clampAndSetPosition(rect.left, rect.top);
+          if (shouldSave) this.savePosition();
+        });
+
+        setTimeout(() => {
+          this.cardEl.classList.remove('rj-anim-expanding');
+          this.isTransitioning = false;
+        }, 240);
+      }, 100);
+    }
   }
 
   /**
@@ -319,6 +373,18 @@ export class OverlayHUD {
     if (!this.wrapper) return;
     this.wrapper.classList.remove('rj-hidden');
     this.isVisible = true;
+
+    // Trigger graceful entry animation based on active state
+    if (this.isMinimized && this.pillEl) {
+      this.pillEl.classList.remove('rj-pill-exiting');
+      this.pillEl.classList.add('rj-pill-entering');
+      setTimeout(() => this.pillEl.classList.remove('rj-pill-entering'), 220);
+    } else if (this.cardEl) {
+      this.cardEl.classList.remove('rj-anim-minimizing');
+      this.cardEl.classList.add('rj-anim-expanding');
+      setTimeout(() => this.cardEl.classList.remove('rj-anim-expanding'), 240);
+    }
+
     requestAnimationFrame(() => {
       const rect = this.wrapper.getBoundingClientRect();
       this.clampAndSetPosition(rect.left, rect.top);
@@ -326,12 +392,28 @@ export class OverlayHUD {
   }
 
   /**
-   * Hides the overlay HUD.
+   * Hides the overlay HUD with exit animation.
    */
   hide() {
     if (!this.wrapper) return;
-    this.wrapper.classList.add('rj-hidden');
-    this.isVisible = false;
+    if (this.isMinimized && this.pillEl) {
+      this.pillEl.classList.add('rj-pill-exiting');
+      setTimeout(() => {
+        this.wrapper.classList.add('rj-hidden');
+        this.pillEl.classList.remove('rj-pill-exiting');
+        this.isVisible = false;
+      }, 120);
+    } else if (this.cardEl) {
+      this.cardEl.classList.add('rj-anim-minimizing');
+      setTimeout(() => {
+        this.wrapper.classList.add('rj-hidden');
+        this.cardEl.classList.remove('rj-anim-minimizing');
+        this.isVisible = false;
+      }, 130);
+    } else {
+      this.wrapper.classList.add('rj-hidden');
+      this.isVisible = false;
+    }
   }
 
   /**
@@ -368,7 +450,7 @@ export class OverlayHUD {
             this.clampAndSetPosition(left, top);
           }
           if (typeof isMinimized === 'boolean' && isMinimized) {
-            this.setMinimized(true, false);
+            this.setMinimized(true, false, false);
           }
         }
         resolve();
