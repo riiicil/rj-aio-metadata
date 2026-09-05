@@ -615,6 +615,10 @@ function renderPlatformDynamicForm(platformId) {
 
   // Initialize Custom Selects for Newly Rendered Elements
   CustomSelect.initAll(platformDynamicForm);
+
+  if (isAutomationRunning) {
+    setFormDisabledState(true);
+  }
 }
 
 /**
@@ -643,10 +647,101 @@ async function saveCurrentSettings() {
   // 3. Persist to storage
   await StorageService.saveConfig(currentConfig);
   showToast('Settings saved successfully');
+  updateAutomationButtonUI(isAutomationRunning);
 }
 
 /**
- * Updates the Start / Stop Automation button UI in the toolbar popup.
+ * Checks if the currently active provider has valid credentials and a selected model.
+ * @returns {boolean}
+ */
+function isCurrentProviderReady() {
+  const activeProvId = providerSelect ? providerSelect.value : (currentConfig.activeProvider || 'gemini');
+  const provider = currentConfig.providers ? currentConfig.providers[activeProvId] : null;
+  if (!provider) return false;
+
+  const rawKey = (apiKeyInput ? apiKeyInput.value.trim() : '') || provider.apiKey || '';
+  const keys = StorageService.parseApiKeys(rawKey);
+  const selectedModel = (modelSelect ? modelSelect.value : '') || provider.selectedModel || '';
+
+  return keys.length > 0 && Boolean(selectedModel) && (modelSelect ? !modelSelect.disabled : true);
+}
+
+/**
+ * Toggles disabled state on all settings fields during active automation.
+ * @param {boolean} disabled
+ */
+function setFormDisabledState(disabled) {
+  // 1. Target Platform Card
+  if (platformSelect) {
+    platformSelect.disabled = disabled;
+    CustomSelect.refresh(platformSelect);
+  }
+  if (btnNavigatePlatform) {
+    btnNavigatePlatform.disabled = disabled;
+    btnNavigatePlatform.style.pointerEvents = disabled ? 'none' : '';
+    btnNavigatePlatform.style.opacity = disabled ? '0.4' : '';
+  }
+
+  // 2. AI Provider Card
+  if (providerSelect) {
+    providerSelect.disabled = disabled;
+    CustomSelect.refresh(providerSelect);
+  }
+  if (baseUrlInput) {
+    baseUrlInput.disabled = disabled || (providerSelect.value !== 'custom');
+  }
+  if (apiKeyInput) {
+    apiKeyInput.disabled = disabled;
+  }
+  if (btnToggleApiKey) {
+    btnToggleApiKey.disabled = disabled;
+  }
+  if (btnBrowseApiKey) {
+    btnBrowseApiKey.disabled = disabled;
+  }
+  if (btnFetchModels) {
+    btnFetchModels.disabled = disabled;
+  }
+  if (modelSelect) {
+    if (disabled) {
+      modelSelect.disabled = true;
+      CustomSelect.refresh(modelSelect);
+    } else {
+      const activeProvId = providerSelect ? providerSelect.value : currentConfig.activeProvider;
+      if (currentConfig.providers && currentConfig.providers[activeProvId]) {
+        updateModelDropdownState(currentConfig.providers[activeProvId]);
+      }
+    }
+  }
+
+  // 3. Platform Dynamic Form
+  if (platformDynamicForm) {
+    const formControls = platformDynamicForm.querySelectorAll('input, select, button');
+    formControls.forEach(ctrl => {
+      ctrl.disabled = disabled;
+      if (ctrl.tagName === 'SELECT') {
+        CustomSelect.refresh(ctrl);
+      }
+    });
+
+    const steppers = platformDynamicForm.querySelectorAll('.rj-stepper-control');
+    steppers.forEach(st => {
+      if (disabled) st.classList.add('disabled');
+      else st.classList.remove('disabled');
+    });
+  }
+
+  // 4. Action Buttons
+  if (btnSaveSettings) {
+    btnSaveSettings.disabled = disabled;
+  }
+  if (btnLaunchOverlay) {
+    btnLaunchOverlay.disabled = disabled;
+  }
+}
+
+/**
+ * Updates the Start / Stop Automation button UI and toggles input field disabling in the toolbar popup.
  * @param {boolean} running
  */
 function updateAutomationButtonUI(running) {
@@ -655,11 +750,20 @@ function updateAutomationButtonUI(running) {
     btnToggleAutomation.className = 'rj-btn rj-btn-danger';
     automationBtnText.textContent = 'Stop Automation';
     automationIcon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
+    btnToggleAutomation.disabled = false;
+    btnToggleAutomation.title = 'Stop Automation';
   } else {
     btnToggleAutomation.className = 'rj-btn rj-btn-accent';
     automationBtnText.textContent = 'Start Automation';
     automationIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+
+    const ready = isCurrentProviderReady();
+    btnToggleAutomation.disabled = !ready;
+    btnToggleAutomation.title = ready ? 'Start Automation' : 'Please input API key and select an AI model first';
   }
+
+  // Disable all fields when processing, enable when idle
+  setFormDisabledState(isAutomationRunning);
 }
 
 /**
@@ -702,6 +806,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 4. Set Initial Provider UI
   providerSelect.value = currentConfig.activeProvider || 'gemini';
   renderProviderFields(providerSelect.value);
+  updateAutomationButtonUI(isAutomationRunning);
 
   // Initialize all custom selects outside dynamic form
   CustomSelect.initAll();
@@ -726,7 +831,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Event: Provider dropdown changed
   providerSelect.addEventListener('change', () => {
+    currentConfig.activeProvider = providerSelect.value;
     renderProviderFields(providerSelect.value);
+    StorageService.saveConfig(currentConfig);
+    updateAutomationButtonUI(isAutomationRunning);
   });
 
   // Event: API Key typing listener
@@ -735,6 +843,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const provider = currentConfig.providers[activeProvId] || {};
     provider.apiKey = apiKeyInput.value;
     updateModelDropdownState(provider);
+    updateAutomationButtonUI(isAutomationRunning);
+  });
+
+  // Event: Model selection changed
+  modelSelect.addEventListener('change', () => {
+    const activeProvId = providerSelect.value;
+    if (currentConfig.providers[activeProvId]) {
+      currentConfig.providers[activeProvId].selectedModel = modelSelect.value || '';
+    }
+    saveCurrentSettings();
+    updateAutomationButtonUI(isAutomationRunning);
   });
 
   // Event: Toggle API Key Visibility (Show/Hide)

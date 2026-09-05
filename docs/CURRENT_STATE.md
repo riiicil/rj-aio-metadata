@@ -69,14 +69,14 @@
   - `src/services/StorageService.js` — Storage engine with multi-provider config, schema version 3 migration, multi-key round-robin, and keyword priority.
   - `src/background/service_worker.js` — Dynamic `/v1/models` fetcher with Gemini query auth, active tab evaluator, platform navigator, overlay relay.
   - `src/styles/variables.css` — Raycast Dark Precision design tokens with deep emerald teal (`#079183`) primary accent palette.
-  - `src/styles/components.css` — Raycast Dark Precision form components, emerald teal accent interactive states, custom stepper control, floating custom select styles, transparent warning banner, and smooth slide-down conditional field animations.
+  - `src/styles/components.css` — Raycast Dark Precision form components, emerald teal accent interactive states, custom stepper control, floating custom select styles, transparent warning banner, smooth slide-down conditional field animations, and disabled states for buttons, inputs, steppers, and switches.
   - `src/popup/popup.html` — Platform-adaptive toolbar popup interface with brand logo image integration and modular dynamic platform settings container adhering to `DESIGN.md`.
   - `src/popup/popup.css` — 380px dark canvas popup styling with brand logo image styling and sticky header/footer.
-  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, 100% modular platform-dynamic form rendering, and bidirectional storage synchronization (`chrome.storage.onChanged`) with the in-page HUD.
+  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, 100% modular platform-dynamic form rendering, bidirectional storage synchronization (`chrome.storage.onChanged`), model selection guard for Start Automation button, and full form disabling during active processing.
   - `src/popup/custom_select.js` — Zero-dependency progressive dropdown enhancer replacing native OS selects with emerald teal highlights.
   - `src/popup/depositphotos_countries.js` — Complete 237 ISO countries catalog extracted for Depositphotos editorial location settings (omitting commercial option).
-  - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed, streamlined pill styling, spring transition animations (`cubic-bezier(0.16, 1, 0.3, 1)`), adaptive quick form components, live asset counter bar, and primary action buttons.
-  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, live asset card scanner across all 7 platforms, adaptive quick form controls (stepper, specific keywords, adaptive AI declaration), and bidirectional synchronization via `chrome.storage.onChanged`.
+  - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed, streamlined pill styling, spring transition animations (`cubic-bezier(0.16, 1, 0.3, 1)`), adaptive quick form components, live asset counter bar, and disabled control styles.
+  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, live asset card scanner across all 7 platforms, adaptive quick form controls (stepper, specific keywords, adaptive AI declaration), model selection guard for automation toggle, processing state field disabling, and bidirectional synchronization via `chrome.storage.onChanged`.
   - `src/content/content_main.js` — Content script router importing OverlayHUD via dynamic import, auto-mounting HUD, and handling background toggle messages.
 
 ---

@@ -472,6 +472,9 @@ export class OverlayHUD {
     if (btnAutomation) {
       btnAutomation.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (!this.isAutomationRunning && !this.isProviderReady(this.currentConfig)) {
+          return;
+        }
         this.isAutomationRunning = !this.isAutomationRunning;
         if (typeof chrome !== 'undefined' && chrome.storage?.local) {
           chrome.storage.local.set({
@@ -498,13 +501,69 @@ export class OverlayHUD {
   }
 
   /**
+   * Checks if the active provider has valid credentials and a selected model.
+   * @param {Object} config
+   * @returns {boolean}
+   */
+  isProviderReady(config) {
+    if (!config) return false;
+    const activeProvId = config.activeProvider || 'gemini';
+    const provider = config.providers ? config.providers[activeProvId] : null;
+    if (!provider) return false;
+
+    const rawKey = (provider.apiKey || '').trim();
+    const keys = rawKey.split(/[\r\n,\s\t]+/).filter(k => k.trim().length > 0);
+    const model = (provider.selectedModel || '').trim();
+
+    return keys.length > 0 && model.length > 0;
+  }
+
+  /**
+   * Updates start button disabled status based on active provider readiness.
+   */
+  updateStartButtonReadiness() {
+    if (this.isAutomationRunning) return;
+    const btn = this.shadow?.querySelector('#rjBtnToggleAutomation');
+    if (btn) {
+      const ready = this.isProviderReady(this.currentConfig);
+      btn.disabled = !ready;
+      btn.title = ready ? 'Start Automation' : 'Please configure AI model in popup first';
+    }
+  }
+
+  /**
+   * Toggles disabled state on all HUD quick form controls during active automation.
+   * @param {boolean} disabled
+   */
+  setFormControlsDisabled(disabled) {
+    if (!this.shadow) return;
+
+    const btnDec = this.shadow.querySelector('#rjBtnDecKeywords');
+    const btnInc = this.shadow.querySelector('#rjBtnIncKeywords');
+    const inputCount = this.shadow.querySelector('#rjInputKeywordCount');
+    const specificInput = this.shadow.querySelector('#rjInputSpecificKeywords');
+    const aiToggle = this.shadow.querySelector('#rjToggleAiDeclaration');
+    const stepper = this.shadow.querySelector('.rj-hud-stepper');
+
+    if (btnDec) btnDec.disabled = disabled;
+    if (btnInc) btnInc.disabled = disabled;
+    if (inputCount) inputCount.disabled = disabled;
+    if (specificInput) specificInput.disabled = disabled;
+    if (aiToggle) aiToggle.disabled = disabled;
+    if (stepper) {
+      if (disabled) stepper.classList.add('disabled');
+      else stepper.classList.remove('disabled');
+    }
+  }
+
+  /**
    * Handles chrome.storage.onChanged events for bidirectional synchronization.
    * @param {Object} changes
    * @param {string} areaName
    */
   onStorageChanged(changes, areaName) {
-    // 1. Sync config / platformSettings changes from Popup
-    if (changes.platformSettings || changes.activePlatform) {
+    // 1. Sync config / platformSettings / providers / activeProvider changes from Popup
+    if (changes.platformSettings || changes.activePlatform || changes.providers || changes.activeProvider) {
       this.syncFromStorage();
     }
     // 2. Sync automation start/stop state changes
@@ -520,7 +579,7 @@ export class OverlayHUD {
   }
 
   /**
-   * Updates automation UI indicators (buttons, badges, progress bar, pill status).
+   * Updates automation UI indicators (buttons, badges, progress bar, pill status) and field disabled states.
    * @param {boolean} isRunning
    */
   updateAutomationUI(isRunning) {
@@ -539,6 +598,8 @@ export class OverlayHUD {
       if (btn) {
         btn.classList.remove('rj-btn-start');
         btn.classList.add('rj-btn-stop');
+        btn.disabled = false;
+        btn.title = 'Stop Automation';
       }
       if (btnText) btnText.textContent = 'Stop Automation';
       if (icon) icon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
@@ -550,6 +611,9 @@ export class OverlayHUD {
       if (btn) {
         btn.classList.remove('rj-btn-stop');
         btn.classList.add('rj-btn-start');
+        const ready = this.isProviderReady(this.currentConfig);
+        btn.disabled = !ready;
+        btn.title = ready ? 'Start Automation' : 'Please configure AI model in popup first';
       }
       if (btnText) btnText.textContent = 'Start Automation';
       if (icon) icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
@@ -560,6 +624,9 @@ export class OverlayHUD {
         pillStatus.textContent = this.assetCount > 0 ? `${this.assetCount} Assets` : 'Ready';
       }
     }
+
+    // Disable inputs while running, re-enable when idle
+    this.setFormControlsDisabled(isRunning);
   }
 
   /**
@@ -575,13 +642,17 @@ export class OverlayHUD {
         if (chrome.runtime.lastError || !config.platformSettings) {
           if (chrome.storage.local) {
             chrome.storage.local.get(null, (localRes) => {
-              this._applyConfigToInputs(localRes || {});
+              this.currentConfig = localRes || {};
+              this._applyConfigToInputs(this.currentConfig);
+              this.updateStartButtonReadiness();
               resolve();
             });
             return;
           }
         }
+        this.currentConfig = config;
         this._applyConfigToInputs(config);
+        this.updateStartButtonReadiness();
         resolve();
       });
     });

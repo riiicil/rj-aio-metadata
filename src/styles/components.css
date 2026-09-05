@@ -450,6 +450,41 @@ input[type="number"] {
   background-color: #ff7575;
 }
 
+.rj-btn:disabled,
+.rj-btn[disabled] {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  filter: grayscale(0.5);
+  box-shadow: none !important;
+}
+
+.rj-btn-icon:disabled,
+.rj-btn-icon[disabled] {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+.rj-stepper-control.disabled,
+.rj-stepper-control:has(.rj-stepper-input:disabled) {
+  opacity: 0.5;
+  background-color: #131416;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.rj-stepper-btn:disabled,
+.rj-stepper-btn[disabled] {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+.rj-switch input:disabled + .rj-slider {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+}
+
 .rj-btn-icon {
   width: 34px;
   height: 34px;

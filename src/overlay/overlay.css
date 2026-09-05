@@ -439,6 +439,43 @@
   background-color: #ff7575;
 }
 
+.rj-hud-btn-action:disabled,
+.rj-hud-btn-action[disabled] {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  filter: grayscale(0.5);
+  box-shadow: none !important;
+}
+
+.rj-hud-stepper.disabled,
+.rj-hud-stepper:has(.rj-hud-stepper-input:disabled) {
+  opacity: 0.5;
+  background-color: #0c0d0e;
+  border-color: #1a1b1c;
+}
+
+.rj-hud-stepper-btn:disabled,
+.rj-hud-stepper-btn[disabled] {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
+.rj-hud-input:disabled,
+.rj-hud-input[disabled] {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  background-color: #0c0d0e !important;
+  color: #6a6b6c !important;
+  border-color: #1a1b1c !important;
+}
+
+.rj-hud-switch input:disabled + .rj-hud-slider {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+}
+
 /* Minimized Floating Pill State */
 .rj-hud-pill {
   height: 32px;

@@ -8,7 +8,7 @@
 
 - **Current Milestone**: Phase 2 Complete (In-Page Draggable Floating Overlay HUD)
 - **Active Branch**: `task/draggable-overlay-ui`
-- **Latest Commit**: `feat(overlay): wire adaptive quick form, asset counter and bidirectional sync`
+- **Latest Commit**: `fix(ui): enforce model selection for automation and disable fields during processing`
 - **Working Tree**: Clean local branch (ready for review & merge to `dev`)
 - **Build / Test State**: Verified healthy (syntax validated, zero emoji clean)
 
@@ -18,12 +18,14 @@
 
 Phase 2 (In-Page Draggable Floating Overlay HUD) is 100% complete. The overlay HUD controller (`src/overlay/overlay.js`) mounts an isolated Shadow DOM (`#rj-overlay-host` with open mode) linking scoped stylesheet `src/overlay/overlay.css`, ensuring complete style immunity across all 7 supported microstock dashboards (Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas).
 
-The HUD features viewport-clamped drag-and-drop physics, fluid spring transitions (`cubic-bezier(0.16, 1, 0.3, 1)`), dual-mode display (270px Expanded Card and 32px Minimized Pill), and persistent coordinates stored in `chrome.storage.local`. In this session (Scope 2 Part 2), the HUD body was fully populated with:
+The HUD features viewport-clamped drag-and-drop physics, fluid spring transitions (`cubic-bezier(0.16, 1, 0.3, 1)`), dual-mode display (270px Expanded Card and 32px Minimized Pill), and persistent coordinates stored in `chrome.storage.local`. In this session (Scope 2 Part 2 & Polish), the HUD body was fully populated with:
 1. **Live Asset Detection & Counter**: Automatic querying for unsubmitted cards across all 7 platforms (Adobe Stock `div.upload-tile`, Shutterstock `div[data-testid="asset-card"]`, Freepik `div.catalog__item`, Vecteezy `div[data-testid="resource-card"]`, Dreamstime `div.upload-item[id]`, Depositphotos `tr.unfinished__item`, MiriCanvas `div.css-1qnaji9.e1pyeb4g3, div.panda-ehlNbj div.panda-gFNlpN`) with periodic (2.5s) and `MutationObserver` reactive updates.
 2. **Adaptive Quick Form**: Target keyword stepper with platform limit clamping (Adobe: 49, Dreamstime: 70, MiriCanvas: 25, others: 50), Index-0 priority specific keywords input with debounced persistence, and platform-adaptive AI Declaration toggle (hidden on Shutterstock & Depositphotos).
 3. **Primary Action Button**: Start/Stop automation button styled in deep emerald teal (`#079183`) toggling to danger red (`#ff6161`), paired with a mini progress track.
 4. **Bidirectional Synchronization**: Real-time state synchronization wired via `chrome.storage.onChanged` between the in-page HUD and `popup/popup.js`. Changing form inputs or toggling automation in either interface instantly updates the other without reload.
 5. **Dynamic Pill Status**: Minimized pill reflects live asset count (`12 Assets`) when idle and changes to `Running...` during automation.
+6. **Model Selection Guard**: Start Automation button in both popup and HUD is automatically disabled when the active provider lacks an API key or selected model, dynamically re-evaluating when switching providers or selecting models.
+7. **Processing State Safety**: All configuration controls across both the popup and in-page HUD are disabled during active execution (`isAutomationRunning === true`), preventing accidental configuration changes during processing.
 
 ---
 
@@ -85,7 +87,8 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| 15 | 2026-09-05 | `task/draggable-overlay-ui` | `feat(overlay)` | Adaptive quick form, live asset counter across 7 platforms, and bidirectional sync | Review & merge Phase 2 to dev |
+| 16 | 2026-09-05 | `task/draggable-overlay-ui` | `fix(ui)` | Model selection guard for automation and disabled fields during processing | Review & merge Phase 2 to dev |
+| 15 | 2026-09-05 | `task/draggable-overlay-ui` | `ce1539c` | Adaptive quick form, live asset counter across 7 platforms, and bidirectional sync | Review & merge Phase 2 to dev |
 | 14 | 2026-09-05 | `task/draggable-overlay-ui` | `8e48601` | Streamlined minimized pill (logo + Ready) and added fluid spring animations | Wire active form controls & sync (Part 2) |
 | 13 | 2026-09-05 | `task/draggable-overlay-ui` | `91a9384` | Isolated Shadow DOM injection, viewport-clamped draggable HUD, minimized pill, storage persistence | Wire active form controls & sync (Part 2) |
 | 12 | 2026-09-05 | `task/popup-storage` | `5db2436` | Modular dynamic form renderer, emerald teal (#079183) theme, logo asset, 237 Depositphotos countries, schema v3 | User review of Phase 1 popup, merge to dev |
