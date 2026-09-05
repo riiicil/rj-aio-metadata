@@ -6,32 +6,38 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 2 In-Progress (In-Page Draggable Floating Overlay HUD — Scope 1 Part 1)
+- **Current Milestone**: Phase 2 Complete (In-Page Draggable Floating Overlay HUD)
 - **Active Branch**: `task/draggable-overlay-ui`
-- **Latest Commit**: `feat(overlay): implement isolated shadow dom injection and draggable floating hud`
-- **Working Tree**: Clean local branch (ready for Scope 1 Part 2)
+- **Latest Commit**: `feat(overlay): wire adaptive quick form, asset counter and bidirectional sync`
+- **Working Tree**: Clean local branch (ready for review & merge to `dev`)
 - **Build / Test State**: Verified healthy (syntax validated, zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 2 Scope 1 Part 1 is complete. The In-Page Draggable Floating Overlay HUD foundation has been fully built and verified. The controller (`src/overlay/overlay.js`) mounts an isolated Shadow Root (`#rj-overlay-host` with open mode) and links scoped stylesheet `src/overlay/overlay.css`. This guarantees 100% style isolation against host page stylesheet interference across all 7 supported microstock dashboards (Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas).
+Phase 2 (In-Page Draggable Floating Overlay HUD) is 100% complete. The overlay HUD controller (`src/overlay/overlay.js`) mounts an isolated Shadow DOM (`#rj-overlay-host` with open mode) linking scoped stylesheet `src/overlay/overlay.css`, ensuring complete style immunity across all 7 supported microstock dashboards (Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas).
 
-The HUD features smooth drag-and-drop mechanics bound to `#rjHudHeader` and `#rjHudPill` with automated boundary clamping against viewport dimensions (`clampAndSetPosition`), defaulting initially to Top-Left (`top: 80px; left: 24px`) so it never obstructs native contributor metadata forms on the right. Coordinates and minimize/expanded states are automatically saved to and restored from `chrome.storage.local` under the `rj_hud_pos` key. The UI supports an Expanded HUD Card (270px width) and an Ultra-Compact Minimized Pill (32px height) with Phosphor/Lucide SVG icons. Following user design review, the pill was streamlined to display solely the RJ brand logo and "Ready" status label (removing the redundant "RJ AIO" text), and fluid spring transitions (`cubic-bezier(0.16, 1, 0.3, 1)`) were implemented for both card expand/collapse and overlay show/hide actions. The content script entry point (`src/content/content_main.js`) uses dynamic ES module imports to load `OverlayHUD` in compliance with Manifest V3 classic script execution contexts and listens for `TOGGLE_OVERLAY` messages relayed from the background service worker.
+The HUD features viewport-clamped drag-and-drop physics, fluid spring transitions (`cubic-bezier(0.16, 1, 0.3, 1)`), dual-mode display (270px Expanded Card and 32px Minimized Pill), and persistent coordinates stored in `chrome.storage.local`. In this session (Scope 2 Part 2), the HUD body was fully populated with:
+1. **Live Asset Detection & Counter**: Automatic querying for unsubmitted cards across all 7 platforms (Adobe Stock `div.upload-tile`, Shutterstock `div[data-testid="asset-card"]`, Freepik `div.catalog__item`, Vecteezy `div[data-testid="resource-card"]`, Dreamstime `div.upload-item[id]`, Depositphotos `tr.unfinished__item`, MiriCanvas `div.css-1qnaji9.e1pyeb4g3, div.panda-ehlNbj div.panda-gFNlpN`) with periodic (2.5s) and `MutationObserver` reactive updates.
+2. **Adaptive Quick Form**: Target keyword stepper with platform limit clamping (Adobe: 49, Dreamstime: 70, MiriCanvas: 25, others: 50), Index-0 priority specific keywords input with debounced persistence, and platform-adaptive AI Declaration toggle (hidden on Shutterstock & Depositphotos).
+3. **Primary Action Button**: Start/Stop automation button styled in deep emerald teal (`#079183`) toggling to danger red (`#ff6161`), paired with a mini progress track.
+4. **Bidirectional Synchronization**: Real-time state synchronization wired via `chrome.storage.onChanged` between the in-page HUD and `popup/popup.js`. Changing form inputs or toggling automation in either interface instantly updates the other without reload.
+5. **Dynamic Pill Status**: Minimized pill reflects live asset count (`12 Assets`) when idle and changes to `Running...` during automation.
 
 ---
 
 ## 3. Recommended Next Steps for Incoming Agent
 
-1. **Step 1 (Scope 1 Part 2 — Wire Form Controls & Bidirectional Sync)**:
-   - Expand `src/overlay/overlay.js` and `overlay.css` to render active metadata input fields (Title, Description, Category, Tags).
-   - Implement bidirectional state synchronization between `popup/popup.js` and the in-page overlay via storage change listeners or runtime messaging.
-2. **Step 2 (Scope 2 — Platform Adapters Integration)**:
-   - Connect HUD action buttons ("Auto-Tag All", "Apply Metadata", "Clear") to active platform adapters once Phase 4 adapters are in place.
+1. **Step 1 (User Review & Merge to Dev)**:
+   - Present Phase 2 completion for user review.
+   - Once approved, merge `task/draggable-overlay-ui` into `dev` using `git merge --no-ff`.
+2. **Step 2 (Phase 3 — Universal Vision Service)**:
+   - Branch `task/vision-service` off `dev`.
+   - Implement `src/services/AIService.js` (universal OpenAI-compatible multimodal chat completions client with multi-key round-robin support) and `src/services/PromptTemplates.js` (platform-tailored system prompts for microstock metadata generation).
 3. **Step 3 (Live Browser Verification)**:
    - Load unpacked `src/` in Chromium browser (`chrome://extensions/`).
-   - Navigate to contributor tabs (e.g. `contributor.stock.adobe.com`, `submit.shutterstock.com`) and verify drag physics, clamping at viewport edges, and storage persistence across reloads.
+   - Navigate to contributor tabs (e.g. `contributor.stock.adobe.com`, `submit.shutterstock.com`) and verify live card count detection, stepper boundaries, and popup bidirectional synchronization.
 
 ---
 
@@ -79,7 +85,8 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| 14 | 2026-09-05 | `task/draggable-overlay-ui` | `feat(overlay)` | Streamlined minimized pill (logo + Ready) and added fluid spring animations | Wire active form controls & sync (Part 2) |
+| 15 | 2026-09-05 | `task/draggable-overlay-ui` | `feat(overlay)` | Adaptive quick form, live asset counter across 7 platforms, and bidirectional sync | Review & merge Phase 2 to dev |
+| 14 | 2026-09-05 | `task/draggable-overlay-ui` | `8e48601` | Streamlined minimized pill (logo + Ready) and added fluid spring animations | Wire active form controls & sync (Part 2) |
 | 13 | 2026-09-05 | `task/draggable-overlay-ui` | `91a9384` | Isolated Shadow DOM injection, viewport-clamped draggable HUD, minimized pill, storage persistence | Wire active form controls & sync (Part 2) |
 | 12 | 2026-09-05 | `task/popup-storage` | `5db2436` | Modular dynamic form renderer, emerald teal (#079183) theme, logo asset, 237 Depositphotos countries, schema v3 | User review of Phase 1 popup, merge to dev |
 | 11 | 2026-09-04 | `task/popup-storage` | `a0c9ed9` | Smart dropup bounds detection, elevated stacking context, legible disabled field styling | Modular platform dynamic forms |

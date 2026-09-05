@@ -10,7 +10,7 @@
 
 - **Phase 0 — Governance & Research**: [COMPLETE] (Repository governance, design system, reference analyses)
 - **Phase 1 — Storage & Popup UI**: [COMPLETE] (Storage engine, background worker, modular platform-dynamic popup UI merged to dev)
-- **Phase 2 — In-Page Draggable Overlay HUD**: [IN_PROGRESS] (Isolated Shadow DOM injection, draggable header, floating pill, persistent coordinates)
+- **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, bidirectional sync)
 - **Phase 3 — Universal Vision Service**: [PLANNED] (OpenAI-compatible client & prompts)
 - **Phase 4 — Platform Adapters**: [PLANNED] (DOM injectors for 7 platforms)
 - **Phase 5 — End-to-End Testing & Polish**: [PLANNED] (E2E live verification & packaging)
@@ -23,7 +23,7 @@
 | :--- | :--- | :--- |
 | `main` | Clean (1 empty commit) | Stable production releases only |
 | `dev` | Integration (Phase 0 & 1 merged) | Active development integration branch |
-| `task/draggable-overlay-ui` | Active | Phase 2: In-Page Draggable Floating Overlay HUD |
+| `task/draggable-overlay-ui` | Active (Phase 2 complete) | Phase 2: In-Page Draggable Floating Overlay HUD |
 
 ---
 
@@ -64,7 +64,7 @@
   - `docs/agent-logs/2026-09-05.md` — Session Entries (newest on top).
   - `docs/references/` — 8 technical reference analyses for Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas, and Vision APIs.
 - **Source Code (`src/`):**
-  - `src/manifest.json` — Chromium Manifest V3 configuration, permissions, icons, action, service worker, web accessible resources.
+  - `src/manifest.json` — Chromium Manifest V3 configuration, permissions, icons, action, service worker, web accessible resources (`overlay/*`, `styles/*`, `icons/*`, `services/*`).
   - `src/icons/` — Extension icons (`icon16.png`, `icon48.png`, `icon128.png`, `logo_rj.png` branding logo).
   - `src/services/StorageService.js` — Storage engine with multi-provider config, schema version 3 migration, multi-key round-robin, and keyword priority.
   - `src/background/service_worker.js` — Dynamic `/v1/models` fetcher with Gemini query auth, active tab evaluator, platform navigator, overlay relay.
@@ -72,18 +72,17 @@
   - `src/styles/components.css` — Raycast Dark Precision form components, emerald teal accent interactive states, custom stepper control, floating custom select styles, transparent warning banner, and smooth slide-down conditional field animations.
   - `src/popup/popup.html` — Platform-adaptive toolbar popup interface with brand logo image integration and modular dynamic platform settings container adhering to `DESIGN.md`.
   - `src/popup/popup.css` — 380px dark canvas popup styling with brand logo image styling and sticky header/footer.
-  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, and 100% modular platform-dynamic form rendering with smooth conditional visibility.
+  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, 100% modular platform-dynamic form rendering, and bidirectional storage synchronization (`chrome.storage.onChanged`) with the in-page HUD.
   - `src/popup/custom_select.js` — Zero-dependency progressive dropdown enhancer replacing native OS selects with emerald teal highlights.
   - `src/popup/depositphotos_countries.js` — Complete 237 ISO countries catalog extracted for Depositphotos editorial location settings (omitting commercial option).
-  - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed, streamlined pill styling, and spring transition animations (`cubic-bezier(0.16, 1, 0.3, 1)`).
-  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, streamlined logo + Ready pill, and `chrome.storage.local` coordinate persistence.
+  - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed, streamlined pill styling, spring transition animations (`cubic-bezier(0.16, 1, 0.3, 1)`), adaptive quick form components, live asset counter bar, and primary action buttons.
+  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, live asset card scanner across all 7 platforms, adaptive quick form controls (stepper, specific keywords, adaptive AI declaration), and bidirectional synchronization via `chrome.storage.onChanged`.
   - `src/content/content_main.js` — Content script router importing OverlayHUD via dynamic import, auto-mounting HUD, and handling background toggle messages.
 
 ---
 
 ## 5. What Does NOT Exist Yet
 
-- In-Page HUD active form controls and bidirectional synchronization between Popup and Overlay HUD (Phase 2 Part 2).
 - `src/services/AIService.js` — Universal OpenAI-compatible multimodal vision client (Phase 3).
 - `src/services/PromptTemplates.js` — High-converting platform-optimized prompt templates (Phase 3).
 - `src/adapters/` — Platform DOM injector adapters (Adobe, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas) (Phase 4).
@@ -93,9 +92,9 @@
 
 ## 6. Testing & Build Verification Status
 
-- Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `overlay/`, `styles/`).
+- Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `overlay/`, `styles/`, `services/`).
 - Storage schema version 3 migration tested and verified in Node.js (obsolete keys purged, platform keyword limits clamped, legacy models handled).
-- Syntax validation passed for `src/overlay/overlay.js` and `src/content/content_main.js` via `node --check`.
+- Syntax validation passed for `src/overlay/overlay.js`, `src/content/content_main.js`, `src/popup/popup.js`, and `src/services/StorageService.js` via `node --check`.
 - Viewport boundary clamping and storage persistence logic verified.
 - Depositphotos 237 country catalog and custom select progressive enhancement verified.
 - Multi-API key round-robin distribution tested and verified across multi-line inputs.
@@ -107,4 +106,4 @@
 
 ## 7. Immediate Next Step
 
-Wire active form fields and bidirectional synchronization between Toolbar Popup and In-Page Overlay HUD (Phase 2 Scope 1 Part 2).
+User review and merge `task/draggable-overlay-ui` into `dev`, then proceed to Phase 3 (Universal Vision Service implementation).

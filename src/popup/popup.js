@@ -646,9 +646,34 @@ async function saveCurrentSettings() {
 }
 
 /**
+ * Updates the Start / Stop Automation button UI in the toolbar popup.
+ * @param {boolean} running
+ */
+function updateAutomationButtonUI(running) {
+  isAutomationRunning = Boolean(running);
+  if (isAutomationRunning) {
+    btnToggleAutomation.className = 'rj-btn rj-btn-danger';
+    automationBtnText.textContent = 'Stop Automation';
+    automationIcon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
+  } else {
+    btnToggleAutomation.className = 'rj-btn rj-btn-accent';
+    automationBtnText.textContent = 'Start Automation';
+    automationIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+  }
+}
+
+/**
  * Event Listeners Initialization
  */
 document.addEventListener('DOMContentLoaded', async () => {
+  // Restore running automation state if active in overlay
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    chrome.storage.local.get(['rj_automation_state'], (res) => {
+      if (res && res.rj_automation_state) {
+        updateAutomationButtonUI(Boolean(res.rj_automation_state.isRunning));
+      }
+    });
+  }
   // 1. Load Stored Config
   currentConfig = await StorageService.getConfig();
 
@@ -797,19 +822,54 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Event: Start / Stop Automation Toggle
   btnToggleAutomation.addEventListener('click', () => {
-    isAutomationRunning = !isAutomationRunning;
-    if (isAutomationRunning) {
-      btnToggleAutomation.className = 'rj-btn rj-btn-danger';
-      automationBtnText.textContent = 'Stop Automation';
-      automationIcon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
-      showToast('Automation started');
-    } else {
-      btnToggleAutomation.className = 'rj-btn rj-btn-accent';
-      automationBtnText.textContent = 'Start Automation';
-      automationIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
-      showToast('Automation stopped');
+    const nextRunningState = !isAutomationRunning;
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({
+        rj_automation_state: {
+          isRunning: nextRunningState,
+          platformId: currentActivePlatformId,
+          timestamp: Date.now()
+        }
+      });
     }
+    updateAutomationButtonUI(nextRunningState);
+    showToast(nextRunningState ? 'Automation started' : 'Automation stopped');
   });
+
+  // Listen to chrome.storage.onChanged for bidirectional sync
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      // 1. Sync automation state from overlay HUD
+      if (changes.rj_automation_state) {
+        const state = changes.rj_automation_state.newValue;
+        if (state) {
+          updateAutomationButtonUI(Boolean(state.isRunning));
+        }
+      }
+      // 2. Sync platformSettings changes from overlay HUD
+      if (changes.platformSettings) {
+        const newSettings = changes.platformSettings.newValue;
+        if (newSettings) {
+          currentConfig.platformSettings = newSettings;
+          if (currentActivePlatformId && newSettings[currentActivePlatformId]) {
+            const platSettings = newSettings[currentActivePlatformId];
+            const countInput = platformDynamicForm.querySelector('#keywordCountInput');
+            const specificInput = platformDynamicForm.querySelector('#specificKeywordsInput');
+            if (countInput && countInput !== document.activeElement && typeof platSettings.keywordCount === 'number') {
+              countInput.value = platSettings.keywordCount;
+            }
+            if (specificInput && specificInput !== document.activeElement && platSettings.specificKeywords !== undefined) {
+              specificInput.value = platSettings.specificKeywords;
+            }
+            const aiToggle = platformDynamicForm.querySelector(`#${currentActivePlatformId}_isAiGenerated`);
+            if (aiToggle && platSettings.isAiGenerated !== undefined) {
+              aiToggle.checked = Boolean(platSettings.isAiGenerated);
+            }
+          }
+        }
+      }
+    });
+  }
 
   // Event: Launch In-Page Overlay HUD
   btnLaunchOverlay.addEventListener('click', () => {
