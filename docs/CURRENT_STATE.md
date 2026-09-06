@@ -62,7 +62,7 @@
   - `docs/agent-logs/2026-09-02.md` — Session Entries 1 through 9 (newest on top).
   - `docs/agent-logs/2026-09-04.md` — Session Entries 1 and 2 (Docs and UI bounds detection).
   - `docs/agent-logs/2026-09-05.md` — Session Entries 1 through 6 (newest on top).
-  - `docs/agent-logs/2026-09-06.md` — Session Entry 1 (HUD polish, media tabs, single asset ID).
+  - `docs/agent-logs/2026-09-06.md` — Session Entries 1 and 2 (HUD polish, media tabs, single asset ID, label refinement, Shutterstock subtabs).
   - `docs/references/` — 8 technical reference analyses for Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas, and Vision APIs.
 - **Source Code (`src/`):**
   - `src/manifest.json` — Chromium Manifest V3 configuration with universal content scripts matches (`http://*/*`, `https://*/*`), permissions, icons, action, service worker, web accessible resources (`overlay/*`, `styles/*`, `icons/*`, `services/*`).
@@ -77,7 +77,7 @@
   - `src/popup/custom_select.js` — Zero-dependency progressive dropdown enhancer replacing native OS selects with emerald teal highlights.
   - `src/popup/depositphotos_countries.js` — Complete 237 ISO countries catalog extracted for Depositphotos editorial location settings (omitting commercial option).
   - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed, streamlined pill styling with SVG status icons (`.rj-status-icon-ready`, `.rj-status-icon-not-ready`), warning banner styles, spring transition animations (`cubic-bezier(0.16, 1, 0.3, 1)`), adaptive quick form components, live asset counter bar, and disabled control styles.
-  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, live asset scanner with specific Depositphotos subtab media detection (`32 Images Detected`, `3 Vectors Detected`, `1 Video Detected`), Dreamstime single-asset ID detection (`In ID 473814624`), non-microstock warning state, adaptive quick form controls (stepper, specific keywords, adaptive AI declaration), model selection guard for automation toggle, processing state field disabling, and bidirectional synchronization via `chrome.storage.onChanged`.
+  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, live asset scanner with specific Depositphotos and Shutterstock subtab media detection (`32 Images Detected`, `3 Videos Detected`), Dreamstime single-asset ID detection (`In ID 473814624`), non-microstock warning state and labels (`Unknown Page`, `Assets Not Detected`), adaptive quick form controls (stepper, specific keywords, adaptive AI declaration), model selection guard for automation toggle, processing state field disabling, and bidirectional synchronization via `chrome.storage.onChanged`.
   - `src/content/content_main.js` — Content script router importing OverlayHUD via dynamic import, auto-mounting HUD, and handling background toggle, ping, and status messages.
 
 

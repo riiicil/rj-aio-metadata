@@ -92,7 +92,7 @@ export class OverlayHUD {
     if (host.includes('freepik.com')) return 'Freepik';
     if (host.includes('depositphotos.com')) return 'Depositphotos';
     if (host.includes('miricanvas.com')) return 'MiriCanvas';
-    return 'RJ AIO Metadata';
+    return 'Unknown Page';
   }
 
   /**
@@ -115,11 +115,47 @@ export class OverlayHUD {
 
     // 2. Shutterstock
     if (host.includes('shutterstock.com')) {
-      const elements = document.querySelectorAll('div[data-testid="asset-card"]');
-      const count = elements.length;
+      const isVideoPath = window.location.pathname.includes('/video');
+      const isPhotoPath = window.location.pathname.includes('/photo');
+      const btnPhoto = document.querySelector('button[data-testid="media-type-photo-button"]');
+      const btnVideo = document.querySelector('button[data-testid="media-type-video-button"]');
+      const cards = document.querySelectorAll('div[data-testid="asset-card"]');
+
+      // Determine active media type: check path or button attributes
+      let isVideo = isVideoPath;
+      if (!isVideoPath && !isPhotoPath) {
+        if (btnVideo && (
+          btnVideo.getAttribute('aria-pressed') === 'true' ||
+          btnVideo.getAttribute('aria-selected') === 'true' ||
+          btnVideo.getAttribute('data-selected') === 'true' ||
+          btnVideo.classList.contains('active') ||
+          btnVideo.classList.contains('selected')
+        )) {
+          isVideo = true;
+        }
+      }
+
+      const mediaType = isVideo ? 'Videos' : 'Images';
+      const targetBtn = isVideo ? btnVideo : (btnPhoto || btnVideo);
+
+      let count = cards.length;
+      if (targetBtn) {
+        const text = targetBtn.textContent.trim();
+        const match = text.match(/(?:Images?|Videos?|Photos?)\s*\(\s*(\d+)\s*\)/i);
+        if (match) {
+          const parsed = parseInt(match[1], 10);
+          if (!isNaN(parsed)) {
+            count = parsed;
+          }
+        }
+      }
+
+      // Format media-specific label (e.g. "0 Images Detected", "1 Image Detected", "5 Videos Detected")
+      const pluralLabel = (count === 1 && mediaType.endsWith('s')) ? mediaType.slice(0, -1) : mediaType;
       return {
         count,
-        label: count > 0 ? `${count} Asset${count === 1 ? '' : 's'} Found` : '0 Assets Detected',
+        mediaType,
+        label: `${count} ${pluralLabel} Detected`,
         selector: 'div[data-testid="asset-card"]'
       };
     }
@@ -264,7 +300,7 @@ export class OverlayHUD {
     // 8. Unknown / Non-microstock platform
     return {
       count: 0,
-      label: 'Not on Microstock Tab',
+      label: 'Assets Not Detected',
       selector: ''
     };
   }
@@ -406,7 +442,7 @@ export class OverlayHUD {
               <svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>
               </svg>
-              <span>Not on a supported microstock contributor page.</span>
+              <span>Not a supported microstock page.</span>
             </div>
 
             <!-- Row 1: Live Asset Counter & Progress Indicator -->
