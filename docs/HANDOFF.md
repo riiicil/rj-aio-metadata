@@ -6,40 +6,49 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 2 Complete (In-Page Draggable Floating Overlay HUD)
-- **Active Branch**: `task/draggable-overlay-ui`
-- **Latest Commit**: `fix(ui): enforce model selection for automation and disable fields during processing`
-- **Working Tree**: Clean local branch (ready for review & merge to `dev`)
-- **Build / Test State**: Verified healthy (syntax validated, zero emoji clean)
+- **Current Milestone**: Phase 3 in progress (Step 3.1 complete, Step 3.2 next)
+- **Active Branch**: `task/vision-service`
+- **Latest Commit**: `feat(prompt): implement platform-adaptive prompt engine and schema builder`
+- **Working Tree**: Clean local branch
+- **Build / Test State**: Verified healthy (55/55 test assertions passed in scratch/test_ai_prompt.mjs, zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 2 (In-Page Draggable Floating Overlay HUD) is 100% complete. The overlay HUD controller (`src/overlay/overlay.js`) mounts an isolated Shadow DOM (`#rj-overlay-host` with open mode) linking scoped stylesheet `src/overlay/overlay.css`, ensuring complete style immunity across all 7 supported microstock dashboards (Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas).
+Phase 3 (Universal Vision AI Service & Prompt Engine) is officially underway. In Step 3.1, the core prompt engine (`src/services/AiPrompt.js`) was implemented and fully verified with zero external dependencies.
 
-The HUD features viewport-clamped drag-and-drop physics, fluid spring transitions (`cubic-bezier(0.16, 1, 0.3, 1)`), dual-mode display (270px Expanded Card and 32px Minimized Pill), and persistent coordinates stored in `chrome.storage.local`. In this session (Scope 2 Part 2 & Polish), the HUD body was fully populated with:
-1. **Live Asset Detection & Counter**: Automatic querying for unsubmitted cards across all 7 platforms (Adobe Stock `div.upload-tile`, Shutterstock `div[data-testid="asset-card"]`, Freepik `div.catalog__item`, Vecteezy `div[data-testid="resource-card"]`, Dreamstime `div.upload-item[id]`, Depositphotos `tr.unfinished__item`, MiriCanvas `div.css-1qnaji9.e1pyeb4g3, div.panda-ehlNbj div.panda-gFNlpN`) with periodic (2.5s) and `MutationObserver` reactive updates.
-2. **Adaptive Quick Form**: Target keyword stepper with platform limit clamping (Adobe: 49, Dreamstime: 70, MiriCanvas: 25, others: 50), Index-0 priority specific keywords input with debounced persistence, and platform-adaptive AI Declaration toggle (hidden on Shutterstock & Depositphotos).
-3. **Primary Action Button**: Start/Stop automation button styled in deep emerald teal (`#079183`) toggling to danger red (`#ff6161`), paired with a mini progress track.
-4. **Bidirectional Synchronization**: Real-time state synchronization wired via `chrome.storage.onChanged` between the in-page HUD and `popup/popup.js`. Changing form inputs or toggling automation in either interface instantly updates the other without reload.
-5. **Dynamic Pill Status**: Minimized pill reflects live asset count (`12 Assets`) when idle and changes to `Running...` during automation.
-6. **Model Selection Guard**: Start Automation button in both popup and HUD is automatically disabled when the active provider lacks an API key or selected model, dynamically re-evaluating when switching providers or selecting models.
-7. **Processing State Safety**: All configuration controls across both the popup and in-page HUD are disabled during active execution (`isAutomationRunning === true`), preventing accidental configuration changes during processing.
+`src/services/AiPrompt.js` serves as the single source of truth for:
+1. **Official Platform Category Dictionaries (`PLATFORM_CATEGORIES`)**:
+   - Adobe Stock: 21 official categories with numeric ID mappings (`10001` through `10988`).
+   - Shutterstock: 26 Image categories vs 19 Video categories (strictly omitting abstract, beauty, interiors, vintage, etc. on video).
+   - Dreamstime: Complete 15 Main categories and hierarchical subcategory trees extracted from `docs/references/analysis_dreamstime.md` Section 6.
+   - Depositphotos, Vecteezy, Freepik, MiriCanvas: Defined as empty dictionaries (category selection not required on these platforms).
+2. **Platform Schema & Output Format Generator (`getPlatformOutputSchema`)**:
+   - Dynamic JSON schema representation for all 7 platforms.
+   - Enforces Dreamstime 3 category pairs for standard uploads vs 2 category pairs for AI-generated assets (3rd slot reserved by platform).
+   - Omit category fields entirely for platforms without category requirements.
+3. **Structured Microstock Prompt Generator (`buildPrompt`)**:
+   - System prompt establishing world-class microstock SEO specialist persona.
+   - Enforces flat 80-keyword quota ordered by relevance from primary subject to broader contextual terms.
+   - Keyword structure: single word or maximum 2 words per tag without punctuation.
+   - Prohibits spammy/banned terms (`best`, `top`, `isolated`, `white background`, `no people`, `copy space`, trademarks).
+   - Injects Adobe Stock non-English language instructions when configured.
+4. **Multimodal OpenAI Chat Payload Builder (`buildChatPayload`)**:
+   - Constructs standard `POST /v1/chat/completions` request body with `response_format: { type: "json_object" }` and `max_completion_tokens: 1200`.
+   - Normalizes Base64 image URIs (`normalizeBase64Image`), formatting clean `data:image/jpeg;base64,...` with `detail: "low"` to save >90% tokens.
+   - **Critical Parameter Safety Guard**: Detects GPT-5 and reasoning models (`/^(o1|o3|gpt-5)/i.test(model)`) and automatically omits the `temperature` parameter to prevent HTTP 400 rejection errors.
 
 ---
 
 ## 3. Recommended Next Steps for Incoming Agent
 
-1. **Step 1 (User Review & Merge to Dev)**:
-   - Present Phase 2 completion for user review.
-   - Once approved, merge `task/draggable-overlay-ui` into `dev` using `git merge --no-ff`.
-2. **Step 2 (Phase 3 — Universal Vision Service)**:
-   - Branch `task/vision-service` off `dev`.
-   - Implement `src/services/AIService.js` (universal OpenAI-compatible multimodal chat completions client with multi-key round-robin support) and `src/services/PromptTemplates.js` (platform-tailored system prompts for microstock metadata generation).
-3. **Step 3 (Live Browser Verification)**:
-   - Load unpacked `src/` in Chromium browser (`chrome://extensions/`).
-   - Navigate to contributor tabs (e.g. `contributor.stock.adobe.com`, `submit.shutterstock.com`) and verify live card count detection, stepper boundaries, and popup bidirectional synchronization.
+1. **Step 1 (Step 3.2 — Comprehensive Sanitizer Engine)**:
+   - Implement `src/services/SanitizerService.js` handling keyword sanitization, symbol stripping, title length clamping, and platform-specific banned term removal.
+2. **Step 2 (Step 3.3 — Universal Vision Client & Service Worker Proxy)**:
+   - Implement `src/services/AiService.js` and update `src/background/service_worker.js` with multi-key round-robin, rate-limiting, exponential backoff, and CORS background routing.
+3. **Step 3 (Verification)**:
+   - Run unit test suites and verify cross-model requests across Gemini, Mistral, OpenAI, and OpenRouter.
 
 ---
 
@@ -87,6 +96,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 22 | 2026-09-07 | `task/vision-service` | `feat(prompt)` | Implemented AiPrompt.js with official category taxonomies, schemas, 80-keyword prompts, and payload builder | Step 3.2: SanitizerService.js |
 | 21 | 2026-09-07 | `task/draggable-overlay-ui` | `56f7f1a` | Synchronized roadmap with real Phase 2 implementation, marked Phases 0, 1, 2 complete, Phase 3 next | User manual merge to dev, then Phase 3 |
 | 20 | 2026-09-06 | `task/draggable-overlay-ui` | `374242f` | Enhanced toast contrast, sub-header positioning, and smooth slide-out exit animation | Review & merge Phase 2 to dev |
 | 19 | 2026-09-06 | `task/draggable-overlay-ui` | `7067daa` | Minimized pill Layers asset icon separation and top-right stacked toast queue system | Review & merge Phase 2 to dev |
