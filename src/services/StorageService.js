@@ -106,6 +106,10 @@ export class StorageService {
    */
   static async getConfig() {
     return new Promise(resolve => {
+      if (typeof chrome === 'undefined' || !chrome.storage) {
+        resolve(StorageService._deepMerge(DEFAULT_CONFIG, {}));
+        return;
+      }
       chrome.storage.sync.get(null, stored => {
         let rawData = stored;
         if (chrome.runtime.lastError || !rawData || Object.keys(rawData).length === 0) {
@@ -120,6 +124,14 @@ export class StorageService {
         resolve(config);
       });
     });
+  }
+
+  /**
+   * Alias for getConfig()
+   * @returns {Promise<typeof DEFAULT_CONFIG>}
+   */
+  static async loadConfig() {
+    return StorageService.getConfig();
   }
 
   /**

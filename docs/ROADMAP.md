@@ -15,9 +15,9 @@ gantt
     section Phase 2
     Draggable Overlay HUD         :done, 2026-09-05, 2d
     section Phase 3
-    Universal Vision API Engine   :active, 2026-09-07, 2d
+    Universal Vision API Engine   :done, 2026-09-07, 2d
     section Phase 4
-    Platform Adapters (7 Sites)   :2026-09-09, 2d
+    Platform Adapters (7 Sites)   :active, 2026-09-09, 2d
     section Phase 5
     E2E Automation & Release      :2026-09-11, 1d
 ```
@@ -75,19 +75,28 @@ gantt
 
 ---
 
-### Phase 3: Universal OpenAI-Compatible Vision AI Service & Prompt Engine `[NEXT]`
-- [ ] Implement `src/services/AiVisionService.js`:
-  - Standard OpenAI `POST /v1/chat/completions` client with multimodal base64 image support.
-  - Provider presets: Gemini, Groq, Mistral, OpenAI, OpenRouter, and Custom Endpoint.
-  - Automatic rate-limiting and retry handler with exponential backoff.
-- [ ] Implement `src/services/PromptBuilder.js`:
-  - Structured prompt engineering optimized for microstock SEO (Commercial vs Editorial title, top 30-50 high-converting keywords, category mapping).
-- [ ] Implement `src/services/SanitizerService.js`:
-  - Prohibited terms filtering, symbol stripping, and platform-specific sanitization.
+### Phase 3: Universal OpenAI-Compatible Vision AI Service & Prompt Engine `[COMPLETE]`
+- [x] Implement `src/services/AiPrompt.js`:
+  - Platform-adaptive prompt engineering optimized for microstock SEO (commercial relevance, flat 80-keyword quota, 1-2 words/tag, non-English language routing for Adobe Stock).
+  - Official platform category taxonomies (Adobe Stock 21 IDs, Shutterstock 26 Image / 19 Video, Dreamstime 15 Main & Subcategories).
+  - Dynamic output schemas with character safety margins (Adobe/Vecteezy title <=185, Freepik/MiriCanvas title <=90, descriptions <=230; Vecteezy description strictly omitted).
+  - Multimodal OpenAI `buildChatPayload` with model-safe parameter guards (omits `temperature` for strict models like GPT-5, o1, o3).
+- [x] Implement `src/services/SanitizerService.js`:
+  - Resilient JSON extraction and repair (`extractAndParseJson`) from markdown fences (```json) and conversational text, with trailing comma repair.
+  - Microstock keyword pipeline (`sanitizeKeywords`): word count <=2, symbol stripping, Vecteezy/general prohibited terms filtering, user custom keywords index-0 priority, case-insensitive deduplication, and platform quota clamping.
+  - Smart boundary clamping (`sanitizeTitle`, `sanitizeDescription`): sentence boundary cut, word boundary cut without mid-word cuts, mandatory trailing period.
+  - Shutterstock editorial prefix normalization (`: `, double-prefix prevention) and unified `sanitizeMetadata` facade.
+- [x] Implement `src/services/AiService.js` and background proxy worker (`src/background/service_worker.js`):
+  - Multimodal image conversion utility (`imageToBase64`) supporting Data URLs, raw base64, and image URLs.
+  - Background proxy worker handler (`handleGenerateVisionMetadata`) bypassing browser CORS/CSP restrictions.
+  - Multi-API key round-robin distribution via `StorageService.getRoundRobinApiKey` and `assetIndex`.
+  - Multi-provider authentication router: Google Gemini (`?key=` + `x-goog-api-key`), OpenRouter (`Bearer` + `HTTP-Referer` + `X-Title`), OpenAI, Mistral, and Custom (`Bearer`).
+  - Resilient request execution with exponential backoff retry (429/5xx, 1s/2s/4s) and robust error classification (`API_KEY_INVALID`, `MODEL_NOT_FOUND`, `RATE_LIMIT_EXCEEDED`, `PROVIDER_SERVER_ERROR`).
+  - Unified `generateMetadata` pipeline facade and injectable test dispatcher.
 
 ---
 
-### Phase 4: Platform Adapters Implementation (7 Platforms)
+### Phase 4: Platform Adapters Implementation (7 Platforms) `[NEXT]`
 - [ ] Create `src/adapters/BaseAdapter.js` abstract interface.
 - [ ] **Tier 1 Adapters**:
   - `AdobeStockAdapter.js` (React Spectrum value setter, 21 categories).
