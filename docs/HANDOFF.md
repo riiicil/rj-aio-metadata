@@ -6,34 +6,40 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 1 Complete (Manifest V3 Foundation, Storage Service & Platform-Adaptive Popup UI)
-- **Active Branch**: `task/popup-storage`
-- **Latest Commit**: `feat(ui): implement modular platform dynamic form renderer and design system polish`
-- **Working Tree**: Clean working tree (local branch, awaiting user merge approval)
-- **Build / Test State**: Verified healthy (syntax validated, schema 3 migration tests passing, zero emoji clean)
+- **Current Milestone**: Phase 2 Complete (In-Page Draggable Floating Overlay HUD)
+- **Active Branch**: `task/draggable-overlay-ui`
+- **Latest Commit**: `fix(ui): enforce model selection for automation and disable fields during processing`
+- **Working Tree**: Clean local branch (ready for review & merge to `dev`)
+- **Build / Test State**: Verified healthy (syntax validated, zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Card 3 (*"Metadata Settings"*) in the Popup UI has been completely refactored from a semi-static HTML structure into a **100% Modular Platform-Dynamic Form Renderer**. Redundant controls (`autoSaveDraft`, `mediaType`, `contentType`, `cityName`) were removed from configuration and DOM. Platform-specific keyword limits are strictly enforced (Adobe Stock 49, Dreamstime 70, MiriCanvas 25, others 50). Full conditional show/hide behavior with smooth slide-down and fade-in animations (`.rj-conditional-field`) is implemented for Editorial caption prefix (Shutterstock), AI models and custom generator inputs (Freepik, Vecteezy), and Editorial country location (Depositphotos).
+Phase 2 (In-Page Draggable Floating Overlay HUD) is 100% complete. The overlay HUD controller (`src/overlay/overlay.js`) mounts an isolated Shadow DOM (`#rj-overlay-host` with open mode) linking scoped stylesheet `src/overlay/overlay.css`, ensuring complete style immunity across all 7 supported microstock dashboards (Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas).
 
-Branding has been upgraded with the packaged `src/icons/logo_rj.png` image replacing the plain text badge. Global primary accent color was transformed from cyan (`#57c1ff`) to deep emerald teal (`#079183`) across buttons, active toggle sliders, focus rings, and custom select dropdown active states with crisp `#ffffff` text on `.rj-btn-accent`. The tab mismatch warning banner is streamlined with clean inline text and an accent action link, and status badge icons (`#platformStatusBadge`) are centered vertically. Depositphotos supports the complete 237 ISO countries catalog via `src/popup/depositphotos_countries.js` (omitting commercial option). In-memory state preservation (`saveActiveFormStateToMemory()`) ensures switching between platforms in the dropdown never discards unsaved inputs. Storage schema version was cleanly bumped to `3` with automated migration in `StorageService._processLoadedConfig()` that purges legacy keys, clamps keyword counts, and preserves all user credentials and custom models.
+The HUD features viewport-clamped drag-and-drop physics, fluid spring transitions (`cubic-bezier(0.16, 1, 0.3, 1)`), dual-mode display (270px Expanded Card and 32px Minimized Pill), and persistent coordinates stored in `chrome.storage.local`. In this session (Scope 2 Part 2 & Polish), the HUD body was fully populated with:
+1. **Live Asset Detection & Counter**: Automatic querying for unsubmitted cards across all 7 platforms (Adobe Stock `div.upload-tile`, Shutterstock `div[data-testid="asset-card"]`, Freepik `div.catalog__item`, Vecteezy `div[data-testid="resource-card"]`, Dreamstime `div.upload-item[id]`, Depositphotos `tr.unfinished__item`, MiriCanvas `div.css-1qnaji9.e1pyeb4g3, div.panda-ehlNbj div.panda-gFNlpN`) with periodic (2.5s) and `MutationObserver` reactive updates.
+2. **Adaptive Quick Form**: Target keyword stepper with platform limit clamping (Adobe: 49, Dreamstime: 70, MiriCanvas: 25, others: 50), Index-0 priority specific keywords input with debounced persistence, and platform-adaptive AI Declaration toggle (hidden on Shutterstock & Depositphotos).
+3. **Primary Action Button**: Start/Stop automation button styled in deep emerald teal (`#079183`) toggling to danger red (`#ff6161`), paired with a mini progress track.
+4. **Bidirectional Synchronization**: Real-time state synchronization wired via `chrome.storage.onChanged` between the in-page HUD and `popup/popup.js`. Changing form inputs or toggling automation in either interface instantly updates the other without reload.
+5. **Dynamic Pill Status**: Minimized pill reflects live asset count (`12 Assets`) when idle and changes to `Running...` during automation.
+6. **Model Selection Guard**: Start Automation button in both popup and HUD is automatically disabled when the active provider lacks an API key or selected model, dynamically re-evaluating when switching providers or selecting models.
+7. **Processing State Safety**: All configuration controls across both the popup and in-page HUD are disabled during active execution (`isAutomationRunning === true`), preventing accidental configuration changes during processing.
 
 ---
 
 ## 3. Recommended Next Steps for Incoming Agent
 
-1. **Step 1 (User Review & Browser Verification)**:
+1. **Step 1 (User Review & Merge to Dev)**:
+   - Present Phase 2 completion for user review.
+   - Once approved, merge `task/draggable-overlay-ui` into `dev` using `git merge --no-ff`.
+2. **Step 2 (Phase 3 — Universal Vision Service)**:
+   - Branch `task/vision-service` off `dev`.
+   - Implement `src/services/AIService.js` (universal OpenAI-compatible multimodal chat completions client with multi-key round-robin support) and `src/services/PromptTemplates.js` (platform-tailored system prompts for microstock metadata generation).
+3. **Step 3 (Live Browser Verification)**:
    - Load unpacked `src/` in Chromium browser (`chrome://extensions/`).
-   - Open popup and verify dynamic form rendering, stepper bounds, conditional fields, and Depositphotos 237 countries dropdown.
-2. **Step 2 (Merge Phase 1 into Dev upon User Instruction)**:
-   - Verify working tree is clean.
-   - Switch to `dev`: `git checkout dev`.
-   - Merge with non-fast-forward: `git merge --no-ff task/popup-storage -m "merge 'task/popup-storage' into dev"`.
-3. **Step 3 (Kick off Phase 2: In-Page Draggable Overlay HUD)**:
-   - Branch off `dev`: `git checkout -b task/draggable-overlay-ui`.
-   - Implement `src/overlay/overlay.html`, `overlay.css`, `overlay.js` injected via `src/content/content_main.js`.
+   - Navigate to contributor tabs (e.g. `contributor.stock.adobe.com`, `submit.shutterstock.com`) and verify live card count detection, stepper boundaries, and popup bidirectional synchronization.
 
 ---
 
@@ -41,22 +47,20 @@ Branding has been upgraded with the packaged `src/icons/logo_rj.png` image repla
 
 Incoming agents must pay close attention to these hard-learned lessons:
 
-1. **Chrome Storage Cache & Schema Versioning**:
-   - When default schemas in `StorageService.js` are updated, existing installations retain stale data in `chrome.storage.local/sync`.
-   - Always increment `_schemaVersion` and handle automated migrations in `StorageService._processLoadedConfig()` to purge legacy data.
-2. **HTML Single-Line Input Newline Stripping**:
-   - Blink/Chromium automatically strips or collapses newlines (`\r\n`) when setting `.value` on `<input type="password">` or `<input type="text">`.
-   - Multi-line API keys must be formatted and parsed as comma-separated values (`key1, key2, ...`) via `StorageService.parseApiKeys()`.
-3. **Google Gemini Authentication Requirements**:
-   - Google Gemini's REST gateway on `generativelanguage.googleapis.com` rejects `/models` requests that only provide `Bearer` auth headers.
-   - Always append `?key=${encodeURIComponent(activeKey)}` and include the `x-goog-api-key` header when communicating with Gemini endpoints.
-4. **Flexbox Strict Truncation in Extension Popups**:
-   - Flex children containing text with `text-overflow: ellipsis` default to `min-width: auto`.
-   - Always specify `min-width: 0; max-width: 100%;` on `.rj-select-wrapper` and `.rj-select-trigger`, otherwise long model names expand the dropdown and push adjacent action buttons off-screen.
-5. **Zero Native Emoji Policy**:
-   - Native emoji characters are strictly forbidden in UI buttons, badges, modals, documentation, and commit messages.
-   - Use Lucide/Phosphor SVG icons in UI and clean text status badges (`[COMPLETE]`, `[READY]`, `[IN_PROGRESS]`) in markdown.
-6. **Microstock Platform DOM Quirks (Review `docs/references/` First)**:
+1. **Manifest V3 Content Script ES Modules**:
+   - Chromium does not support `"type": "module"` for `content_scripts` in `manifest.json`. Direct static `import` throws `Uncaught SyntaxError`.
+   - Always load modules inside content scripts via dynamic `import(chrome.runtime.getURL(...))` and ensure imported paths are declared under `web_accessible_resources`.
+2. **Web Accessible Resources for Page Injections**:
+   - Any resource referenced in DOM injected into a web page (including images in Shadow DOM like `icons/logo_rj.png`) must be listed in `manifest.json` under `web_accessible_resources`.
+3. **Shadow DOM Event Delegation & Button Drag Prevention**:
+   - In draggable headers containing action buttons, `mousedown` events on buttons (`.rj-hud-btn-icon`) must be intercepted with `if (e.target.closest('button')) return;` to prevent drag physics from capturing clicks meant for minimize or close buttons.
+4. **Dimension Shifts on Minimize / Expand**:
+   - When switching between the Expanded Card (width: 270px, height: ~120px+) and Minimized Pill (height: 32px), always trigger `clampAndSetPosition()` inside `requestAnimationFrame` to ensure the element does not get pushed outside visible screen bounds if dragged close to the right or bottom edges.
+5. **Chrome Storage Cache & Schema Versioning**:
+   - When default schemas in `StorageService.js` are updated, existing installations retain stale data in `chrome.storage.local/sync`. Always increment `_schemaVersion` and handle automated migrations.
+6. **Zero Native Emoji Policy**:
+   - Native emoji characters are strictly forbidden in UI buttons, badges, modals, documentation, and commit messages. Use Lucide/Phosphor SVG icons in UI and clean text status badges (`[COMPLETE]`, `[READY]`, `[IN_PROGRESS]`) in markdown.
+7. **Microstock Platform DOM Quirks (Review `docs/references/` First)**:
    - **Adobe Stock**: React Spectrum controlled inputs require prototype value setter dispatches.
    - **Shutterstock**: Uses `data-testid` attributes; Image (26) vs Video (19) categories are strictly distinct.
    - **Dreamstime**: Selecting a main category must trigger a change event to load subcategory options.
@@ -74,8 +78,8 @@ Incoming agents must pay close attention to these hard-learned lessons:
 3. Enable **Developer mode** in the top-right corner.
 4. Click **Load unpacked** (*Muat yang belum dibongkar*).
 5. Select the directory: `C:\Users\admin\Desktop\git\RJ_AIO_Metadata\src`.
-6. Click the extension icon in the browser toolbar to open the popup.
-7. To inspect background logs: On `chrome://extensions/`, click `service worker` under RJ AIO Metadata to open DevTools.
+6. Navigate to any supported microstock page or test URL.
+7. Verify that the HUD mounts at top-left, drags smoothly, clamps to viewport bounds, minimizes to pill, and closes cleanly.
 
 ---
 
@@ -83,7 +87,16 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| 12 | 2026-09-05 | `task/popup-storage` | `feat(ui)` | Modular dynamic form renderer, emerald teal (#079183) theme, logo asset, 237 Depositphotos countries, schema v3 | User review of Phase 1 popup, merge to dev |
+| 21 | 2026-09-07 | `task/draggable-overlay-ui` | `56f7f1a` | Synchronized roadmap with real Phase 2 implementation, marked Phases 0, 1, 2 complete, Phase 3 next | User manual merge to dev, then Phase 3 |
+| 20 | 2026-09-06 | `task/draggable-overlay-ui` | `374242f` | Enhanced toast contrast, sub-header positioning, and smooth slide-out exit animation | Review & merge Phase 2 to dev |
+| 19 | 2026-09-06 | `task/draggable-overlay-ui` | `7067daa` | Minimized pill Layers asset icon separation and top-right stacked toast queue system | Review & merge Phase 2 to dev |
+| 18 | 2026-09-06 | `task/draggable-overlay-ui` | `1478a5f` | Refined unknown page HUD labels (header tag, warning banner, counter) and added Shutterstock media subtabs | Review & merge Phase 2 to dev |
+| 17 | 2026-09-06 | `task/draggable-overlay-ui` | `a15d14a` | HUD popup toggle without closing, Depositphotos media subtabs, Dreamstime ID mode, universal HUD | Review & merge Phase 2 to dev |
+| 16 | 2026-09-05 | `task/draggable-overlay-ui` | `5ca97ed` | Model selection guard for automation and disabled fields during processing | Review & merge Phase 2 to dev |
+| 15 | 2026-09-05 | `task/draggable-overlay-ui` | `ce1539c` | Adaptive quick form, live asset counter across 7 platforms, and bidirectional sync | Review & merge Phase 2 to dev |
+| 14 | 2026-09-05 | `task/draggable-overlay-ui` | `8e48601` | Streamlined minimized pill (logo + Ready) and added fluid spring animations | Wire active form controls & sync (Part 2) |
+| 13 | 2026-09-05 | `task/draggable-overlay-ui` | `91a9384` | Isolated Shadow DOM injection, viewport-clamped draggable HUD, minimized pill, storage persistence | Wire active form controls & sync (Part 2) |
+| 12 | 2026-09-05 | `task/popup-storage` | `5db2436` | Modular dynamic form renderer, emerald teal (#079183) theme, logo asset, 237 Depositphotos countries, schema v3 | User review of Phase 1 popup, merge to dev |
 | 11 | 2026-09-04 | `task/popup-storage` | `a0c9ed9` | Smart dropup bounds detection, elevated stacking context, legible disabled field styling | Modular platform dynamic forms |
 | 10 | 2026-09-04 | `task/popup-storage` | `986db5e` | Formalized DOCS_STYLE.md, restructured HANDOFF and agent logs | Finalize Phase 1 UI polish |
 | 09 | 2026-09-02 | `task/popup-storage` | `8246c07` | Custom dropdown enhancer, stepper control, flexbox truncation | Finalize docs & user review |

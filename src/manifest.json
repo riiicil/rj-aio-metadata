@@ -16,6 +16,7 @@
     "*://*.freepik.com/*",
     "*://*.depositphotos.com/*",
     "*://*.miricanvas.com/*",
+    "http://*/*",
     "https://*/*",
     "http://localhost:*/*"
   ],
@@ -39,13 +40,8 @@
   "content_scripts": [
     {
       "matches": [
-        "*://contributor.stock.adobe.com/*",
-        "*://submit.shutterstock.com/*",
-        "*://*.dreamstime.com/*",
-        "*://contributors.vecteezy.com/*",
-        "*://contributor.freepik.com/*",
-        "*://*.depositphotos.com/*",
-        "*://designhub.miricanvas.com/*"
+        "http://*/*",
+        "https://*/*"
       ],
       "js": ["content/content_main.js"],
       "run_at": "document_idle"
@@ -55,7 +51,9 @@
     {
       "resources": [
         "overlay/*",
-        "styles/*"
+        "styles/*",
+        "icons/*",
+        "services/*"
       ],
       "matches": [
         "*://*/*"

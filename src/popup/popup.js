@@ -53,8 +53,7 @@ const btnSaveSettings = document.getElementById('btnSaveSettings');
 const btnToggleAutomation = document.getElementById('btnToggleAutomation');
 const automationIcon = document.getElementById('automationIcon');
 const automationBtnText = document.getElementById('automationBtnText');
-const toastNotification = document.getElementById('toastNotification');
-const toastMessage = document.getElementById('toastMessage');
+const toastContainer = document.getElementById('toastContainer');
 
 /**
  * HTML String Sanitizer for Input Values
@@ -70,16 +69,90 @@ function escapeHtml(str) {
 }
 
 /**
- * Toast Notification Utility
+ * Stacked Toast Notification System
+ * FIFO Queue: Max 3 stacked toasts, top-right positioning, 2-line clamped text,
+ * manual dismiss button, and 4500ms auto-dismiss with smooth reflow.
  */
+const MAX_TOASTS = 3;
+const TOAST_DURATION = 4500;
+const activeToasts = [];
+
 function showToast(msg, isError = false) {
-  toastMessage.textContent = msg;
-  toastNotification.style.borderColor = isError ? 'rgba(255, 97, 97, 0.4)' : 'rgba(89, 212, 153, 0.4)';
-  toastNotification.style.color = isError ? '#ff6161' : '#59d499';
-  toastNotification.classList.add('rj-toast-visible');
+  const container = document.getElementById('toastContainer') || toastContainer;
+  if (!container) return;
+
+  // Enforce max 3 stacked toasts (FIFO: dismiss oldest if limit reached)
+  if (activeToasts.length >= MAX_TOASTS) {
+    const oldest = activeToasts[0];
+    dismissToast(oldest);
+  }
+
+  const toastEl = document.createElement('div');
+  const typeClass = isError ? 'rj-toast-error' : 'rj-toast-success';
+  toastEl.className = `rj-toast-item ${typeClass}`;
+
+  const iconSvg = isError
+    ? `<svg class="rj-toast-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>`
+    : `<svg class="rj-toast-icon" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>`;
+
+  toastEl.innerHTML = `
+    ${iconSvg}
+    <div class="rj-toast-body">
+      <p class="rj-toast-text" title="${escapeHtml(String(msg))}">${escapeHtml(String(msg))}</p>
+    </div>
+    <button type="button" class="rj-toast-close" aria-label="Dismiss notification" title="Dismiss">
+      <svg class="rj-toast-close-icon" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  `;
+
+  const toastItem = {
+    el: toastEl,
+    timer: null
+  };
+
+  const btnClose = toastEl.querySelector('.rj-toast-close');
+  if (btnClose) {
+    btnClose.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismissToast(toastItem);
+    });
+  }
+
+  toastItem.timer = setTimeout(() => {
+    dismissToast(toastItem);
+  }, TOAST_DURATION);
+
+  container.appendChild(toastEl);
+  activeToasts.push(toastItem);
+}
+
+function dismissToast(toastItem) {
+  if (!toastItem || !toastItem.el) return;
+  if (toastItem.timer) {
+    clearTimeout(toastItem.timer);
+    toastItem.timer = null;
+  }
+
+  const idx = activeToasts.indexOf(toastItem);
+  if (idx !== -1) {
+    activeToasts.splice(idx, 1);
+  }
+
+  toastItem.el.classList.add('rj-toast-hiding');
   setTimeout(() => {
-    toastNotification.classList.remove('rj-toast-visible');
-  }, 2200);
+    if (toastItem.el && toastItem.el.parentNode) {
+      toastItem.el.parentNode.removeChild(toastItem.el);
+    }
+  }, 280);
 }
 
 /**
@@ -615,6 +688,10 @@ function renderPlatformDynamicForm(platformId) {
 
   // Initialize Custom Selects for Newly Rendered Elements
   CustomSelect.initAll(platformDynamicForm);
+
+  if (isAutomationRunning) {
+    setFormDisabledState(true);
+  }
 }
 
 /**
@@ -643,12 +720,155 @@ async function saveCurrentSettings() {
   // 3. Persist to storage
   await StorageService.saveConfig(currentConfig);
   showToast('Settings saved successfully');
+  updateAutomationButtonUI(isAutomationRunning);
+}
+
+/**
+ * Checks if the currently active provider has valid credentials and a selected model.
+ * @returns {boolean}
+ */
+function isCurrentProviderReady() {
+  const activeProvId = providerSelect ? providerSelect.value : (currentConfig.activeProvider || 'gemini');
+  const provider = currentConfig.providers ? currentConfig.providers[activeProvId] : null;
+  if (!provider) return false;
+
+  const rawKey = (apiKeyInput ? apiKeyInput.value.trim() : '') || provider.apiKey || '';
+  const keys = StorageService.parseApiKeys(rawKey);
+  const selectedModel = (modelSelect ? modelSelect.value : '') || provider.selectedModel || '';
+
+  return keys.length > 0 && Boolean(selectedModel) && (modelSelect ? !modelSelect.disabled : true);
+}
+
+/**
+ * Toggles disabled state on all settings fields during active automation.
+ * @param {boolean} disabled
+ */
+function setFormDisabledState(disabled) {
+  // 1. Target Platform Card
+  if (platformSelect) {
+    platformSelect.disabled = disabled;
+    CustomSelect.refresh(platformSelect);
+  }
+  if (btnNavigatePlatform) {
+    btnNavigatePlatform.disabled = disabled;
+    btnNavigatePlatform.style.pointerEvents = disabled ? 'none' : '';
+    btnNavigatePlatform.style.opacity = disabled ? '0.4' : '';
+  }
+
+  // 2. AI Provider Card
+  if (providerSelect) {
+    providerSelect.disabled = disabled;
+    CustomSelect.refresh(providerSelect);
+  }
+  if (baseUrlInput) {
+    baseUrlInput.disabled = disabled || (providerSelect.value !== 'custom');
+  }
+  if (apiKeyInput) {
+    apiKeyInput.disabled = disabled;
+  }
+  if (btnToggleApiKey) {
+    btnToggleApiKey.disabled = disabled;
+  }
+  if (btnBrowseApiKey) {
+    btnBrowseApiKey.disabled = disabled;
+  }
+  if (btnFetchModels) {
+    btnFetchModels.disabled = disabled;
+  }
+  if (modelSelect) {
+    if (disabled) {
+      modelSelect.disabled = true;
+      CustomSelect.refresh(modelSelect);
+    } else {
+      const activeProvId = providerSelect ? providerSelect.value : currentConfig.activeProvider;
+      if (currentConfig.providers && currentConfig.providers[activeProvId]) {
+        updateModelDropdownState(currentConfig.providers[activeProvId]);
+      }
+    }
+  }
+
+  // 3. Platform Dynamic Form
+  if (platformDynamicForm) {
+    const formControls = platformDynamicForm.querySelectorAll('input, select, button');
+    formControls.forEach(ctrl => {
+      ctrl.disabled = disabled;
+      if (ctrl.tagName === 'SELECT') {
+        CustomSelect.refresh(ctrl);
+      }
+    });
+
+    const steppers = platformDynamicForm.querySelectorAll('.rj-stepper-control');
+    steppers.forEach(st => {
+      if (disabled) st.classList.add('disabled');
+      else st.classList.remove('disabled');
+    });
+  }
+
+  // 4. Action Buttons
+  if (btnSaveSettings) {
+    btnSaveSettings.disabled = disabled;
+  }
+  if (btnLaunchOverlay) {
+    btnLaunchOverlay.disabled = disabled;
+  }
+}
+
+/**
+ * Updates the Open HUD button UI outline and label based on active overlay visibility.
+ * @param {boolean} isActive
+ */
+function updateHudButtonState(isActive) {
+  if (!btnLaunchOverlay) return;
+  const labelSpan = btnLaunchOverlay.querySelector('span');
+  if (isActive) {
+    btnLaunchOverlay.classList.add('rj-btn-active');
+    btnLaunchOverlay.title = 'Close Floating In-Page Overlay (HUD Active)';
+    if (labelSpan) labelSpan.textContent = 'HUD Active';
+  } else {
+    btnLaunchOverlay.classList.remove('rj-btn-active');
+    btnLaunchOverlay.title = 'Launch Floating In-Page Overlay';
+    if (labelSpan) labelSpan.textContent = 'Open HUD';
+  }
+}
+
+/**
+ * Updates the Start / Stop Automation button UI and toggles input field disabling in the toolbar popup.
+ * @param {boolean} running
+ */
+function updateAutomationButtonUI(running) {
+  isAutomationRunning = Boolean(running);
+  if (isAutomationRunning) {
+    btnToggleAutomation.className = 'rj-btn rj-btn-danger';
+    automationBtnText.textContent = 'Stop Automation';
+    automationIcon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
+    btnToggleAutomation.disabled = false;
+    btnToggleAutomation.title = 'Stop Automation';
+  } else {
+    btnToggleAutomation.className = 'rj-btn rj-btn-accent';
+    automationBtnText.textContent = 'Start Automation';
+    automationIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+
+    const ready = isCurrentProviderReady();
+    btnToggleAutomation.disabled = !ready;
+    btnToggleAutomation.title = ready ? 'Start Automation' : 'Please input API key and select an AI model first';
+  }
+
+  // Disable all fields when processing, enable when idle
+  setFormDisabledState(isAutomationRunning);
 }
 
 /**
  * Event Listeners Initialization
  */
 document.addEventListener('DOMContentLoaded', async () => {
+  // Restore running automation state if active in overlay
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    chrome.storage.local.get(['rj_automation_state'], (res) => {
+      if (res && res.rj_automation_state) {
+        updateAutomationButtonUI(Boolean(res.rj_automation_state.isRunning));
+      }
+    });
+  }
   // 1. Load Stored Config
   currentConfig = await StorageService.getConfig();
 
@@ -677,6 +897,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 4. Set Initial Provider UI
   providerSelect.value = currentConfig.activeProvider || 'gemini';
   renderProviderFields(providerSelect.value);
+  updateAutomationButtonUI(isAutomationRunning);
 
   // Initialize all custom selects outside dynamic form
   CustomSelect.initAll();
@@ -701,7 +922,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Event: Provider dropdown changed
   providerSelect.addEventListener('change', () => {
+    currentConfig.activeProvider = providerSelect.value;
     renderProviderFields(providerSelect.value);
+    StorageService.saveConfig(currentConfig);
+    updateAutomationButtonUI(isAutomationRunning);
   });
 
   // Event: API Key typing listener
@@ -710,6 +934,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const provider = currentConfig.providers[activeProvId] || {};
     provider.apiKey = apiKeyInput.value;
     updateModelDropdownState(provider);
+    updateAutomationButtonUI(isAutomationRunning);
+  });
+
+  // Event: Model selection changed
+  modelSelect.addEventListener('change', () => {
+    const activeProvId = providerSelect.value;
+    if (currentConfig.providers[activeProvId]) {
+      currentConfig.providers[activeProvId].selectedModel = modelSelect.value || '';
+    }
+    saveCurrentSettings();
+    updateAutomationButtonUI(isAutomationRunning);
   });
 
   // Event: Toggle API Key Visibility (Show/Hide)
@@ -797,25 +1032,74 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Event: Start / Stop Automation Toggle
   btnToggleAutomation.addEventListener('click', () => {
-    isAutomationRunning = !isAutomationRunning;
-    if (isAutomationRunning) {
-      btnToggleAutomation.className = 'rj-btn rj-btn-danger';
-      automationBtnText.textContent = 'Stop Automation';
-      automationIcon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
-      showToast('Automation started');
-    } else {
-      btnToggleAutomation.className = 'rj-btn rj-btn-accent';
-      automationBtnText.textContent = 'Start Automation';
-      automationIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
-      showToast('Automation stopped');
+    const nextRunningState = !isAutomationRunning;
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({
+        rj_automation_state: {
+          isRunning: nextRunningState,
+          platformId: currentActivePlatformId,
+          timestamp: Date.now()
+        }
+      });
     }
+    updateAutomationButtonUI(nextRunningState);
+    showToast(nextRunningState ? 'Automation started' : 'Automation stopped');
   });
 
-  // Event: Launch In-Page Overlay HUD
+  // Listen to chrome.storage.onChanged for bidirectional sync
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+      // 1. Sync automation state from overlay HUD
+      if (changes.rj_automation_state) {
+        const state = changes.rj_automation_state.newValue;
+        if (state) {
+          updateAutomationButtonUI(Boolean(state.isRunning));
+        }
+      }
+      // 2. Sync platformSettings changes from overlay HUD
+      if (changes.platformSettings) {
+        const newSettings = changes.platformSettings.newValue;
+        if (newSettings) {
+          currentConfig.platformSettings = newSettings;
+          if (currentActivePlatformId && newSettings[currentActivePlatformId]) {
+            const platSettings = newSettings[currentActivePlatformId];
+            const countInput = platformDynamicForm.querySelector('#keywordCountInput');
+            const specificInput = platformDynamicForm.querySelector('#specificKeywordsInput');
+            if (countInput && countInput !== document.activeElement && typeof platSettings.keywordCount === 'number') {
+              countInput.value = platSettings.keywordCount;
+            }
+            if (specificInput && specificInput !== document.activeElement && platSettings.specificKeywords !== undefined) {
+              specificInput.value = platSettings.specificKeywords;
+            }
+            const aiToggle = platformDynamicForm.querySelector(`#${currentActivePlatformId}_isAiGenerated`);
+            if (aiToggle && platSettings.isAiGenerated !== undefined) {
+              aiToggle.checked = Boolean(platSettings.isAiGenerated);
+            }
+          }
+        }
+      }
+      // 3. Sync overlay HUD visibility changes from page
+      if (changes.rj_overlay_visible) {
+        updateHudButtonState(Boolean(changes.rj_overlay_visible.newValue));
+      }
+    });
+  }
+
+  // Check initial Overlay HUD status on the active tab
+  chrome.runtime.sendMessage({ action: 'GET_OVERLAY_STATUS' }, res => {
+    updateHudButtonState(Boolean(res?.isVisible));
+  });
+
+  // Event: Toggle In-Page Overlay HUD (Interactive in-place toggle)
   btnLaunchOverlay.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'TOGGLE_OVERLAY_HUD' }, () => {
-      showToast('Overlay HUD activated');
-      window.close(); // Close popup so user interacts with in-page HUD
+    chrome.runtime.sendMessage({ action: 'TOGGLE_OVERLAY_HUD' }, res => {
+      if (res && res.success) {
+        const isVisible = Boolean(res.isVisible);
+        updateHudButtonState(isVisible);
+        showToast(isVisible ? 'Overlay HUD opened' : 'Overlay HUD closed');
+      } else {
+        showToast(res?.error || 'Could not toggle HUD on this page', true);
+      }
     });
   });
 });

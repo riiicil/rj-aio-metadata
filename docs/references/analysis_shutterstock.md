@@ -64,32 +64,32 @@ Shutterstock enforces distinct category catalogs depending on the asset media ty
 
 | Category Name | Available in Images (Photos/Vectors) | Available in Videos (Footage) | Focus & Description |
 | :--- | :---: | :---: | :--- |
-| **Abstract** | ✅ | ❌ | Geometric patterns, 3D shapes, textures, fractal designs |
-| **Animals/Wildlife** | ✅ | ✅ | Domestic pets, wildlife, birds, underwater marine life |
-| **Arts** | ✅ | ✅ | Performing arts, dance, theater, music concerts, painting |
-| **Backgrounds/Textures** | ✅ | ✅ | Wooden textures, gradient wallpapers, motion backgrounds |
-| **Beauty/Fashion** | ✅ | ❌ | Runway, makeup, cosmetics, luxury jewelry, lifestyle fashion |
-| **Buildings/Landmarks** | ✅ | ✅ | Architecture, cityscapes, aerial drone monuments, bridges |
-| **Business/Finance** | ✅ | ✅ | Corporate offices, stock charts, handshakes, team meetings |
-| **Celebrities** | ✅ | ❌ | Public figures, red carpet press events, festivals |
-| **Education** | ✅ | ✅ | Classrooms, online learning, graduation ceremonies, libraries |
-| **Food and drink** | ✅ | ✅ | Cooking recipes, cafe baristas, food plating, cocktails |
-| **Healthcare/Medical** | ✅ | ✅ | Hospitals, surgeries, research labs, pharmaceuticals |
-| **Holidays** | ✅ | ✅ | Christmas, New Year fireworks, Halloween, seasonal holidays |
-| **Industrial** | ✅ | ✅ | Heavy manufacturing, oil refineries, construction machinery |
-| **Interiors** | ✅ | ❌ | Modern living rooms, minimalist offices, architecture decor |
-| **Miscellaneous** | ✅ | ❌ | General topics not covered elsewhere |
-| **Nature** | ✅ | ✅ | Mountain timelapses, oceans, aerial forests, waterfalls |
-| **Objects** | ✅ | ✅ | Isolated product shots, tools, tech gadgets |
-| **Parks/Outdoor** | ✅ | ❌ | National parks, camping, trekking, public recreational gardens |
-| **People** | ✅ | ✅ | Human emotions, diverse age groups, lifestyle portraits |
-| **Religion** | ✅ | ✅ | Historic temples, churches, traditional religious ceremonies |
-| **Science** | ✅ | ✅ | Astronomy, molecular 3D animations, biology experiments |
-| **Signs/Symbols** | ✅ | ✅ | Wayfinding signs, graphical icons, UI/UX badges |
-| **Sports/Recreation** | ✅ | ✅ | Extreme sports, fitness workouts, stadium football matches |
-| **Technology** | ✅ | ✅ | Artificial intelligence, data centers, futuristic concepts |
-| **Transportation** | ✅ | ✅ | High-speed trains, aerial traffic, aircraft takeoffs, highways |
-| **Vintage** | ✅ | ❌ | Retro aesthetics, antique objects, historical archival styling |
+| **Abstract** | [YES] | [NO] | Geometric patterns, 3D shapes, textures, fractal designs |
+| **Animals/Wildlife** | [YES] | [YES] | Domestic pets, wildlife, birds, underwater marine life |
+| **Arts** | [YES] | [YES] | Performing arts, dance, theater, music concerts, painting |
+| **Backgrounds/Textures** | [YES] | [YES] | Wooden textures, gradient wallpapers, motion backgrounds |
+| **Beauty/Fashion** | [YES] | [NO] | Runway, makeup, cosmetics, luxury jewelry, lifestyle fashion |
+| **Buildings/Landmarks** | [YES] | [YES] | Architecture, cityscapes, aerial drone monuments, bridges |
+| **Business/Finance** | [YES] | [YES] | Corporate offices, stock charts, handshakes, team meetings |
+| **Celebrities** | [YES] | [NO] | Public figures, red carpet press events, festivals |
+| **Education** | [YES] | [YES] | Classrooms, online learning, graduation ceremonies, libraries |
+| **Food and drink** | [YES] | [YES] | Cooking recipes, cafe baristas, food plating, cocktails |
+| **Healthcare/Medical** | [YES] | [YES] | Hospitals, surgeries, research labs, pharmaceuticals |
+| **Holidays** | [YES] | [YES] | Christmas, New Year fireworks, Halloween, seasonal holidays |
+| **Industrial** | [YES] | [YES] | Heavy manufacturing, oil refineries, construction machinery |
+| **Interiors** | [YES] | [NO] | Modern living rooms, minimalist offices, architecture decor |
+| **Miscellaneous** | [YES] | [NO] | General topics not covered elsewhere |
+| **Nature** | [YES] | [YES] | Mountain timelapses, oceans, aerial forests, waterfalls |
+| **Objects** | [YES] | [YES] | Isolated product shots, tools, tech gadgets |
+| **Parks/Outdoor** | [YES] | [NO] | National parks, camping, trekking, public recreational gardens |
+| **People** | [YES] | [YES] | Human emotions, diverse age groups, lifestyle portraits |
+| **Religion** | [YES] | [YES] | Historic temples, churches, traditional religious ceremonies |
+| **Science** | [YES] | [YES] | Astronomy, molecular 3D animations, biology experiments |
+| **Signs/Symbols** | [YES] | [YES] | Wayfinding signs, graphical icons, UI/UX badges |
+| **Sports/Recreation** | [YES] | [YES] | Extreme sports, fitness workouts, stadium football matches |
+| **Technology** | [YES] | [YES] | Artificial intelligence, data centers, futuristic concepts |
+| **Transportation** | [YES] | [YES] | High-speed trains, aerial traffic, aircraft takeoffs, highways |
+| **Vintage** | [YES] | [NO] | Retro aesthetics, antique objects, historical archival styling |
 
 ### B. Summary Lists for Fast Reference
 
