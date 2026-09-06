@@ -33,15 +33,25 @@ getOrInitHUD().then((instance) => {
 
 // Listen for runtime messages from background service worker or popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'PING_HUD') {
+    sendResponse({ pong: true, isVisible: hud ? Boolean(hud.isVisible) : false });
+    return;
+  }
+
+  if (message.action === 'GET_OVERLAY_STATE') {
+    sendResponse({ success: true, isVisible: hud ? Boolean(hud.isVisible) : false });
+    return;
+  }
+
   if (message.action === 'TOGGLE_OVERLAY') {
     if (hud) {
       hud.toggle();
-      sendResponse({ success: true, isVisible: hud.isVisible });
+      sendResponse({ success: true, isVisible: Boolean(hud.isVisible) });
     } else {
       getOrInitHUD().then((instance) => {
         if (instance) {
           instance.show();
-          sendResponse({ success: true, isVisible: instance.isVisible });
+          sendResponse({ success: true, isVisible: Boolean(instance.isVisible) });
         } else {
           sendResponse({ success: false, error: 'Failed to mount overlay HUD.' });
         }

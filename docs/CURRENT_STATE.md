@@ -1,6 +1,6 @@
 # Current Project State — RJ AIO Metadata Extension
 
-*Last Updated: 2026-09-05*<br>
+*Last Updated: 2026-09-06*<br>
 *Active Branch: `task/draggable-overlay-ui`*<br>
 *Current Milestone: Phase 2 (In-Page Draggable Floating Overlay HUD)*
 
@@ -10,7 +10,7 @@
 
 - **Phase 0 — Governance & Research**: [COMPLETE] (Repository governance, design system, reference analyses)
 - **Phase 1 — Storage & Popup UI**: [COMPLETE] (Storage engine, background worker, modular platform-dynamic popup UI merged to dev)
-- **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, bidirectional sync)
+- **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, multi-platform media detection, popup toggle, bidirectional sync)
 - **Phase 3 — Universal Vision Service**: [PLANNED] (OpenAI-compatible client & prompts)
 - **Phase 4 — Platform Adapters**: [PLANNED] (DOM injectors for 7 platforms)
 - **Phase 5 — End-to-End Testing & Polish**: [PLANNED] (E2E live verification & packaging)
@@ -61,23 +61,25 @@
   - `docs/ROADMAP.md` — Phase execution roadmap and milestone checklists.
   - `docs/agent-logs/2026-09-02.md` — Session Entries 1 through 9 (newest on top).
   - `docs/agent-logs/2026-09-04.md` — Session Entries 1 and 2 (Docs and UI bounds detection).
-  - `docs/agent-logs/2026-09-05.md` — Session Entries (newest on top).
+  - `docs/agent-logs/2026-09-05.md` — Session Entries 1 through 6 (newest on top).
+  - `docs/agent-logs/2026-09-06.md` — Session Entry 1 (HUD polish, media tabs, single asset ID).
   - `docs/references/` — 8 technical reference analyses for Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas, and Vision APIs.
 - **Source Code (`src/`):**
-  - `src/manifest.json` — Chromium Manifest V3 configuration, permissions, icons, action, service worker, web accessible resources (`overlay/*`, `styles/*`, `icons/*`, `services/*`).
+  - `src/manifest.json` — Chromium Manifest V3 configuration with universal content scripts matches (`http://*/*`, `https://*/*`), permissions, icons, action, service worker, web accessible resources (`overlay/*`, `styles/*`, `icons/*`, `services/*`).
   - `src/icons/` — Extension icons (`icon16.png`, `icon48.png`, `icon128.png`, `logo_rj.png` branding logo).
   - `src/services/StorageService.js` — Storage engine with multi-provider config, schema version 3 migration, multi-key round-robin, and keyword priority.
-  - `src/background/service_worker.js` — Dynamic `/v1/models` fetcher with Gemini query auth, active tab evaluator, platform navigator, overlay relay.
+  - `src/background/service_worker.js` — Dynamic `/v1/models` fetcher with Gemini query auth, active tab evaluator, platform navigator, overlay relay with dynamic script injection fallback and status query.
   - `src/styles/variables.css` — Raycast Dark Precision design tokens with deep emerald teal (`#079183`) primary accent palette.
-  - `src/styles/components.css` — Raycast Dark Precision form components, emerald teal accent interactive states, custom stepper control, floating custom select styles, transparent warning banner, smooth slide-down conditional field animations, and disabled states for buttons, inputs, steppers, and switches.
+  - `src/styles/components.css` — Raycast Dark Precision form components, emerald teal accent interactive states, custom stepper control, floating custom select styles, transparent warning banner, active HUD button outline style (`.rj-btn-active`), and disabled states for buttons, inputs, steppers, and switches.
   - `src/popup/popup.html` — Platform-adaptive toolbar popup interface with brand logo image integration and modular dynamic platform settings container adhering to `DESIGN.md`.
   - `src/popup/popup.css` — 380px dark canvas popup styling with brand logo image styling and sticky header/footer.
-  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, 100% modular platform-dynamic form rendering, bidirectional storage synchronization (`chrome.storage.onChanged`), model selection guard for Start Automation button, and full form disabling during active processing.
+  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, 100% modular platform-dynamic form rendering, bidirectional storage synchronization (`chrome.storage.onChanged`), model selection guard for Start Automation button, full form disabling during active processing, and interactive in-place HUD toggle button with active outline state.
   - `src/popup/custom_select.js` — Zero-dependency progressive dropdown enhancer replacing native OS selects with emerald teal highlights.
   - `src/popup/depositphotos_countries.js` — Complete 237 ISO countries catalog extracted for Depositphotos editorial location settings (omitting commercial option).
-  - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed, streamlined pill styling, spring transition animations (`cubic-bezier(0.16, 1, 0.3, 1)`), adaptive quick form components, live asset counter bar, and disabled control styles.
-  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, live asset card scanner across all 7 platforms, adaptive quick form controls (stepper, specific keywords, adaptive AI declaration), model selection guard for automation toggle, processing state field disabling, and bidirectional synchronization via `chrome.storage.onChanged`.
-  - `src/content/content_main.js` — Content script router importing OverlayHUD via dynamic import, auto-mounting HUD, and handling background toggle messages.
+  - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed, streamlined pill styling with SVG status icons (`.rj-status-icon-ready`, `.rj-status-icon-not-ready`), warning banner styles, spring transition animations (`cubic-bezier(0.16, 1, 0.3, 1)`), adaptive quick form components, live asset counter bar, and disabled control styles.
+  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, live asset scanner with specific Depositphotos subtab media detection (`32 Images Detected`, `3 Vectors Detected`, `1 Video Detected`), Dreamstime single-asset ID detection (`In ID 473814624`), non-microstock warning state, adaptive quick form controls (stepper, specific keywords, adaptive AI declaration), model selection guard for automation toggle, processing state field disabling, and bidirectional synchronization via `chrome.storage.onChanged`.
+  - `src/content/content_main.js` — Content script router importing OverlayHUD via dynamic import, auto-mounting HUD, and handling background toggle, ping, and status messages.
+
 
 ---
 

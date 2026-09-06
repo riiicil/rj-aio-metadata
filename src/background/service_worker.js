@@ -174,13 +174,60 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.action === 'TOGGLE_OVERLAY_HUD') {
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
-      if (tabs && tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'TOGGLE_OVERLAY' }, res => {
-          sendResponse({ success: true, response: res });
-        });
-      } else {
+      const activeTab = tabs && tabs[0];
+      if (!activeTab || !activeTab.id) {
         sendResponse({ success: false, error: 'No active tab found.' });
+        return;
       }
+
+      const sendToggle = () => {
+        chrome.tabs.sendMessage(activeTab.id, { action: 'TOGGLE_OVERLAY' }, res => {
+          if (chrome.runtime.lastError) {
+            sendResponse({ success: false, error: chrome.runtime.lastError.message });
+          } else {
+            sendResponse({ success: true, isVisible: Boolean(res?.isVisible) });
+          }
+        });
+      };
+
+      // Check if content script is active via ping
+      chrome.tabs.sendMessage(activeTab.id, { action: 'PING_HUD' }, res => {
+        if (chrome.runtime.lastError) {
+          // Content script not yet injected on this tab, inject dynamically
+          if (chrome.scripting && chrome.scripting.executeScript) {
+            chrome.scripting.executeScript({
+              target: { tabId: activeTab.id },
+              files: ['content/content_main.js']
+            }).then(() => {
+              setTimeout(sendToggle, 120);
+            }).catch(err => {
+              sendResponse({ success: false, error: err.message });
+            });
+          } else {
+            sendResponse({ success: false, error: chrome.runtime.lastError.message });
+          }
+        } else {
+          sendToggle();
+        }
+      });
+    });
+    return true;
+  }
+
+  if (message.action === 'GET_OVERLAY_STATUS') {
+    chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+      const activeTab = tabs && tabs[0];
+      if (!activeTab || !activeTab.id) {
+        sendResponse({ isVisible: false });
+        return;
+      }
+      chrome.tabs.sendMessage(activeTab.id, { action: 'GET_OVERLAY_STATE' }, res => {
+        if (chrome.runtime.lastError || !res) {
+          sendResponse({ isVisible: false });
+        } else {
+          sendResponse({ isVisible: Boolean(res.isVisible) });
+        }
+      });
     });
     return true;
   }

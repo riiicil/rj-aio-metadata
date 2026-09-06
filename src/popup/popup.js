@@ -741,6 +741,24 @@ function setFormDisabledState(disabled) {
 }
 
 /**
+ * Updates the Open HUD button UI outline and label based on active overlay visibility.
+ * @param {boolean} isActive
+ */
+function updateHudButtonState(isActive) {
+  if (!btnLaunchOverlay) return;
+  const labelSpan = btnLaunchOverlay.querySelector('span');
+  if (isActive) {
+    btnLaunchOverlay.classList.add('rj-btn-active');
+    btnLaunchOverlay.title = 'Close Floating In-Page Overlay (HUD Active)';
+    if (labelSpan) labelSpan.textContent = 'HUD Active';
+  } else {
+    btnLaunchOverlay.classList.remove('rj-btn-active');
+    btnLaunchOverlay.title = 'Launch Floating In-Page Overlay';
+    if (labelSpan) labelSpan.textContent = 'Open HUD';
+  }
+}
+
+/**
  * Updates the Start / Stop Automation button UI and toggles input field disabling in the toolbar popup.
  * @param {boolean} running
  */
@@ -987,14 +1005,28 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         }
       }
+      // 3. Sync overlay HUD visibility changes from page
+      if (changes.rj_overlay_visible) {
+        updateHudButtonState(Boolean(changes.rj_overlay_visible.newValue));
+      }
     });
   }
 
-  // Event: Launch In-Page Overlay HUD
+  // Check initial Overlay HUD status on the active tab
+  chrome.runtime.sendMessage({ action: 'GET_OVERLAY_STATUS' }, res => {
+    updateHudButtonState(Boolean(res?.isVisible));
+  });
+
+  // Event: Toggle In-Page Overlay HUD (Interactive in-place toggle)
   btnLaunchOverlay.addEventListener('click', () => {
-    chrome.runtime.sendMessage({ action: 'TOGGLE_OVERLAY_HUD' }, () => {
-      showToast('Overlay HUD activated');
-      window.close(); // Close popup so user interacts with in-page HUD
+    chrome.runtime.sendMessage({ action: 'TOGGLE_OVERLAY_HUD' }, res => {
+      if (res && res.success) {
+        const isVisible = Boolean(res.isVisible);
+        updateHudButtonState(isVisible);
+        showToast(isVisible ? 'Overlay HUD opened' : 'Overlay HUD closed');
+      } else {
+        showToast(res?.error || 'Could not toggle HUD on this page', true);
+      }
     });
   });
 });

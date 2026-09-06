@@ -92,62 +92,224 @@ export class OverlayHUD {
     if (host.includes('freepik.com')) return 'Freepik';
     if (host.includes('depositphotos.com')) return 'Depositphotos';
     if (host.includes('miricanvas.com')) return 'MiriCanvas';
-    return 'Microstock Contributor';
+    return 'RJ AIO Metadata';
   }
 
   /**
-   * Detects the number of unsubmitted asset cards currently present on the page.
-   * @returns {{ count: number, selector: string }}
+   * Detects the number of unsubmitted asset cards or active asset ID currently present on the page.
+   * @returns {{ count: number, mediaType?: string, isSingleAsset?: boolean, assetId?: string, label: string, selector: string }}
    */
   detectAssetCount() {
     const host = window.location.hostname.toLowerCase();
-    let selector = '';
 
+    // 1. Adobe Stock
     if (host.includes('stock.adobe.com')) {
-      selector = 'div.upload-tile';
-    } else if (host.includes('shutterstock.com')) {
-      selector = 'div[data-testid="asset-card"]';
-    } else if (host.includes('freepik.com')) {
-      selector = 'div.catalog__item';
-    } else if (host.includes('vecteezy.com')) {
-      selector = 'div[data-testid="resource-card"]';
-    } else if (host.includes('dreamstime.com')) {
-      selector = 'div.upload-item[id]';
-    } else if (host.includes('depositphotos.com')) {
-      selector = 'tr.unfinished__item';
-    } else if (host.includes('miricanvas.com')) {
-      selector = 'div.css-1qnaji9.e1pyeb4g3, div.panda-ehlNbj div.panda-gFNlpN';
+      const elements = document.querySelectorAll('div.upload-tile');
+      const count = elements.length;
+      return {
+        count,
+        label: count > 0 ? `${count} Asset${count === 1 ? '' : 's'} Found` : '0 Assets Detected',
+        selector: 'div.upload-tile'
+      };
     }
 
-    if (!selector) return { count: 0, selector: '' };
+    // 2. Shutterstock
+    if (host.includes('shutterstock.com')) {
+      const elements = document.querySelectorAll('div[data-testid="asset-card"]');
+      const count = elements.length;
+      return {
+        count,
+        label: count > 0 ? `${count} Asset${count === 1 ? '' : 's'} Found` : '0 Assets Detected',
+        selector: 'div[data-testid="asset-card"]'
+      };
+    }
 
-    const elements = document.querySelectorAll(selector);
-    return { count: elements.length, selector };
+    // 3. Freepik
+    if (host.includes('freepik.com')) {
+      const elements = document.querySelectorAll('div.catalog__item');
+      const count = elements.length;
+      return {
+        count,
+        label: count > 0 ? `${count} Asset${count === 1 ? '' : 's'} Found` : '0 Assets Detected',
+        selector: 'div.catalog__item'
+      };
+    }
+
+    // 4. Vecteezy
+    if (host.includes('vecteezy.com')) {
+      const elements = document.querySelectorAll('div[data-testid="resource-card"]');
+      const count = elements.length;
+      return {
+        count,
+        label: count > 0 ? `${count} Asset${count === 1 ? '' : 's'} Found` : '0 Assets Detected',
+        selector: 'div[data-testid="resource-card"]'
+      };
+    }
+
+    // 5. Dreamstime
+    if (host.includes('dreamstime.com')) {
+      // Check for single asset edit mode (e.g. /upload/edit473814624)
+      const editMatch = window.location.pathname.match(/\/upload\/edit(\d+)/i);
+      let assetId = editMatch ? editMatch[1] : null;
+      if (!assetId) {
+        const headingEl = document.querySelector('h1, .upload-title, .breadcrumb, div.breadcrumbs');
+        const headingMatch = headingEl?.textContent.match(/Submit file\s*(\d+)/i);
+        if (headingMatch) assetId = headingMatch[1];
+      }
+
+      if (assetId) {
+        return {
+          count: 1,
+          isSingleAsset: true,
+          assetId,
+          label: `In ID ${assetId}`,
+          selector: 'window.location.pathname'
+        };
+      }
+
+      // Multi-asset upload list mode (/upload)
+      const elements = document.querySelectorAll('div.upload-item[id]');
+      const count = elements.length;
+      return {
+        count,
+        label: count > 0 ? `${count} Asset${count === 1 ? '' : 's'} Found` : '0 Assets Detected',
+        selector: 'div.upload-item[id]'
+      };
+    }
+
+    // 6. Depositphotos
+    if (host.includes('depositphotos.com')) {
+      // A. Check active subtab: Images (32), Vectors (3), PNG (1), Videos (1), Audio (0)
+      const activeTabEl = document.querySelector(
+        '.cmp-tabs__tab_active a.cmp-tabs__link, li.cmp-tabs__tab_active a, .cmp-tabs__tab.cmp-tabs__tab_active, .seller-menu-files-counts li.active a, .cmp-tabs__tab_active'
+      );
+      if (activeTabEl) {
+        const text = activeTabEl.textContent.trim();
+        const match = text.match(/^([a-zA-Z]+)\s*\((\d+)\)/i);
+        if (match) {
+          const mediaType = match[1];
+          const count = parseInt(match[2], 10);
+          const pluralLabel = (count === 1 && mediaType.endsWith('s')) ? mediaType.slice(0, -1) : mediaType;
+          return {
+            count,
+            mediaType,
+            label: `${count} ${pluralLabel} Detected`,
+            selector: '.cmp-tabs__tab_active'
+          };
+        }
+      }
+
+      // B. Fallback: match URL query param ?type= against tabs
+      const urlType = new URLSearchParams(window.location.search).get('type') || 'image';
+      const allTabs = document.querySelectorAll('.cmp-tabs__link, .cmp-tabs__tab a, .seller-menu-files-counts a');
+      for (const tab of allTabs) {
+        const tabText = tab.textContent.trim();
+        const match = tabText.match(/^([a-zA-Z]+)\s*\((\d+)\)/i);
+        if (match) {
+          const tabMedia = match[1].toLowerCase();
+          if (tabMedia.startsWith(urlType) || (urlType === 'image' && tabMedia.startsWith('image'))) {
+            const count = parseInt(match[2], 10);
+            const pluralLabel = (count === 1 && match[1].endsWith('s')) ? match[1].slice(0, -1) : match[1];
+            return {
+              count,
+              mediaType: match[1],
+              label: `${count} ${pluralLabel} Detected`,
+              selector: '.cmp-tabs__link'
+            };
+          }
+        }
+      }
+
+      // C. Fallback: table rows on page
+      const rows = document.querySelectorAll(
+        'div._unfinished__section_items table tbody tr, table.unfinished-files tbody tr, tr.unfinished__item'
+      );
+      if (rows.length > 0) {
+        return {
+          count: rows.length,
+          mediaType: 'Assets',
+          label: `${rows.length} Asset${rows.length === 1 ? '' : 's'} Detected`,
+          selector: 'div._unfinished__section_items table tbody tr'
+        };
+      }
+
+      // D. Fallback: counter badge
+      const counterBadge = document.querySelector('span._counter-unfinished, .sub-menu__info._counter-unfinished');
+      if (counterBadge) {
+        const total = parseInt(counterBadge.textContent.trim(), 10);
+        if (!isNaN(total)) {
+          return {
+            count: total,
+            mediaType: 'Assets',
+            label: `${total} Asset${total === 1 ? '' : 's'} Detected`,
+            selector: 'span._counter-unfinished'
+          };
+        }
+      }
+
+      return { count: 0, mediaType: 'Assets', label: '0 Assets Detected', selector: '' };
+    }
+
+    // 7. MiriCanvas
+    if (host.includes('miricanvas.com')) {
+      const elements = document.querySelectorAll('div.css-1qnaji9.e1pyeb4g3, div.panda-ehlNbj div.panda-gFNlpN');
+      const count = elements.length;
+      return {
+        count,
+        label: count > 0 ? `${count} Asset${count === 1 ? '' : 's'} Found` : '0 Assets Detected',
+        selector: 'div.css-1qnaji9.e1pyeb4g3'
+      };
+    }
+
+    // 8. Unknown / Non-microstock platform
+    return {
+      count: 0,
+      label: 'Not on Microstock Tab',
+      selector: ''
+    };
   }
 
   /**
    * Updates live asset counter labels and minimized pill status.
    */
   updateAssetCounter() {
-    const { count } = this.detectAssetCount();
-    this.assetCount = count;
+    const res = this.detectAssetCount();
+    this.assetCount = res.count;
 
     const countTextEl = this.shadow?.querySelector('#rjAssetCountText');
     if (countTextEl) {
-      if (count > 0) {
-        countTextEl.textContent = `${count} Asset${count === 1 ? '' : 's'} Found`;
-      } else if (this.platformId !== 'unknown') {
-        countTextEl.textContent = '0 Assets Detected';
-      } else {
-        countTextEl.textContent = 'Scanning assets...';
-      }
+      countTextEl.textContent = res.label;
     }
 
-    // Update pill status text when idle
+    // Update pill status text/icon when idle
     if (!this.isAutomationRunning) {
       const pillStatus = this.shadow?.querySelector('#rjPillStatus');
       if (pillStatus) {
-        pillStatus.textContent = count > 0 ? `${count} Assets` : 'Ready';
+        if (this.platformId === 'unknown') {
+          pillStatus.innerHTML = `
+            <svg class="rj-hud-icon-svg rj-status-icon-not-ready" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+          `;
+          pillStatus.title = 'Not on a supported microstock tab';
+        } else {
+          const readySvg = `
+            <svg class="rj-hud-icon-svg rj-status-icon-ready" viewBox="0 0 24 24" fill="none" stroke="#59d499" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          `;
+          if (res.isSingleAsset && res.assetId) {
+            pillStatus.innerHTML = `${readySvg}<span>ID: ${res.assetId}</span>`;
+            pillStatus.title = `In ID ${res.assetId}`;
+          } else if (res.count > 0) {
+            const badgeText = res.mediaType && res.mediaType !== 'Assets' ? `${res.count} ${res.mediaType}` : `${res.count} Assets`;
+            pillStatus.innerHTML = `${readySvg}<span>${badgeText}</span>`;
+            pillStatus.title = res.label;
+          } else {
+            pillStatus.innerHTML = readySvg;
+            pillStatus.title = `Ready on Tab (${this.platformName})`;
+          }
+        }
       }
     }
   }
@@ -239,6 +401,14 @@ export class OverlayHUD {
           </header>
 
           <div class="rj-hud-body" id="rjHudBody">
+            <!-- Warning Banner for Non-Microstock Tabs -->
+            <div class="rj-hud-warning-banner" id="rjHudWarningBanner" style="display: none;">
+              <svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              <span>Not on a supported microstock contributor page.</span>
+            </div>
+
             <!-- Row 1: Live Asset Counter & Progress Indicator -->
             <div class="rj-hud-asset-bar">
               <div class="rj-hud-asset-info">
@@ -304,7 +474,7 @@ export class OverlayHUD {
         <div class="rj-hud-pill rj-hidden" id="rjHudPill">
           <div class="rj-hud-brand" id="rjPillBrand" style="cursor: pointer;">
             <img class="rj-hud-logo" src="${logoUrl}" alt="RJ">
-            <span class="rj-hud-pill-status" id="rjPillStatus">Ready</span>
+            <span class="rj-hud-pill-status" id="rjPillStatus"></span>
           </div>
           <div class="rj-hud-actions">
             <button class="rj-hud-btn-icon" id="rjBtnExpand" title="Expand HUD" type="button" aria-label="Expand">
@@ -335,6 +505,11 @@ export class OverlayHUD {
    */
   setupAdaptiveQuickForm() {
     if (!this.shadow) return;
+
+    const warningBanner = this.shadow.querySelector('#rjHudWarningBanner');
+    if (warningBanner) {
+      warningBanner.style.display = (this.platformId === 'unknown') ? 'flex' : 'none';
+    }
 
     const limits = PLATFORM_LIMITS[this.platformId] || { min: 8, max: 50, hint: 'Min 8, Max 50' };
     const inputCount = this.shadow.querySelector('#rjInputKeywordCount');
@@ -525,6 +700,11 @@ export class OverlayHUD {
     if (this.isAutomationRunning) return;
     const btn = this.shadow?.querySelector('#rjBtnToggleAutomation');
     if (btn) {
+      if (this.platformId === 'unknown') {
+        btn.disabled = true;
+        btn.title = 'Open a supported microstock contributor page to run automation';
+        return;
+      }
       const ready = this.isProviderReady(this.currentConfig);
       btn.disabled = !ready;
       btn.title = ready ? 'Start Automation' : 'Please configure AI model in popup first';
@@ -611,18 +791,21 @@ export class OverlayHUD {
       if (btn) {
         btn.classList.remove('rj-btn-stop');
         btn.classList.add('rj-btn-start');
-        const ready = this.isProviderReady(this.currentConfig);
-        btn.disabled = !ready;
-        btn.title = ready ? 'Start Automation' : 'Please configure AI model in popup first';
+        if (this.platformId === 'unknown') {
+          btn.disabled = true;
+          btn.title = 'Open a supported microstock contributor page to run automation';
+        } else {
+          const ready = this.isProviderReady(this.currentConfig);
+          btn.disabled = !ready;
+          btn.title = ready ? 'Start Automation' : 'Please configure AI model in popup first';
+        }
       }
       if (btnText) btnText.textContent = 'Start Automation';
       if (icon) icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
       if (badge) badge.classList.remove('rj-running');
       if (statusText) statusText.textContent = 'Idle';
       if (progressTrack) progressTrack.style.display = 'none';
-      if (pillStatus) {
-        pillStatus.textContent = this.assetCount > 0 ? `${this.assetCount} Assets` : 'Ready';
-      }
+      this.updateAssetCounter();
     }
 
     // Disable inputs while running, re-enable when idle
@@ -912,6 +1095,10 @@ export class OverlayHUD {
     this.wrapper.classList.remove('rj-hidden');
     this.isVisible = true;
 
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({ rj_overlay_visible: true });
+    }
+
     // Trigger graceful entry animation based on active state
     if (this.isMinimized && this.pillEl) {
       this.pillEl.classList.remove('rj-pill-exiting');
@@ -934,23 +1121,26 @@ export class OverlayHUD {
    */
   hide() {
     if (!this.wrapper) return;
+    this.isVisible = false;
+
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({ rj_overlay_visible: false });
+    }
+
     if (this.isMinimized && this.pillEl) {
       this.pillEl.classList.add('rj-pill-exiting');
       setTimeout(() => {
         this.wrapper.classList.add('rj-hidden');
         this.pillEl.classList.remove('rj-pill-exiting');
-        this.isVisible = false;
       }, 120);
     } else if (this.cardEl) {
       this.cardEl.classList.add('rj-anim-minimizing');
       setTimeout(() => {
         this.wrapper.classList.add('rj-hidden');
         this.cardEl.classList.remove('rj-anim-minimizing');
-        this.isVisible = false;
       }, 130);
     } else {
       this.wrapper.classList.add('rj-hidden');
-      this.isVisible = false;
     }
   }
 

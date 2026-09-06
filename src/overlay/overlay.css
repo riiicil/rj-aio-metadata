@@ -233,6 +233,27 @@
   transition: width 0.25s ease;
 }
 
+/* Warning Banner for Non-Microstock Tabs */
+.rj-hud-warning-banner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  background-color: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  border-radius: 6px;
+  font-size: 10.5px;
+  color: #f59e0b;
+  line-height: 1.35;
+}
+
+.rj-hud-warning-banner svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  stroke: #f59e0b;
+}
+
 /* Field Groups */
 .rj-hud-field-group {
   display: flex;
@@ -531,6 +552,21 @@
   font-weight: 600;
   letter-spacing: 0.2px;
   user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rj-hud-pill-status .rj-status-icon-ready {
+  width: 13px;
+  height: 13px;
+  stroke: #59d499;
+}
+
+.rj-hud-pill-status .rj-status-icon-not-ready {
+  width: 13px;
+  height: 13px;
+  stroke: #f59e0b;
 }
 
 /* Visibility Utilities */
