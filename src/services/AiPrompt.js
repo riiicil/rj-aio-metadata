@@ -420,14 +420,14 @@ export function getPlatformOutputSchema(platformId = 'adobestock', { isAiGenerat
   switch (normalizedId) {
     case 'adobestock':
       return {
-        title: 'string, 6-15 words, <=200 characters, descriptive title without keyword stuffing',
+        title: 'string, 6-15 words, <=185 characters, descriptive title without keyword stuffing',
         category: 'string, exactly one category chosen from official Adobe Stock categories list',
         keywords: ['string, 80 highly relevant microstock tags ordered from specific to general']
       };
 
     case 'shutterstock':
       return {
-        description: 'string, 6-25 words, <=2048 characters, detailed description describing subject, setting, context',
+        description: 'string, 6-25 words, <=230 characters, detailed description describing subject, setting, context',
         category_1: 'string, primary category chosen from official Shutterstock category list',
         category_2: 'string, secondary distinct category chosen from official Shutterstock category list',
         keywords: ['string, 80 highly relevant microstock tags ordered from specific to general']
@@ -435,8 +435,8 @@ export function getPlatformOutputSchema(platformId = 'adobestock', { isAiGenerat
 
     case 'dreamstime':
       return {
-        title: 'string, 5-10 words, concise descriptive title',
-        description: 'string, 15-30 words, detailed comprehensive description',
+        title: 'string, 5-10 words, <=200 characters, concise descriptive title',
+        description: 'string, 15-30 words, <=230 characters, detailed comprehensive description',
         categories: isAiGenerated
           ? [
               { main: 'Main Category Name', sub: 'Subcategory Name' },
@@ -452,33 +452,32 @@ export function getPlatformOutputSchema(platformId = 'adobestock', { isAiGenerat
 
     case 'depositphotos':
       return {
-        description: 'string, 6-20 words, <=250 characters, concise accurate description',
+        description: 'string, 6-20 words, <=230 characters, concise accurate description',
         keywords: ['string, 80 highly relevant microstock tags ordered from specific to general']
       };
 
     case 'vecteezy':
       return {
-        title: 'string, 6-15 words, <=200 characters, descriptive title',
-        description: 'string, 10-25 words, clear description',
+        title: 'string, 6-15 words, <=185 characters, descriptive title without keyword stuffing',
         keywords: ['string, 80 highly relevant microstock tags ordered from specific to general']
       };
 
     case 'freepik':
       return {
-        title: 'string, 6-12 words, <=100 characters, descriptive title',
+        title: 'string, 6-12 words, <=90 characters, descriptive title',
         keywords: ['string, 80 highly relevant microstock tags ordered from specific to general']
       };
 
     case 'miricanvas':
       return {
-        title: 'string, 6-12 words, <=100 characters, descriptive title',
+        title: 'string, 6-12 words, <=90 characters, descriptive title',
         keywords: ['string, 80 highly relevant microstock tags ordered from specific to general']
       };
 
     default:
       return {
-        title: 'string, 6-15 words, descriptive title',
-        description: 'string, 10-25 words, clear description',
+        title: 'string, 6-15 words, <=185 characters, descriptive title',
+        description: 'string, 10-25 words, <=230 characters, clear description',
         keywords: ['string, 80 highly relevant microstock tags ordered from specific to general']
       };
   }

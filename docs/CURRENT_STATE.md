@@ -1,8 +1,8 @@
 # Current Project State — RJ AIO Metadata Extension
 
 *Last Updated: 2026-09-07*<br>
-*Active Branch: `task/vision-service` (Phase 3 in progress, Step 3.1 complete)*<br>
-*Current Milestone: Phase 3 in progress (Step 3.1 complete -> Step 3.2 [NEXT] Sanitizer Engine)*
+*Active Branch: `task/vision-service` (Phase 3 in progress, Step 3.2 complete)*<br>
+*Current Milestone: Phase 3 in progress (Step 3.2 complete -> Step 3.3 [NEXT] Universal Vision Client & Service Worker Proxy)*
 
 ---
 
@@ -11,7 +11,7 @@
 - **Phase 0 — Governance & Research**: [COMPLETE] (Repository governance, design system, reference analyses)
 - **Phase 1 — Storage & Popup UI**: [COMPLETE] (Storage engine, background worker, modular platform-dynamic popup UI merged to dev)
 - **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, multi-platform media detection, popup toggle, bidirectional sync merged to dev)
-- **Phase 3 — Universal Vision Service**: [IN_PROGRESS] (Step 3.1 Core Prompt Engine complete; Step 3.2 Sanitizer Engine next; Step 3.3 Universal Vision Client future)
+- **Phase 3 — Universal Vision Service**: [IN_PROGRESS] (Step 3.1 Core Prompt Engine complete; Step 3.2 Sanitizer Engine complete; Step 3.3 Universal Vision Client next)
 - **Phase 4 — Platform Adapters**: [PLANNED] (DOM injectors for 7 platforms)
 - **Phase 5 — End-to-End Testing & Polish**: [PLANNED] (E2E live verification & packaging)
 
@@ -68,7 +68,8 @@
 - **Source Code (`src/`):**
   - `src/manifest.json` — Chromium Manifest V3 configuration with universal content scripts matches (`http://*/*`, `https://*/*`), permissions, icons, action, service worker, web accessible resources (`overlay/*`, `styles/*`, `icons/*`, `services/*`).
   - `src/icons/` — Extension icons (`icon16.png`, `icon48.png`, `icon128.png`, `logo_rj.png` branding logo).
-  - `src/services/AiPrompt.js` — Platform-adaptive prompt engine, official category dictionaries (Adobe Stock 21 IDs, Shutterstock 26 Image / 19 Video, Dreamstime 15 Main & subcategories), dynamic JSON schemas, flat 80-keyword generator, and multimodal OpenAI payload builder with model-safe parameter guards.
+  - `src/services/AiPrompt.js` — Platform-adaptive prompt engine, official category dictionaries (Adobe Stock 21 IDs, Shutterstock 26 Image / 19 Video, Dreamstime 15 Main & subcategories), dynamic JSON schemas with safety bounds (Adobe/Vecteezy title <=185, Freepik/MiriCanvas title <=90, descriptions <=230), Vecteezy schema strictly restricted to title and keywords without description, flat 80-keyword generator, and multimodal OpenAI payload builder with model-safe parameter guards.
+  - `src/services/SanitizerService.js` — Comprehensive microstock sanitizer engine with robust JSON extractor/repairer, keyword validation pipeline (word count <=2, punctuation stripping, Vecteezy/general prohibited terms, custom keyword index-0 priority, case-insensitive deduplication, platform quota clamping), title and description smart boundary clamping (sentence boundary, word boundary without mid-word cuts, trailing period), Shutterstock editorial prefix normalization, and unified metadata facade.
   - `src/services/StorageService.js` — Storage engine with multi-provider config, schema version 3 migration, multi-key round-robin, and keyword priority.
   - `src/background/service_worker.js` — Dynamic `/v1/models` fetcher with Gemini query auth, active tab evaluator, platform navigator, overlay relay with dynamic script injection fallback and status query.
   - `src/styles/variables.css` — Raycast Dark Precision design tokens with deep emerald teal (`#079183`) primary accent palette.
@@ -86,7 +87,6 @@
 
 ## 5. What Does NOT Exist Yet
 
-- `src/services/SanitizerService.js` — Comprehensive platform keyword, title, and character sanitizer (Phase 3, Step 3.2).
 - `src/services/AiService.js` — Universal OpenAI-compatible multimodal vision client & service worker proxy (Phase 3, Step 3.3).
 - `src/adapters/` — Platform DOM injector adapters (Adobe, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas) (Phase 4).
 
@@ -95,7 +95,8 @@
 ## 6. Testing & Build Verification Status
 
 - Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `overlay/`, `styles/`, `services/`).
-- `src/services/AiPrompt.js` syntax verified with `node --check` and tested with `scratch/test_ai_prompt.mjs` (55/55 assertions passed).
+- `src/services/AiPrompt.js` syntax verified with `node --check` and tested with `scratch/test_ai_prompt.mjs` (65/65 assertions passed).
+- `src/services/SanitizerService.js` syntax verified with `node --check` and tested with `scratch/test_sanitizer_service.mjs` (86/86 assertions passed).
 - Storage schema version 3 migration tested and verified in Node.js (obsolete keys purged, platform keyword limits clamped, legacy models handled).
 - Syntax validation passed for `src/overlay/overlay.js`, `src/content/content_main.js`, `src/popup/popup.js`, and `src/services/StorageService.js` via `node --check`.
 - Viewport boundary clamping and storage persistence logic verified.
@@ -109,4 +110,4 @@
 
 ## 7. Immediate Next Step
 
-Step 3.2: Comprehensive Sanitizer Engine (`src/services/SanitizerService.js`).
+Step 3.3: Universal Vision Client (`src/services/AiService.js`) & Service Worker Proxy Routing (`src/background/service_worker.js`).
