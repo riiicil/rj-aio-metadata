@@ -557,7 +557,8 @@
   gap: 4px;
 }
 
-.rj-hud-pill-status .rj-status-icon-ready {
+.rj-hud-pill-status .rj-status-icon-ready,
+.rj-hud-pill-status .rj-status-icon-layers {
   width: 13px;
   height: 13px;
   stroke: #59d499;

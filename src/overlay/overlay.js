@@ -334,12 +334,19 @@ export class OverlayHUD {
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
           `;
+          const layersSvg = `
+            <svg class="rj-hud-icon-svg rj-status-icon-layers" viewBox="0 0 24 24" fill="none" stroke="#59d499" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+              <polyline points="2 17 12 22 22 17"></polyline>
+              <polyline points="2 12 12 17 22 12"></polyline>
+            </svg>
+          `;
           if (res.isSingleAsset && res.assetId) {
-            pillStatus.innerHTML = `${readySvg}<span>ID: ${res.assetId}</span>`;
+            pillStatus.innerHTML = `${layersSvg}<span>ID: ${res.assetId}</span>`;
             pillStatus.title = `In ID ${res.assetId}`;
           } else if (res.count > 0) {
             const badgeText = res.mediaType && res.mediaType !== 'Assets' ? `${res.count} ${res.mediaType}` : `${res.count} Assets`;
-            pillStatus.innerHTML = `${readySvg}<span>${badgeText}</span>`;
+            pillStatus.innerHTML = `${layersSvg}<span>${badgeText}</span>`;
             pillStatus.title = res.label;
           } else {
             pillStatus.innerHTML = readySvg;

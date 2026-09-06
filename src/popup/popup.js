@@ -53,8 +53,7 @@ const btnSaveSettings = document.getElementById('btnSaveSettings');
 const btnToggleAutomation = document.getElementById('btnToggleAutomation');
 const automationIcon = document.getElementById('automationIcon');
 const automationBtnText = document.getElementById('automationBtnText');
-const toastNotification = document.getElementById('toastNotification');
-const toastMessage = document.getElementById('toastMessage');
+const toastContainer = document.getElementById('toastContainer');
 
 /**
  * HTML String Sanitizer for Input Values
@@ -70,16 +69,90 @@ function escapeHtml(str) {
 }
 
 /**
- * Toast Notification Utility
+ * Stacked Toast Notification System
+ * FIFO Queue: Max 3 stacked toasts, top-right positioning, 2-line clamped text,
+ * manual dismiss button, and 4500ms auto-dismiss with smooth reflow.
  */
+const MAX_TOASTS = 3;
+const TOAST_DURATION = 4500;
+const activeToasts = [];
+
 function showToast(msg, isError = false) {
-  toastMessage.textContent = msg;
-  toastNotification.style.borderColor = isError ? 'rgba(255, 97, 97, 0.4)' : 'rgba(89, 212, 153, 0.4)';
-  toastNotification.style.color = isError ? '#ff6161' : '#59d499';
-  toastNotification.classList.add('rj-toast-visible');
+  const container = document.getElementById('toastContainer') || toastContainer;
+  if (!container) return;
+
+  // Enforce max 3 stacked toasts (FIFO: dismiss oldest if limit reached)
+  if (activeToasts.length >= MAX_TOASTS) {
+    const oldest = activeToasts[0];
+    dismissToast(oldest);
+  }
+
+  const toastEl = document.createElement('div');
+  const typeClass = isError ? 'rj-toast-error' : 'rj-toast-success';
+  toastEl.className = `rj-toast-item ${typeClass}`;
+
+  const iconSvg = isError
+    ? `<svg class="rj-toast-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>`
+    : `<svg class="rj-toast-icon" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>`;
+
+  toastEl.innerHTML = `
+    ${iconSvg}
+    <div class="rj-toast-body">
+      <p class="rj-toast-text" title="${escapeHtml(String(msg))}">${escapeHtml(String(msg))}</p>
+    </div>
+    <button type="button" class="rj-toast-close" aria-label="Dismiss notification" title="Dismiss">
+      <svg class="rj-toast-close-icon" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  `;
+
+  const toastItem = {
+    el: toastEl,
+    timer: null
+  };
+
+  const btnClose = toastEl.querySelector('.rj-toast-close');
+  if (btnClose) {
+    btnClose.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dismissToast(toastItem);
+    });
+  }
+
+  toastItem.timer = setTimeout(() => {
+    dismissToast(toastItem);
+  }, TOAST_DURATION);
+
+  container.appendChild(toastEl);
+  activeToasts.push(toastItem);
+}
+
+function dismissToast(toastItem) {
+  if (!toastItem || !toastItem.el) return;
+  if (toastItem.timer) {
+    clearTimeout(toastItem.timer);
+    toastItem.timer = null;
+  }
+
+  const idx = activeToasts.indexOf(toastItem);
+  if (idx !== -1) {
+    activeToasts.splice(idx, 1);
+  }
+
+  toastItem.el.classList.add('rj-toast-hiding');
   setTimeout(() => {
-    toastNotification.classList.remove('rj-toast-visible');
-  }, 2200);
+    if (toastItem.el && toastItem.el.parentNode) {
+      toastItem.el.parentNode.removeChild(toastItem.el);
+    }
+  }, 180);
 }
 
 /**
