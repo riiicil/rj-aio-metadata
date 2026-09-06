@@ -21,7 +21,8 @@
     "http://localhost:*/*"
   ],
   "background": {
-    "service_worker": "background/service_worker.js"
+    "service_worker": "background/service_worker.js",
+    "type": "module"
   },
   "icons": {
     "16": "icons/icon16.png",
@@ -56,7 +57,7 @@
         "services/*"
       ],
       "matches": [
-        "*://*/*"
+        "<all_urls>"
       ]
     }
   ]

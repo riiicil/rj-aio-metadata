@@ -6,38 +6,54 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 3 in progress (Step 3.2 complete, Step 3.3 next)
+- **Current Milestone**: Phase 3 Complete (Ready for Merge to dev) -> Phase 4 [NEXT] (Platform Adapters)
 - **Active Branch**: `task/vision-service`
-- **Latest Commit**: `feat(sanitizer): implement microstock tag rules and metadata sanitizer`
+- **Latest Commit**: `feat(vision): implement universal ai vision client and background proxy worker`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (65/65 in test_ai_prompt.mjs, 86/86 in test_sanitizer_service.mjs, zero emoji clean)
+- **Build / Test State**: Verified healthy (227/227 assertions passed across test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 3 (Universal Vision AI Service & Prompt Engine) has completed Step 3.1 and Step 3.2:
-1. **AiPrompt.js Refinements (Step 3.1 & 3.2)**:
-   - Platform output schemas refined with character safety margins: Adobe Stock and Vecteezy title <=185 characters (hard limit 200), Freepik and MiriCanvas title <=90 characters (hard limit 100), Dreamstime title <=200 characters, descriptions uniformly target <=230 characters across Shutterstock, Dreamstime, and Depositphotos.
-   - Vecteezy schema strictly restricted to `title` and `keywords` (description field completely removed since Vecteezy editor does not have a description field).
-   - Multimodal OpenAI payload builder (`buildChatPayload`) with model-safe parameter guards (omits `temperature` for strict models like GPT-5, o1, o3).
-2. **SanitizerService.js Implementation (Step 3.2)**:
-   - `extractAndParseJson`: Resiliently extracts JSON from raw LLM output wrapped in markdown code fences (```json ... ``` or plain ``` ... ```), strips conversational filler text, cleans up trailing commas, and returns structured `MALFORMED_JSON_RESPONSE` errors on failure.
-   - `sanitizeKeywords`: Microstock tag pipeline enforcing <=2 words per tag (discards 3+ words), strips noisy punctuation/emojis while converting internal delimiters to single space, filters Vecteezy filetype keywords (`vector`, `photo`, `illustration`) and trademarks (`apple`, `nike`, `google`), injects user custom keywords at Index 0, deduplicates case-insensitively, and clamps to hard platform limits (Adobe Stock 49, MiriCanvas 25, Dreamstime 70, standard 50).
-   - `sanitizeTitle`: Strips special symbols (preserves commas and hyphens), enforces smart boundary clamping (sentence cut, word boundary cut without mid-word splits, mandatory trailing period), and respects platform bounds (100 for Freepik/MiriCanvas, 200 for Adobe/Vecteezy/Dreamstime).
-   - `sanitizeDescription`: Normalizes Shutterstock editorial prefix syntax (`: `), avoids double-prefixing, clamps to uniform 250-character limit, and ensures trailing period.
-   - `sanitizeMetadata`: Unified facade accepting raw object or JSON string, routing clean values, mapping Adobe Stock category numeric IDs (e.g. `Animals` -> `10001`), preserving Shutterstock/Dreamstime category structures, and ensuring platforms without description (Vecteezy, Adobe, Freepik, MiriCanvas) have NO description field.
+Phase 3 (Universal Vision AI Service & Prompt Engine) is now **100% complete** across all 3 components:
+1. **AiPrompt.js (Step 3.1 & 3.2)**:
+   - Official platform category taxonomies (Adobe Stock 21 numeric IDs, Shutterstock 26 Image / 19 Video, Dreamstime 15 Main & Subcategory trees).
+   - Platform output schemas with character safety bounds: Adobe Stock & Vecteezy title <=185 (hard limit 200), Freepik & MiriCanvas title <=90 (hard limit 100), Dreamstime title <=200, descriptions uniformly target <=230 across Shutterstock, Dreamstime, and Depositphotos.
+   - Vecteezy schema strictly restricted to `title` and `keywords` (description field omitted entirely).
+   - Flat 80-keyword generator ordered from specific to contextual with microstock SEO rules.
+   - Multimodal OpenAI payload builder (`buildChatPayload`) with model-safe parameter guards (omits `temperature` for GPT-5, o1, o3).
+2. **SanitizerService.js (Step 3.2)**:
+   - `extractAndParseJson`: Resiliently extracts JSON from raw LLM responses wrapped in markdown code fences, strips conversational text, cleans trailing commas, and returns structured `MALFORMED_JSON_RESPONSE` errors.
+   - `sanitizeKeywords`: Microstock tag pipeline enforcing <=2 words per tag, strips noisy punctuation/emojis, filters Vecteezy filetypes and trademarks, injects user custom keywords at Index 0, deduplicates case-insensitively, and clamps to hard platform limits.
+   - `sanitizeTitle` & `sanitizeDescription`: Smart boundary clamping (sentence cut, word boundary cut without mid-word splits, mandatory trailing period), and Shutterstock editorial prefix normalization (`: `, double-prefix prevention).
+   - `sanitizeMetadata`: Unified facade returning standardized clean metadata payload.
+3. **AiService.js & Background Proxy Worker (Step 3.3)**:
+   - `imageToBase64`: Standardizes image inputs (Data URL, raw base64, HTTP/Blob) into clean base64 Data URLs.
+   - `service_worker.js` Proxy: Background dispatcher handling `GENERATE_VISION_METADATA` requests to bypass browser CORS/CSP restrictions.
+   - Multi-Key Round-Robin: Distributes requests across comma-separated or newline-delimited API keys via `assetIndex`.
+   - Provider Authentication Mapping: Gemini (`?key=` + `x-goog-api-key`), OpenRouter (`Bearer` + `HTTP-Referer` + `X-Title`), OpenAI, Mistral, and Custom (`Bearer`).
+   - Exponential Backoff Retry: Automatically retries HTTP 429 and 5xx errors with exponential backoff (1s, 2s, 4s), while immediately classifying 401 (`API_KEY_INVALID`) and 404 (`MODEL_NOT_FOUND`) without retrying.
+   - `generateMetadata`: Complete pipeline facade connecting prompt building, payload construction, background proxy execution, and sanitizer output.
 
 ---
 
-## 3. Recommended Next Steps for Incoming Agent
+## 3. Actionable Next Steps for Incoming Agent (Phase 4)
 
-1. **Step 1 (Step 3.3 — Universal Vision Client & Service Worker Proxy)**:
-   - Implement `src/services/AiService.js` and update `src/background/service_worker.js` to handle multi-key round-robin, rate-limiting, exponential backoff retry, and background proxy routing to bypass CORS.
-2. **Step 2 (Verification)**:
-   - Run unit test suites and verify vision requests across OpenAI-compatible providers (Gemini, Mistral, OpenAI, OpenRouter).
-3. **Step 3 (Phase 4 — Platform DOM Adapters)**:
-   - Implement DOM injectors for 7 platforms (Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas).
+1. **Step 1 (User Review & Merge to `dev`)**:
+   - Verify that the user has reviewed `task/vision-service` and approved merging to `dev`.
+   - Execute merge: `git checkout dev && git merge --no-ff task/vision-service`.
+2. **Step 2 (Branch for Phase 4)**:
+   - Create feature branch `task/platform-adapters` from updated `dev`.
+3. **Step 3 (BaseAdapter Interface & Tier 1 Adapters)**:
+   - Implement `src/adapters/BaseAdapter.js` abstract interface (`isMatch`, `getAssetCards`, `getThumbnailUrl`, `selectCard`, `clearKeywords`, `fillMetadata`, `saveDraft`, `submitForReview`).
+   - Implement Tier 1 platform adapters:
+     - `AdobeStockAdapter.js` (React Spectrum value setter, 21 categories).
+     - `ShutterstockAdapter.js` (Material-UI testids, Image vs Video categories, spelling warnings approval).
+     - `FreepikAdapter.js` (Mandatory save draft loop per asset, AI base models).
+4. **Step 4 (Tier 2 Adapters & Auto-Router)**:
+   - Implement `VecteezyAdapter.js`, `DreamstimeAdapter.js`, `DepositphotosAdapter.js`, and `MiriCanvasAdapter.js`.
+   - Implement `src/adapters/index.js` adapter registry & auto-router.
 
 ---
 
@@ -85,6 +101,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 24 | 2026-09-07 | `task/vision-service` | `feat(vision)` | Implemented AiService.js, service_worker.js proxy (auth router, multi-key round-robin, exponential retry), and full Phase 3 test suite | Review & merge Phase 3 to dev, then Phase 4 (Platform Adapters) |
 | 23 | 2026-09-07 | `task/vision-service` | `feat(sanitizer)` | Implemented SanitizerService.js (tag rules, title/desc smart clamping, JSON repair) & refined AiPrompt.js schemas | Step 3.3: AiService.js & service_worker.js |
 | 22 | 2026-09-07 | `task/vision-service` | `feat(prompt)` | Implemented AiPrompt.js with official category taxonomies, schemas, 80-keyword prompts, and payload builder | Step 3.2: SanitizerService.js |
 | 21 | 2026-09-07 | `task/draggable-overlay-ui` | `56f7f1a` | Synchronized roadmap with real Phase 2 implementation, marked Phases 0, 1, 2 complete, Phase 3 next | User manual merge to dev, then Phase 3 |
