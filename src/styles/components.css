@@ -719,42 +719,46 @@ input[type="number"] {
   animation: rj-spin 0.8s linear infinite;
 }
 
-/* Stacked Toast Notification System (Top Right) */
+/* Stacked Toast Notification System (Fixed Below Header) */
 .rj-toast-container {
   position: fixed;
-  top: 10px;
-  right: 10px;
+  top: 56px; /* Positioned cleanly below the sticky header (height ~52px) */
+  right: 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
   z-index: 10000;
   pointer-events: none;
-  width: 270px;
-  max-width: calc(100% - 20px);
+  width: 275px;
+  max-width: calc(100% - 24px);
 }
 
 .rj-toast-item {
   pointer-events: auto;
   position: relative;
-  background-color: #111315;
+  background: linear-gradient(135deg, rgba(25, 28, 32, 0.97) 0%, rgba(18, 20, 23, 0.98) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-radius: var(--rj-radius-sm);
-  border: 1px solid var(--rj-hairline-subtle);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.75), 0 1px 3px rgba(0, 0, 0, 0.5);
-  padding: 7px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 8px 10px;
   display: flex;
   align-items: flex-start;
   gap: 8px;
   box-sizing: border-box;
-  animation: rj-toast-slide-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  animation: rj-toast-slide-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .rj-toast-item.rj-toast-success {
-  border-color: rgba(89, 212, 153, 0.4);
+  border-color: rgba(89, 212, 153, 0.5);
+  border-left: 3.5px solid #59d499;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 14px rgba(89, 212, 153, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .rj-toast-item.rj-toast-error {
-  border-color: rgba(255, 97, 97, 0.45);
+  border-color: rgba(255, 97, 97, 0.55);
+  border-left: 3.5px solid #ff6161;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 14px rgba(255, 97, 97, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .rj-toast-icon {
@@ -793,11 +797,11 @@ input[type="number"] {
 }
 
 .rj-toast-item.rj-toast-success .rj-toast-text {
-  color: #c4f1dc;
+  color: #e6f9f0;
 }
 
 .rj-toast-item.rj-toast-error .rj-toast-text {
-  color: #ffb8b8;
+  color: #ffe6e6;
 }
 
 .rj-toast-close {
@@ -818,7 +822,7 @@ input[type="number"] {
 }
 
 .rj-toast-close:hover {
-  background-color: rgba(255, 255, 255, 0.12);
+  background-color: rgba(255, 255, 255, 0.15);
   color: #ffffff;
 }
 
@@ -832,7 +836,11 @@ input[type="number"] {
 @keyframes rj-toast-slide-in {
   0% {
     opacity: 0;
-    transform: translateX(18px) scale(0.96);
+    transform: translateX(24px) scale(0.95);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(-2px) scale(1.01);
   }
   100% {
     opacity: 1;
@@ -840,9 +848,30 @@ input[type="number"] {
   }
 }
 
+@keyframes rj-toast-slide-out {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+    max-height: 80px;
+    margin-bottom: 0;
+  }
+  35% {
+    opacity: 0;
+    transform: translateX(22px) scale(0.95);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(32px) scale(0.88);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-width: 0;
+    margin-bottom: -7px;
+  }
+}
+
 .rj-toast-item.rj-toast-hiding {
-  opacity: 0;
-  transform: translateX(14px) scale(0.95);
+  animation: rj-toast-slide-out 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   pointer-events: none;
 }
 

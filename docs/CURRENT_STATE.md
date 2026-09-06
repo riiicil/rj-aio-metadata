@@ -62,7 +62,7 @@
   - `docs/agent-logs/2026-09-02.md` — Session Entries 1 through 9 (newest on top).
   - `docs/agent-logs/2026-09-04.md` — Session Entries 1 and 2 (Docs and UI bounds detection).
   - `docs/agent-logs/2026-09-05.md` — Session Entries 1 through 6 (newest on top).
-  - `docs/agent-logs/2026-09-06.md` — Session Entries 1, 2, and 3 (HUD polish, media tabs, single asset ID, label refinement, Shutterstock subtabs, pill layers icon, top-right stacked toast queue).
+  - `docs/agent-logs/2026-09-06.md` — Session Entries 1 through 4 (HUD polish, media tabs, single asset ID, label refinement, Shutterstock subtabs, pill layers icon, top-right stacked toast queue, below-header positioning, slide-out exit animation).
   - `docs/references/` — 8 technical reference analyses for Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas, and Vision APIs.
 - **Source Code (`src/`):**
   - `src/manifest.json` — Chromium Manifest V3 configuration with universal content scripts matches (`http://*/*`, `https://*/*`), permissions, icons, action, service worker, web accessible resources (`overlay/*`, `styles/*`, `icons/*`, `services/*`).

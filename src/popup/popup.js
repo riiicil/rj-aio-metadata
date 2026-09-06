@@ -152,7 +152,7 @@ function dismissToast(toastItem) {
     if (toastItem.el && toastItem.el.parentNode) {
       toastItem.el.parentNode.removeChild(toastItem.el);
     }
-  }, 180);
+  }, 280);
 }
 
 /**
