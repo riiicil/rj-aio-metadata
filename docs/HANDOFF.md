@@ -6,41 +6,44 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 4: Platform Adapters (Sub-phase 4.2 Complete -> Sub-phase 4.3 Next)
+- **Current Milestone**: Phase 4: Platform Adapters (Sub-phase 4.3 Complete -> Sub-phase 4.4 Next)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `feat(adapter): implement base adapter interface and dom helpers`
+- **Latest Commit**: `feat(adapter): implement adobe stock and shutterstock platform adapters`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (330/330 assertions passed across test_base_adapter.mjs [65/65], test_storage_v4.mjs [38/38], test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
+- **Build / Test State**: Verified healthy (408/408 assertions passed across test_tier1_adapters.mjs [78/78], test_base_adapter.mjs [65/65], test_storage_v4.mjs [38/38], test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Sub-phase 4.2 (Core Adapter Foundation) is now **100% complete**:
-1. **DOM Helpers Utility (`src/adapters/utils/dom_helpers.js`)**:
-   - Universal single-string text injector (`setNativeValue`): sets controlled input/textarea values by extracting the prototype property descriptor setter (`HTMLInputElement.prototype` / `HTMLTextAreaElement.prototype`) and automatically dispatching synthetic `input`, `change`, and `blur` events.
-   - Async DOM polling helpers (`waitForElement`, `waitForElementToDisappear`): observes dynamic DOM additions and removals via `MutationObserver` with timeout guards and immediate resolution when already matching.
-   - Universal Cooldown Generator (`randomDelay`, `sleep`): provides randomized delays (default 1-5s) to mimic human contributor pacing and prevent bot detection.
-   - Interactive Input Dispatchers: `simulateEnterKey` dispatches keyboard events (`keydown`, `keypress`, `keyup` with keyCode 13) to convert raw text into platform tag chips; `simulateClick` safely dispatches native `.click()` and synthetic `MouseEvent`.
-   - Defensive Thumbnail URL Extractor (`extractThumbnailUrl`): robust fallback hierarchy (`img.src` -> `img.dataset.src` -> `img.dataset.original` -> `img.currentSrc` -> parent card `querySelector('img')`).
-2. **Base Adapter Abstract Contract (`src/adapters/BaseAdapter.js`)**:
-   - Constructor establishes `platformId` and `platformName`.
-   - Strictly enforces abstract method implementations: throws descriptive errors if `isMatch`, `getAssetCards`, `getThumbnailUrl`, `selectCard`, or `fillMetadata` are invoked on un-implemented subclasses.
-   - Provides safe virtual lifecycle defaults: `waitForEditorReady` (resolves true), `clearMetadata` / `clearKeywords` (resolves true), `saveDraft` (resolves true), `bulkSave` (resolves true), and `submitForReview` (safely returns false to prevent accidental user submission).
-   - Built-in `executeCooldown(minMs, maxMs, abortSignal)` executes random delays and supports immediate abort via `AbortSignal` without waiting full delay duration.
-3. **Manifest Configuration Update (`src/manifest.json`)**:
-   - Added `"adapters/*"` to `web_accessible_resources` allowing content scripts to dynamically import adapter modules without `ERR_BLOCKED_BY_CLIENT` browser errors.
+Sub-phase 4.3 (Tier 1 Platform Adapters) is now **100% complete**:
+1. **Adobe Stock Adapter (`src/adapters/AdobeStockAdapter.js`)**:
+   - Commercial mode only (illustrative editorial unchecked / omitted).
+   - Instant single-string value injection via React Spectrum native prototype setter for title (`textarea[data-t="asset-title-content-tagger"]`, max 200 chars) and keywords (`#content-keywords-ui-textarea`, max 49 tags).
+   - Adobe Spectrum 21 numeric category IDs selection (`10001` - `10988`) via `select[name="category"]`.
+   - Generative AI declaration handling: checks `#content-tagger-generative-ai-checkbox`, then automatically checks `#content-tagger-generative-ai-property-release-checkbox` ("people and property are fictional").
+   - Metadata language dropdown support via `select[name="language"]` mapped to platform IDs (English 1, German 2, French 4, Spanish 5, Italian 6, Portuguese 7, Japanese 9, Korean 10, Chinese 14).
+   - Bulk save strategy: Select All checkbox -> Releases switch to "no" (for non-AI assets) -> "Save work" button.
+2. **Shutterstock Adapter (`src/adapters/ShutterstockAdapter.js`)**:
+   - Shared workflow for both Photo (26 categories) and Video (19 categories).
+   - Material-UI controlled input value injection via native prototype setter.
+   - Instant single-string description injection (`textarea[name="description"]`, max 200 chars) with seamless editorial caption prefix support (`options.editorialPrefix`).
+   - Category 1 (Primary) and Category 2 (Secondary) dropdown selection via hidden input and MUI listbox menu items.
+   - Keyword chip injection: comma-separated list into MUI input (`div[data-testid="keyword-input-text"] input`) + `simulateEnterKey` event chain.
+   - Automatic approval of non-dictionary spelling warnings (`button[data-testid="mark-all-correct-button"]`).
+   - Commercial vs Editorial usage switch toggling (`input[name="isEditorial"]`).
+   - Bulk save strategy: Checkbox on last card -> "Select page" button on toolbar -> "Save" button in sidebar.
+3. **Verification Test Suite (`scratch/test_tier1_adapters.mjs`)**:
+   - Validated all 78 assertions across both adapters covering constructor, identity, URL matching, card scanning, thumbnail extraction, selection, editor waiting, metadata clearing, metadata filling, and bulk saving.
 
 ---
 
 ## 3. Actionable Next Steps for Incoming Agent (Phase 4)
 
-1. **Step 1 (Sub-phase 4.3: Tier 1 Platform Adapters)**:
-   - Implement `AdobeStockAdapter.js` (React Spectrum value setter, 21 categories, non-English prompts).
-   - Implement `ShutterstockAdapter.js` (Material-UI selectors, Image vs Video categories, spelling warnings auto-approval).
-2. **Step 2 (Sub-phase 4.4: Tier 2 Platform Adapters & Registry)**:
+1. **Step 1 (Sub-phase 4.4: Tier 2 Platform Adapters)**:
    - Implement `FreepikAdapter.js` (Mandatory save draft loop per asset, 47 base models).
    - Implement `VecteezyAdapter.js` (Automatic filetype category, prohibited terms handling, AI 'Other' model input).
+2. **Step 2 (Sub-phase 4.5: Tier 3 Platform Adapters & Registry)**:
    - Implement `DreamstimeAdapter.js` (15 Main / 182 Subcategories tree, Mode A vs Mode B loop).
    - Implement `DepositphotosAdapter.js` (160 items/page paginator, raw tag paste trigger, editorial country/city AJAX).
    - Implement `MiriCanvasAdapter.js` (1,000 items/page batching, ContentType & Tier radios).
@@ -92,6 +95,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 27 | 2026-09-07 | `task/platform-adapters` | `feat(adapter)` | Implemented AdobeStockAdapter.js and ShutterstockAdapter.js Tier 1 platform adapters with full verification suite | Sub-phase 4.4: Tier 2 Adapters (FreepikAdapter & VecteezyAdapter) |
 | 26 | 2026-09-07 | `task/platform-adapters` | `feat(adapter)` | Implemented dom_helpers.js, BaseAdapter.js abstract contract, updated manifest web_accessible_resources | Sub-phase 4.3: Tier 1 Adapters (AdobeStockAdapter & ShutterstockAdapter) |
 | 25 | 2026-09-07 | `task/platform-adapters` | `feat(popup)` | Aligned Vecteezy software dropdown & Freepik 47 base models catalog in popup UI, bumped storage schema v4 with automated migrations | Sub-phase 4.2: Core Adapter Foundation (dom_helpers.js + BaseAdapter.js) |
 | 24 | 2026-09-07 | `task/vision-service` | `feat(vision)` | Implemented AiService.js, service_worker.js proxy (auth router, multi-key round-robin, exponential retry), and full Phase 3 test suite | Review & merge Phase 3 to dev, then Phase 4 (Platform Adapters) |

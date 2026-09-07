@@ -1,0 +1,266 @@
+/**
+ * AdobeStockAdapter — Platform Adapter for Adobe Stock Contributor
+ *
+ * Implements BaseAdapter interface for Adobe Stock (contributor.stock.adobe.com / stock.adobe.com).
+ * - React Spectrum controlled input value injection via native prototype setter.
+ * - Commercial mode only (illustrative editorial unchecked / omitted).
+ * - 21 numeric category IDs (10001 - 10988).
+ * - Generative AI declaration + fictional people/property release checkboxes.
+ * - Language selection mapping (English '1', German '2', French '4', Spanish '5', Italian '6', Portuguese '7', Japanese '9', Korean '10', Chinese '14').
+ * - Title (max 200 chars) & Keywords (comma-separated, max 49 tags).
+ * - Bulk save strategy: Select All -> Releases to "no" (if non-AI) -> Save work.
+ */
+
+import { BaseAdapter } from './BaseAdapter.js';
+import {
+  setNativeValue,
+  waitForElement,
+  simulateClick,
+  extractThumbnailUrl
+} from './utils/dom_helpers.js';
+
+/**
+ * Adobe Stock language ID lookup map
+ */
+export const ADOBE_LANGUAGE_MAP = {
+  '1': '1', 'en': '1', 'english': '1',
+  '2': '2', 'de': '2', 'german': '2', 'deutsch': '2',
+  '4': '4', 'fr': '4', 'french': '4', 'francais': '4',
+  '5': '5', 'es': '5', 'spanish': '5', 'espanol': '5',
+  '6': '6', 'it': '6', 'italian': '6', 'italiano': '6',
+  '7': '7', 'pt': '7', 'portuguese': '7', 'portugues': '7',
+  '9': '9', 'ja': '9', 'japanese': '9',
+  '10': '10', 'ko': '10', 'korean': '10',
+  '14': '14', 'zh': '14', 'zh-tw': '14', 'chinese': '14', 'traditional_chinese': '14'
+};
+
+export class AdobeStockAdapter extends BaseAdapter {
+  constructor() {
+    super('adobestock', 'Adobe Stock');
+  }
+
+  /**
+   * Matches Adobe Stock contributor URLs.
+   * @param {string} url - Target URL to evaluate.
+   * @returns {boolean} True if matching, false otherwise.
+   */
+  isMatch(url) {
+    if (typeof url !== 'string') return false;
+    return url.includes('contributor.stock.adobe.com') || url.includes('stock.adobe.com');
+  }
+
+  /**
+   * Scans and retrieves all upload grid cards.
+   * @returns {HTMLElement[]} Array of asset card elements.
+   */
+  getAssetCards() {
+    if (typeof document === 'undefined') return [];
+    return Array.from(document.querySelectorAll('div.upload-tile, div[data-t="upload-tile"]'));
+  }
+
+  /**
+   * Extracts the thumbnail image URL from an asset card.
+   * @param {HTMLElement} cardElement - Asset card element.
+   * @returns {string|null} Image URL or null.
+   */
+  getThumbnailUrl(cardElement) {
+    if (!cardElement) return null;
+    const img = cardElement.querySelector?.('img.upload-tile__thumbnail, div.upload-tile img, img');
+    return extractThumbnailUrl(img || cardElement);
+  }
+
+  /**
+   * Selects an asset card in the grid to display its metadata editor.
+   * @param {HTMLElement} cardElement - Card element to select.
+   */
+  selectCard(cardElement) {
+    if (!cardElement) return;
+    simulateClick(cardElement);
+  }
+
+  /**
+   * Waits for the tagger editor form to become interactive.
+   * @param {HTMLElement} [cardElement=null] - Selected asset card.
+   * @param {number} [timeoutMs=4000] - Timeout in milliseconds.
+   * @returns {Promise<boolean>} True if ready, false on timeout.
+   */
+  async waitForEditorReady(cardElement = null, timeoutMs = 4000) {
+    try {
+      await waitForElement(
+        'textarea[data-t="asset-title-content-tagger"], div.mobile-tagger-details, textarea[name="title"]',
+        typeof document !== 'undefined' ? document : null,
+        timeoutMs
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Clears old metadata fields (title, keywords) prior to new injection.
+   * @returns {Promise<boolean>} True if cleared.
+   */
+  async clearMetadata() {
+    if (typeof document === 'undefined') return true;
+
+    const titleEl = document.querySelector(
+      'textarea[data-t="asset-title-content-tagger"], textarea[name="title"]'
+    );
+    if (titleEl) {
+      setNativeValue(titleEl, '');
+    }
+
+    const kwEl = document.querySelector(
+      '#content-keywords-ui-textarea, textarea[name="keywordsUITextArea"], textarea[data-t="content-keywords-ui-textarea"]'
+    );
+    if (kwEl) {
+      setNativeValue(kwEl, '');
+    }
+
+    return true;
+  }
+
+  /**
+   * Injects sanitized metadata into Adobe Stock tagger form.
+   * Commercial mode only.
+   *
+   * @param {Object} metadata - Sanitized metadata payload.
+   * @param {Object} [options={}] - Options (isAiGenerated, language, etc.).
+   * @returns {Promise<boolean>} True if injection succeeded.
+   */
+  async fillMetadata(metadata, options = {}) {
+    if (typeof document === 'undefined' || !metadata) return false;
+
+    // 1. Category (Adobe Spectrum 21 numeric category IDs: 10001 - 10988)
+    const categoryId = metadata.category || metadata.categoryId;
+    if (categoryId) {
+      const catSelect = document.querySelector('select[name="category"], select[data-t="content-tagger-category-select"]');
+      if (catSelect && catSelect.value !== String(categoryId)) {
+        setNativeValue(catSelect, String(categoryId));
+      }
+    }
+
+    // 2. Generative AI Declaration & Fictional Property Release Checkbox
+    const aiCheckbox = document.querySelector(
+      '#content-tagger-generative-ai-checkbox, input[name="content-tagger-generative-ai-checkbox"], input[data-t="content-tagger-generative-ai-checkbox"]'
+    );
+    const isAi = Boolean(options.isAiGenerated);
+
+    if (aiCheckbox) {
+      if (isAi && !aiCheckbox.checked) {
+        aiCheckbox.click();
+      } else if (!isAi && aiCheckbox.checked) {
+        aiCheckbox.click();
+      }
+
+      if (isAi) {
+        // Automatically check fictional people/property release checkbox
+        const propCheckbox = document.querySelector(
+          '#content-tagger-generative-ai-property-release-checkbox, input[name="content-tagger-generative-ai-property-release-checkbox"], input[data-t="content-tagger-generative-ai-property-release-checkbox"]'
+        );
+        if (propCheckbox && !propCheckbox.checked) {
+          propCheckbox.click();
+        }
+      }
+    }
+
+    // 3. Metadata Language Dropdown
+    const rawLang = options.language || options.languageId;
+    if (rawLang !== undefined && rawLang !== null) {
+      const normalizedLangKey = String(rawLang).toLowerCase().trim();
+      const mappedLangId = ADOBE_LANGUAGE_MAP[normalizedLangKey] || String(rawLang);
+      const langSelect = document.querySelector('select[name="language"], select[data-t="content-tagger-keywords-language-select"]');
+      if (langSelect && langSelect.value !== mappedLangId) {
+        setNativeValue(langSelect, mappedLangId);
+      }
+    }
+
+    // 4. Commercial Mode Guard (Ensure illustrative editorial is NOT checked)
+    const editorialCheckbox = document.querySelector(
+      'input[data-t="content-tagger-illustrative-editorial-checkbox"], div[data-t="content-tagger-illustrative-editorial"] input[type="checkbox"]'
+    );
+    if (editorialCheckbox && editorialCheckbox.checked) {
+      editorialCheckbox.click();
+    }
+
+    // 5. Title (Single-string instant injection, clamped to 200 chars max)
+    if (metadata.title) {
+      const titleEl = document.querySelector(
+        'textarea[data-t="asset-title-content-tagger"], textarea[name="title"], div.mobile-tagger-details textarea'
+      );
+      if (titleEl) {
+        const cleanTitle = String(metadata.title).slice(0, 200);
+        setNativeValue(titleEl, cleanTitle);
+      }
+    }
+
+    // 6. Keywords (Single-string instant injection, clamped to 49 tags max)
+    if (metadata.keywords) {
+      const kwEl = document.querySelector(
+        '#content-keywords-ui-textarea, textarea[name="keywordsUITextArea"], textarea[data-t="content-keywords-ui-textarea"]'
+      );
+      if (kwEl) {
+        const tagList = Array.isArray(metadata.keywords)
+          ? metadata.keywords
+          : String(metadata.keywords).split(',').map((t) => t.trim()).filter(Boolean);
+        const kwString = tagList.slice(0, 49).join(', ');
+        setNativeValue(kwEl, kwString);
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Saves draft for currently selected asset.
+   * @returns {Promise<boolean>}
+   */
+  async saveDraft() {
+    if (typeof document === 'undefined') return true;
+    const saveBtn = document.querySelector('button[data-t="save-work"], button.button--action');
+    if (saveBtn && !saveBtn.disabled) {
+      simulateClick(saveBtn);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Bulk save strategy:
+   * 1. Select All checkbox clicked.
+   * 2. If non-AI (isAiGenerated === false), set releases switch to "no".
+   * 3. Click "Save work" button.
+   *
+   * @param {boolean} [isAiGenerated=false] - Whether assets are AI generated.
+   * @returns {Promise<boolean>} True if bulk save triggered.
+   */
+  async bulkSave(isAiGenerated = false) {
+    if (typeof document === 'undefined') return true;
+
+    // 1. Select All
+    const selectAllCheckbox = document.querySelector(
+      'input[data-t="select-all-checkbox"], div.upload-tile__select-all input, div.content-tagger__select-all input'
+    );
+    if (selectAllCheckbox && !selectAllCheckbox.checked) {
+      simulateClick(selectAllCheckbox);
+    }
+
+    // 2. Releases switch to "no" (for non-AI assets)
+    if (!isAiGenerated) {
+      const noReleaseRadio = document.querySelector('input[name="hasReleases"][value="no"]');
+      if (noReleaseRadio && !noReleaseRadio.checked) {
+        simulateClick(noReleaseRadio);
+      }
+    }
+
+    // 3. Save work button
+    const saveBtn = document.querySelector('button[data-t="save-work"], button.button--action');
+    if (saveBtn && !saveBtn.disabled) {
+      simulateClick(saveBtn);
+      return true;
+    }
+
+    return true;
+  }
+}
