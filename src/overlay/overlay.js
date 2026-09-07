@@ -4,6 +4,10 @@
  * Reference: ADR-002 (Dual UI Strategy), DESIGN.md (Raycast Dark Precision)
  */
 
+import { getAdapterForUrl, getAdapterForPlatform } from '../adapters/index.js';
+import { generateMetadata } from '../services/AiService.js';
+import { randomDelay, sleep } from '../adapters/utils/dom_helpers.js';
+
 // Platform Keyword Count Constraints & Hints
 const PLATFORM_LIMITS = {
   adobestock: { min: 8, max: 49, hint: 'Min 8, Max 49' },
@@ -38,6 +42,7 @@ export class OverlayHUD {
     this.platformName = this.detectPlatform();
     this.assetCount = 0;
     this.isAutomationRunning = false;
+    this.abortController = null;
     this.scanInterval = null;
     this.mutationObserver = null;
     this.saveDebounceTimer = null;
@@ -690,20 +695,11 @@ export class OverlayHUD {
     if (btnAutomation) {
       btnAutomation.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!this.isAutomationRunning && !this.isProviderReady(this.currentConfig)) {
-          return;
+        if (this.isAutomationRunning) {
+          this.stopAutomation();
+        } else {
+          this.startAutomation();
         }
-        this.isAutomationRunning = !this.isAutomationRunning;
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          chrome.storage.local.set({
-            rj_automation_state: {
-              isRunning: this.isAutomationRunning,
-              platformId: this.platformId,
-              timestamp: Date.now()
-            }
-          });
-        }
-        this.updateAutomationUI(this.isAutomationRunning);
       });
     }
 
@@ -795,7 +791,11 @@ export class OverlayHUD {
       if (state) {
         const isRunning = Boolean(state.isRunning);
         if (this.isAutomationRunning !== isRunning) {
-          this.updateAutomationUI(isRunning);
+          if (!isRunning && this.isAutomationRunning) {
+            this.stopAutomation();
+          } else if (isRunning && !this.isAutomationRunning) {
+            this.startAutomation();
+          }
         }
       }
     }
@@ -853,6 +853,238 @@ export class OverlayHUD {
 
     // Disable inputs while running, re-enable when idle
     this.setFormControlsDisabled(isRunning);
+  }
+
+  /**
+   * Starts sequential AI metadata generation and injection across detected assets.
+   */
+  async startAutomation() {
+    if (this.isAutomationRunning) return;
+
+    // 1. Resolve active platform adapter
+    const currentUrl = typeof window !== 'undefined' ? window.location?.href : '';
+    let adapter = getAdapterForUrl(currentUrl);
+    if (!adapter && this.platformId && this.platformId !== 'unknown') {
+      adapter = getAdapterForPlatform(this.platformId);
+    }
+    if (adapter && (!this.platformId || this.platformId === 'unknown')) {
+      this.platformId = adapter.platformId;
+    }
+
+    if (!adapter) {
+      console.warn('[RJ AIO Metadata] No platform adapter matched for URL:', currentUrl);
+      const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
+      if (statusText) statusText.textContent = 'Unsupported Page';
+      return;
+    }
+
+    // 2. Validate active provider credentials
+    if (!this.currentConfig) {
+      await this.syncFromStorage();
+    }
+    if (!this.isProviderReady(this.currentConfig)) {
+      console.warn('[RJ AIO Metadata] AI Provider is not ready. Configure in popup first.');
+      const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
+      if (statusText) statusText.textContent = 'Setup Model';
+      return;
+    }
+
+    // 3. Initialize AbortController
+    this.abortController = new AbortController();
+    const signal = this.abortController.signal;
+
+    // 4. Update HUD UI state to Running
+    this.updateAutomationUI(true);
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({
+        rj_automation_state: {
+          isRunning: true,
+          platformId: this.platformId,
+          timestamp: Date.now()
+        }
+      });
+    }
+
+    const progressFill = this.shadow?.querySelector('#rjProgressFill');
+    const countText = this.shadow?.querySelector('#rjAssetCountText');
+    const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
+    const pillStatus = this.shadow?.querySelector('#rjPillStatus');
+    const badge = this.shadow?.querySelector('#rjAutomationBadge');
+
+    try {
+      // 5. Query asset cards on the page
+      const rawCards = adapter.getAssetCards();
+      const cards = Array.isArray(rawCards) ? rawCards : (rawCards ? Array.from(rawCards) : []);
+      const total = cards.length;
+
+      if (total === 0) {
+        this.updateAutomationUI(false);
+        if (countText) countText.textContent = '0 Assets Detected';
+        if (statusText) statusText.textContent = '0 Assets Detected';
+        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+          chrome.storage.local.set({
+            rj_automation_state: {
+              isRunning: false,
+              platformId: this.platformId,
+              timestamp: Date.now()
+            }
+          });
+        }
+        return;
+      }
+
+      // 6. Sequential Asset Processing Loop
+      for (let i = 0; i < total; i++) {
+        if (signal.aborted) break;
+
+        const card = cards[i];
+
+        // Update HUD progress
+        const pct = Math.round((i / total) * 100);
+        if (progressFill) progressFill.style.width = `${pct}%`;
+        if (countText) countText.textContent = `Asset ${i + 1} of ${total}`;
+        if (statusText) statusText.textContent = 'Processing...';
+        if (pillStatus) pillStatus.textContent = `${i + 1}/${total} (${pct}%)`;
+
+        // Step 1: Select Card
+        await adapter.selectCard(card);
+        if (signal.aborted) break;
+
+        // Step 2: Wait for Editor Ready
+        await adapter.waitForEditorReady(card, 4000);
+        if (signal.aborted) break;
+
+        // Step 3: Extract preview thumbnail
+        const thumb = adapter.getThumbnailUrl(card);
+
+        // Step 4: AI Metadata Generation
+        if (statusText) statusText.textContent = 'Generating AI...';
+
+        const keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 50;
+        const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
+        const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
+        const isAiGenerated = Boolean(this.shadow?.querySelector('#rjToggleAiDeclaration')?.checked);
+        const editorialPrefix = this.currentConfig?.platformSettings?.shutterstock?.editorialPrefix || '';
+        const isVideo = this.platformId === 'shutterstock' && typeof window !== 'undefined' && window.location?.pathname?.includes('/video');
+        const assetType = isVideo ? 'video' : 'image';
+
+        const sanitizedData = await generateMetadata({
+          image: thumb,
+          platformId: this.platformId,
+          assetType,
+          targetKeywordCount: keywordCount,
+          customKeywords,
+          isAiGenerated,
+          editorialPrefix,
+          assetIndex: i,
+          providerConfig: this.currentConfig
+        });
+
+        if (signal.aborted) break;
+
+        // Step 5: Clear existing metadata
+        await adapter.clearMetadata();
+        if (signal.aborted) break;
+
+        // Step 6: Inject sanitized metadata
+        if (statusText) statusText.textContent = 'Injecting metadata...';
+
+        const platformSettings = this.currentConfig?.platformSettings?.[this.platformId] || {};
+        const platformOptions = {
+          ...platformSettings,
+          isAiGenerated
+        };
+
+        await adapter.fillMetadata(sanitizedData, platformOptions);
+        if (signal.aborted) break;
+
+        // Step 7: Per-item save (for Freepik and Dreamstime)
+        if (this.platformId === 'freepik' || this.platformId === 'dreamstime') {
+          await adapter.saveDraft();
+        }
+        if (signal.aborted) break;
+
+        // Step 8: Cooldown Delay
+        if (statusText) statusText.textContent = 'Cooldown...';
+        const minWait = this._cooldownMin ?? 1000;
+        const maxWait = this._cooldownMax ?? 5000;
+        await randomDelay(minWait, maxWait, signal);
+
+        // Dreamstime special carousel navigation
+        if (this.platformId === 'dreamstime') {
+          const navResult = await adapter.navigateToNext();
+          if (navResult?.done) {
+            break;
+          }
+        }
+      }
+
+      // End of Loop / Bulk Save
+      if (!signal.aborted) {
+        // Bulk save for platforms that support it
+        const bulkSavePlatforms = ['adobestock', 'shutterstock', 'vecteezy', 'depositphotos', 'miricanvas'];
+        if (bulkSavePlatforms.includes(this.platformId)) {
+          if (statusText) statusText.textContent = 'Saving all...';
+          await adapter.bulkSave();
+        }
+
+        // Completion status
+        if (progressFill) progressFill.style.width = '100%';
+        if (countText) countText.textContent = `Finished ${total} assets`;
+        this.lastCompletedAssetLabel = `Finished ${total} assets`;
+        if (badge) badge.classList.remove('rj-running');
+        if (statusText) statusText.textContent = 'Completed';
+        if (pillStatus) pillStatus.textContent = 'Finished';
+
+        const finishWait = this._completionWait ?? 3000;
+        await sleep(finishWait);
+        this.updateAutomationUI(false);
+      }
+    } catch (err) {
+      if (err.message === 'ABORTED' || signal.aborted) {
+        console.log('[RJ AIO Metadata] Automation stopped.');
+        this.updateAutomationUI(false);
+        if (statusText) statusText.textContent = 'Stopped';
+      } else {
+        console.error('[RJ AIO Metadata] Automation error:', err);
+        this.updateAutomationUI(false);
+        if (statusText) statusText.textContent = 'Error: ' + (err.message || 'Failed');
+      }
+    } finally {
+      this.abortController = null;
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.set({
+          rj_automation_state: {
+            isRunning: false,
+            platformId: this.platformId,
+            timestamp: Date.now()
+          }
+        });
+      }
+    }
+  }
+
+  /**
+   * Aborts in-flight automation and resets HUD state.
+   */
+  stopAutomation() {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+    this.updateAutomationUI(false);
+    const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
+    if (statusText) statusText.textContent = 'Stopped';
+
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({
+        rj_automation_state: {
+          isRunning: false,
+          platformId: this.platformId,
+          timestamp: Date.now()
+        }
+      });
+    }
   }
 
   /**
@@ -1258,6 +1490,10 @@ export class OverlayHUD {
    * Cleanup method to clear intervals and observers when tearing down.
    */
   destroy() {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
     if (this.scanInterval) clearInterval(this.scanInterval);
     if (this.mutationObserver) this.mutationObserver.disconnect();
     if (this.saveDebounceTimer) clearTimeout(this.saveDebounceTimer);

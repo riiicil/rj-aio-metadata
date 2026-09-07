@@ -8,27 +8,51 @@
 
 /**
  * Standard asynchronous sleep delay.
+ * Supports optional AbortSignal for immediate cancellation.
  * @param {number} ms - Milliseconds to sleep.
+ * @param {AbortSignal} [abortSignal=null] - Optional AbortSignal to cancel delay.
  * @returns {Promise<void>}
  */
-export function sleep(ms) {
+export function sleep(ms, abortSignal = null) {
   if (ms <= 0) return Promise.resolve();
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  if (abortSignal?.aborted) return Promise.reject(new Error('ABORTED'));
+
+  return new Promise((resolve, reject) => {
+    let timer = null;
+    let onAbort = null;
+
+    if (abortSignal) {
+      onAbort = () => {
+        if (timer) clearTimeout(timer);
+        abortSignal.removeEventListener('abort', onAbort);
+        reject(new Error('ABORTED'));
+      };
+      abortSignal.addEventListener('abort', onAbort);
+    }
+
+    timer = setTimeout(() => {
+      if (abortSignal && onAbort) {
+        abortSignal.removeEventListener('abort', onAbort);
+      }
+      resolve();
+    }, ms);
+  });
 }
 
 /**
  * Universal Cooldown Generator.
  * Generates a random delay between minMs and maxMs (inclusive) to mimic human pacing
- * and prevent bot detection / rate limiting.
+ * and prevent bot detection / rate limiting. Respects AbortSignal to cancel immediately.
  * @param {number} [minMs=1000] - Minimum delay in milliseconds.
  * @param {number} [maxMs=5000] - Maximum delay in milliseconds.
+ * @param {AbortSignal} [abortSignal=null] - Optional AbortSignal to cancel delay.
  * @returns {Promise<number>} Actual milliseconds elapsed.
  */
-export async function randomDelay(minMs = 1000, maxMs = 5000) {
+export async function randomDelay(minMs = 1000, maxMs = 5000, abortSignal = null) {
   const safeMin = Math.max(0, minMs);
   const safeMax = Math.max(safeMin, maxMs);
   const ms = Math.floor(Math.random() * (safeMax - safeMin + 1)) + safeMin;
-  await sleep(ms);
+  await sleep(ms, abortSignal);
   return ms;
 }
 
