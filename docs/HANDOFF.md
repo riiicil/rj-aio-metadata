@@ -6,48 +6,66 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 4: Platform Adapters (Sub-phase 4.4 Complete -> Sub-phase 4.5 Next)
+- **Current Milestone**: Phase 4: Platform Adapters (Sub-phase 4.5 Complete -> Sub-phase 4.6 Next)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `feat(adapter): implement freepik and vecteezy platform adapters`
+- **Latest Commit**: `feat(adapter): implement dreamstime, depositphotos, and miricanvas platform adapters`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (502/502 assertions passed across test_tier2_adapters.mjs [94/94], test_tier1_adapters.mjs [78/78], test_base_adapter.mjs [65/65], test_storage_v4.mjs [38/38], test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
+- **Build / Test State**: Verified healthy (609/609 assertions passed across test_tier3_adapters.mjs [107/107], test_tier2_adapters.mjs [94/94], test_tier1_adapters.mjs [78/78], test_base_adapter.mjs [65/65], test_storage_v4.mjs [38/38], test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Sub-phase 4.4 (Tier 2 Platform Adapters) is now **100% complete**:
-1. **Freepik Adapter (`src/adapters/FreepikAdapter.js`)**:
-   - URL matching for `contributor.freepik.com` and `contributor.magnific.com`.
-   - Card retrieval and thumbnail extraction from `div.catalog__item` with lazy image fallback.
-   - Title single-string instant injection clamped to 100 characters max.
-   - Keyword clearing via trash button or individual remove buttons, followed by comma-separated chip injection and Enter key simulation.
-   - Category is strictly omitted (automatically categorized by Freepik).
-   - Generative AI declaration switch, base model selection (supporting the 47 official models catalog with custom dropdown fallback), and prompt injection into `textarea#aiPrompt`.
-   - **Mandatory per-item save draft (`saveDraft`)**: triggers `button.button-paste-draft` ("Create draft") and waits for spinner completion (`waitForElementToDisappear`) and button disabled state before proceeding to the next card.
-   - Submit for review via `button.button--submit`.
-2. **Vecteezy Adapter (`src/adapters/VecteezyAdapter.js`)**:
-   - URL matching for `contributors.vecteezy.com`.
-   - Card retrieval and thumbnail extraction from `div[data-testid="resource-card"]`.
-   - License radio selection (Pro, Free, Editorial).
-   - Category is strictly ignored (auto-detected by Vecteezy based on uploaded file format).
-   - Generative AI declaration checkbox, AI software selection (`Midjourney`, `Stable Diffusion`, `DALL·E`) and "Other" flow with custom tool name injection into `input#undefined-input`.
-   - Title single-string instant injection clamped to 200 characters max.
-   - Keyword clearing via `svg[data-testid="tag-remove"]` and comma-separated chip injection with Enter key simulation.
-   - Prohibited terms warning modal dismiss guard (`div[data-testid="prohibited-terms-modal"]`).
-   - Bulk save strategy (`bulkSave`): Clicks "Deselect all" -> waits 200ms -> clicks "Select all" -> waits 200ms -> clicks "Save changes" icon (`div[data-testid="save-changes-icon"]`).
-3. **Verification Test Suite (`scratch/test_tier2_adapters.mjs`)**:
-   - Validated all 94 assertions across both adapters covering constructor, identity, URL matching, card scanning, thumbnail extraction, selection, editor waiting, metadata clearing, metadata filling (AI models, custom software, character clamps), per-item draft save with spinner disappearance, and bulk save.
+Sub-phase 4.5 (Tier 3 Platform Adapters) is now **100% complete**:
+1. **Dreamstime Adapter (`src/adapters/DreamstimeAdapter.js`)**:
+   - URL matching for `dreamstime.com` (especially `/uploadfile` and `/upload/edit*`).
+   - Modal detection (`div.popup-upload`) and grid asset extraction (`div.upload-item[id]`), with thumbnail extraction.
+   - Numeric asset ID tracking from `.popup-nav__breadcrumbs` and modal attributes.
+   - Full metadata clearing (`#js-remove-title`, `.js-editcleandescription`, `#js-remove-cat*`, `.js-editcleankeywords`).
+   - Single-string instant injection for title and description.
+   - Category pairs interaction with 300ms AJAX delay (`select#M_Category_1/2/3` -> `select#M_Subcategory_1/2/3`), with **AI Mode Special Rule**: Category 3 is hardcoded to "Illustration & Clipart" (172) and "Generative AI" (212).
+   - Keywords comma-separated chip injection clamped to 70 tags max + Enter key simulation.
+   - Commercial (RF) vs Editorial (ED) license button selection.
+   - Save Draft with Toast Confirmation (`waitForElement('.noty_type__dt-success, #js-submit-message')`).
+   - Next item navigation with **Infinite Carousel Loop Guard** (`navigateToNext()`): tracks processed asset IDs and detects cycle when next asset ID matches `firstAssetId` or was already processed.
+   - Submit for review via `a#js-next-submit`.
+2. **Depositphotos Adapter (`src/adapters/DepositphotosAdapter.js`)**:
+   - URL matching for `depositphotos.com/files/unfinished.html`.
+   - Table row card extraction (`tr.unfinished__item`) and thumbnail extraction.
+   - Row selection via item checkbox (`td.unfinished__action label.checkbox-wrapper i`).
+   - Editor readiness wait (`textarea.itemeditor__input_description`).
+   - Description clearing (`a._itemeditor__reset_description`) and single-string instant injection.
+   - Keywords clearing (`a._itemeditor__reset_keywords`, `i.tagseditor__remove`).
+   - **Fast Tag Injection**: clicks trigger `span.paste_editor__tag`, injects comma-separated keywords (clamped to 50 tags max) into active input, and simulates Enter key.
+   - Editorial & Country Location handling: sets `select._itemeditor__value_is_editorial` ('1' vs '0') and country code (`select._itemeditor__value_location_country_code`).
+   - Nudity / Mature dropdown handling (`select._itemeditor__value_is_nudity`).
+   - Paginator capacity helper (`select._paginator__list` -> '160').
+   - **Bulk Save Strategy** (`bulkSave`): clicks table header select all (`th.unfinished__action i.select-all`) -> waits 200ms -> clicks control panel Save button (`button._cp__action_save`).
+   - Submit for review via `button._cp__action_submit`.
+3. **MiriCanvas Adapter (`src/adapters/MiriCanvasAdapter.js`)**:
+   - URL matching for `designhub.miricanvas.com`.
+   - Element card extraction from batch grid (`div.panda-ehlNbj div.panda-gFNlpN`, `div.css-1qnaji9`) and thumbnail extraction.
+   - Card selection via container click.
+   - Editor readiness wait (`textarea[placeholder="Enter Element Name"]`).
+   - Title clearing and single-string instant injection clamped to 100 characters max.
+   - Keywords clearing (removes active chips via SVG icons) and comma-separated tag injection into `input[placeholder*="Separate multiple keywords"]` (clamped to 25 tags max) + Enter simulation.
+   - Content Tier (Pricing) selection: STANDARD (Free) vs PREMIUM (Paid) radio inputs.
+   - AI Generated Declaration: checkbox toggle in AI image generator container.
+   - Content Type handling (optional): selects `input[name="contentType"][value="..."]` if provided.
+   - **Bulk Save Strategy** (`bulkSave`): clicks top navbar select all checkbox (`nav div.panda-cVAOOe input[type="checkbox"]`) -> waits 200ms -> clicks "Save Metadata" button.
+   - Submit for review via "Submit" button.
+4. **Verification Test Suite (`scratch/test_tier3_adapters.mjs`)**:
+   - Validated all 107 assertions across all 3 adapters. All 7 platform adapters across Adobe Stock, Shutterstock, Vecteezy, Freepik, Dreamstime, Depositphotos, and MiriCanvas are now fully implemented.
+   - Complete test suite passes 609/609 assertions across 8 test suites.
 
 ---
 
 ## 3. Actionable Next Steps for Incoming Agent (Phase 4)
 
-1. **Step 1 (Sub-phase 4.5: Tier 3 Platform Adapters & Registry)**:
-   - Implement `DreamstimeAdapter.js` (15 Main / 182 Subcategories tree, Mode A vs Mode B loop).
-   - Implement `DepositphotosAdapter.js` (160 items/page paginator, raw tag paste trigger, editorial country/city AJAX).
-   - Implement `MiriCanvasAdapter.js` (1,000 items/page batching, ContentType & Tier radios).
-   - Implement `src/adapters/index.js` adapter registry & auto-router.
+1. **Step 1 (Sub-phase 4.6: Adapter Registry, In-Page HUD Wiring & Final Verification Test Suite)**:
+   - Implement `src/adapters/index.js` auto-registry registering all 7 platform adapters.
+   - Wire `OverlayHUD` in `src/overlay/overlay.js` to dispatch metadata through active platform adapter.
+   - Build unit verification suite for registry and live tab matching.
 2. **Step 2 (Phase 5: End-to-End Testing & Polish)**:
    - Live browser validation across microstock contributor portals.
    - Batch automation orchestrator & packaging.
@@ -98,6 +116,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 29 | 2026-09-07 | `task/platform-adapters` | `feat(adapter)` | Implemented DreamstimeAdapter.js, DepositphotosAdapter.js, and MiriCanvasAdapter.js Tier 3 adapters with 107/107 assertions | Sub-phase 4.6: Adapter Registry, In-Page HUD Wiring & Verification Suite |
 | 28 | 2026-09-07 | `task/platform-adapters` | `feat(adapter)` | Implemented FreepikAdapter.js (mandatory per-item save draft, 47 base models) and VecteezyAdapter.js (bulk save, software Other flow) Tier 2 adapters | Sub-phase 4.5: Tier 3 Adapters (Dreamstime, Depositphotos, MiriCanvas) & Registry |
 | 27 | 2026-09-07 | `task/platform-adapters` | `feat(adapter)` | Implemented AdobeStockAdapter.js and ShutterstockAdapter.js Tier 1 platform adapters with full verification suite | Sub-phase 4.4: Tier 2 Adapters (FreepikAdapter & VecteezyAdapter) |
 | 26 | 2026-09-07 | `task/platform-adapters` | `feat(adapter)` | Implemented dom_helpers.js, BaseAdapter.js abstract contract, updated manifest web_accessible_resources | Sub-phase 4.3: Tier 1 Adapters (AdobeStockAdapter & ShutterstockAdapter) |
