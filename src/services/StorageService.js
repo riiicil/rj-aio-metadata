@@ -4,6 +4,70 @@
  * dynamic model lists, and platform-adaptive preferences.
  */
 
+/**
+ * Official Vecteezy AI software generator options.
+ */
+export const VECTEEZY_AI_SOFTWARE = [
+  'Midjourney',
+  'Stable Diffusion',
+  'DALL·E',
+  'Other'
+];
+
+/**
+ * Complete catalog of 47 verified official Freepik base models.
+ * Extracted from contributor platform taxonomy (rekaman-freepik-20260907_184356.json).
+ */
+export const FREEPIK_BASE_MODELS = [
+  'Adobe Firefly',
+  'Dall-e 1',
+  'Dall-e 2',
+  'Dall-e 3',
+  'Flux 1.0',
+  'Flux 1.0 Fast',
+  'Flux 1.0 Realism',
+  'Flux 1.1',
+  'Flux Kontext [Max]',
+  'Flux Kontext [Pro]',
+  'Freepik Classic',
+  'Freepik Classic Fast',
+  'Freepik Flux',
+  'Freepik Flux Fast',
+  'Freepik Flux Realism',
+  'Freepik Mystic 1.0',
+  'Freepik Mystic 2.5',
+  'Freepik Mystic 2.5 Flexible',
+  'Freepik Mystic 2.5 Fluid',
+  'Freepik Pikaso',
+  'Google Imagen 3',
+  'Google Imagen 4',
+  'Google Imagen 4 Fast',
+  'Google Imagen 4 Ultra',
+  'Google Nano Banana',
+  'GPT',
+  'GPT 1 - HQ',
+  'Ideogram 1.0',
+  'Ideogram 3',
+  'Leonardo',
+  'Midjourney 1',
+  'Midjourney 2',
+  'Midjourney 3',
+  'Midjourney 4',
+  'Midjourney 5',
+  'Midjourney 5.1',
+  'Midjourney 5.2',
+  'Midjourney 6',
+  'niji',
+  'Runway',
+  'Seedream',
+  'Stable Diffusion 1.4',
+  'Stable Diffusion 1.5',
+  'Stable Diffusion 2.0',
+  'Stable Diffusion 2.1',
+  'Stable Diffusion XL',
+  'Wepik'
+];
+
 export const DEFAULT_CONFIG = {
   activeProvider: 'gemini',
   providers: {
@@ -61,15 +125,15 @@ export const DEFAULT_CONFIG = {
       keywordCount: 50,
       specificKeywords: '',
       isAiGenerated: false,
-      aiModel: 'Adobe Firefly',
-      customAiModel: ''
+      aiModel: 'Midjourney 6'
     },
     vecteezy: {
       keywordCount: 50,
       specificKeywords: '',
       licenseType: 'free',
       isAiGenerated: false,
-      aiToolName: ''
+      aiSoftware: 'Midjourney',
+      customAiSoftware: ''
     },
     dreamstime: {
       keywordCount: 70,
@@ -95,7 +159,7 @@ export const DEFAULT_CONFIG = {
     enableOverlayOnLoad: true,
     autoSanitizeKeywords: true
   },
-  _schemaVersion: 3
+  _schemaVersion: 4
 };
 
 export class StorageService {
@@ -183,6 +247,48 @@ export class StorageService {
       }
     }
 
+    // Schema < 4: align Vecteezy & Freepik AI model taxonomies
+    if (loadedSchema < 4) {
+      if (merged.platformSettings) {
+        // 1. Vecteezy: migrate aiToolName -> aiSoftware + customAiSoftware
+        const vect = merged.platformSettings.vecteezy;
+        if (vect && typeof vect === 'object') {
+          if ('aiToolName' in vect) {
+            const rawTool = (vect.aiToolName || '').trim();
+            if (/midjourney/i.test(rawTool)) {
+              vect.aiSoftware = 'Midjourney';
+              vect.customAiSoftware = '';
+            } else if (/stable[\s_-]?diffusion/i.test(rawTool)) {
+              vect.aiSoftware = 'Stable Diffusion';
+              vect.customAiSoftware = '';
+            } else if (/dall[\s_.-]?e/i.test(rawTool)) {
+              vect.aiSoftware = 'DALL·E';
+              vect.customAiSoftware = '';
+            } else if (rawTool.length > 0) {
+              vect.aiSoftware = 'Other';
+              vect.customAiSoftware = rawTool;
+            } else {
+              vect.aiSoftware = 'Midjourney';
+              vect.customAiSoftware = '';
+            }
+            delete vect.aiToolName;
+          } else {
+            if (!vect.aiSoftware) vect.aiSoftware = 'Midjourney';
+            if (vect.customAiSoftware === undefined) vect.customAiSoftware = '';
+          }
+        }
+
+        // 2. Freepik: purge customAiModel, fallback reset 'Custom' or invalid models
+        const fp = merged.platformSettings.freepik;
+        if (fp && typeof fp === 'object') {
+          delete fp.customAiModel;
+          if (!fp.aiModel || fp.aiModel === 'Custom' || !FREEPIK_BASE_MODELS.includes(fp.aiModel)) {
+            fp.aiModel = 'Midjourney 6';
+          }
+        }
+      }
+    }
+
     // Always ensure obsolete keys are stripped from platformSettings
     if (merged.platformSettings) {
       const obsoleteKeys = ['autoSaveDraft', 'mediaType', 'contentType', 'cityName'];
@@ -194,6 +300,12 @@ export class StorageService {
           });
         }
       });
+      if (merged.platformSettings.vecteezy) {
+        delete merged.platformSettings.vecteezy.aiToolName;
+      }
+      if (merged.platformSettings.freepik) {
+        delete merged.platformSettings.freepik.customAiModel;
+      }
     }
 
     if (merged._schemaVersion !== DEFAULT_CONFIG._schemaVersion) {

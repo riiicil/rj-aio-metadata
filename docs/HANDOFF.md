@@ -6,53 +6,44 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 3 Complete (Ready for Merge to dev) -> Phase 4 [NEXT] (Platform Adapters)
-- **Active Branch**: `task/vision-service`
-- **Latest Commit**: `feat(vision): implement universal ai vision client and background proxy worker`
+- **Current Milestone**: Phase 4: Platform Adapters (Sub-phase 4.1 Complete -> Sub-phase 4.2 Next)
+- **Active Branch**: `task/platform-adapters`
+- **Latest Commit**: `feat(popup): align vecteezy and freepik ai model taxonomies`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (227/227 assertions passed across test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
+- **Build / Test State**: Verified healthy (265/265 assertions passed across test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], test_storage_v4.mjs [38/38], zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 3 (Universal Vision AI Service & Prompt Engine) is now **100% complete** across all 3 components:
-1. **AiPrompt.js (Step 3.1 & 3.2)**:
-   - Official platform category taxonomies (Adobe Stock 21 numeric IDs, Shutterstock 26 Image / 19 Video, Dreamstime 15 Main & Subcategory trees).
-   - Platform output schemas with character safety bounds: Adobe Stock & Vecteezy title <=185 (hard limit 200), Freepik & MiriCanvas title <=90 (hard limit 100), Dreamstime title <=200, descriptions uniformly target <=230 across Shutterstock, Dreamstime, and Depositphotos.
-   - Vecteezy schema strictly restricted to `title` and `keywords` (description field omitted entirely).
-   - Flat 80-keyword generator ordered from specific to contextual with microstock SEO rules.
-   - Multimodal OpenAI payload builder (`buildChatPayload`) with model-safe parameter guards (omits `temperature` for GPT-5, o1, o3).
-2. **SanitizerService.js (Step 3.2)**:
-   - `extractAndParseJson`: Resiliently extracts JSON from raw LLM responses wrapped in markdown code fences, strips conversational text, cleans trailing commas, and returns structured `MALFORMED_JSON_RESPONSE` errors.
-   - `sanitizeKeywords`: Microstock tag pipeline enforcing <=2 words per tag, strips noisy punctuation/emojis, filters Vecteezy filetypes and trademarks, injects user custom keywords at Index 0, deduplicates case-insensitively, and clamps to hard platform limits.
-   - `sanitizeTitle` & `sanitizeDescription`: Smart boundary clamping (sentence cut, word boundary cut without mid-word splits, mandatory trailing period), and Shutterstock editorial prefix normalization (`: `, double-prefix prevention).
-   - `sanitizeMetadata`: Unified facade returning standardized clean metadata payload.
-3. **AiService.js & Background Proxy Worker (Step 3.3)**:
-   - `imageToBase64`: Standardizes image inputs (Data URL, raw base64, HTTP/Blob) into clean base64 Data URLs.
-   - `service_worker.js` Proxy: Background dispatcher handling `GENERATE_VISION_METADATA` requests to bypass browser CORS/CSP restrictions.
-   - Multi-Key Round-Robin: Distributes requests across comma-separated or newline-delimited API keys via `assetIndex`.
-   - Provider Authentication Mapping: Gemini (`?key=` + `x-goog-api-key`), OpenRouter (`Bearer` + `HTTP-Referer` + `X-Title`), OpenAI, Mistral, and Custom (`Bearer`).
-   - Exponential Backoff Retry: Automatically retries HTTP 429 and 5xx errors with exponential backoff (1s, 2s, 4s), while immediately classifying 401 (`API_KEY_INVALID`) and 404 (`MODEL_NOT_FOUND`) without retrying.
-   - `generateMetadata`: Complete pipeline facade connecting prompt building, payload construction, background proxy execution, and sanitizer output.
+Sub-phase 4.1 (Popup AI Model Taxonomies Alignment) is now **100% complete**:
+1. **Vecteezy Software Dropdown Alignment**:
+   - Replaced generic single text input with an official Software dropdown (`Midjourney`, `Stable Diffusion`, `DALL·E`, `Other`).
+   - Implemented conditional custom software text input (`#vecteezy_customAiSoftwareGroup`) appearing only when AI generation is active and `Other` is selected.
+   - Placeholder aligned: `e.g. Flux.1, Adobe Firefly, Leonardo.ai`.
+2. **Freepik Base Models Alignment**:
+   - Replaced legacy 6-model list and completely purged the custom "Other" text input (`#freepik_customAiModelGroup` and `#freepik_customAiModel`), matching Freepik contributor platform constraints.
+   - Populated complete 47 verified official base models catalog extracted from `rekaman-freepik-20260907_184356.json`.
+   - Default model set to `'Midjourney 6'`.
+3. **Storage Engine Schema Version 4**:
+   - Bumped `_schemaVersion: 4` in `DEFAULT_CONFIG`.
+   - Updated `DEFAULT_CONFIG.platformSettings`: `vecteezy.aiSoftware: 'Midjourney'`, `vecteezy.customAiSoftware: ''` (purged `aiToolName`); `freepik.aiModel: 'Midjourney 6'` (purged `customAiModel`).
+   - Implemented automated migration in `StorageService._processLoadedConfig` for `loadedSchema < 4`: normalizes legacy `vecteezy.aiToolName` into `aiSoftware` + `customAiSoftware`, strips `customAiModel` from `freepik`, and fallback resets legacy `'Custom'` or uncataloged models to `'Midjourney 6'`.
+   - Exported `FREEPIK_BASE_MODELS` (47 models) and `VECTEEZY_AI_SOFTWARE` (4 options) constants.
 
 ---
 
 ## 3. Actionable Next Steps for Incoming Agent (Phase 4)
 
-1. **Step 1 (User Review & Merge to `dev`)**:
-   - Verify that the user has reviewed `task/vision-service` and approved merging to `dev`.
-   - Execute merge: `git checkout dev && git merge --no-ff task/vision-service`.
-2. **Step 2 (Branch for Phase 4)**:
-   - Create feature branch `task/platform-adapters` from updated `dev`.
-3. **Step 3 (BaseAdapter Interface & Tier 1 Adapters)**:
-   - Implement `src/adapters/BaseAdapter.js` abstract interface (`isMatch`, `getAssetCards`, `getThumbnailUrl`, `selectCard`, `clearKeywords`, `fillMetadata`, `saveDraft`, `submitForReview`).
-   - Implement Tier 1 platform adapters:
-     - `AdobeStockAdapter.js` (React Spectrum value setter, 21 categories).
-     - `ShutterstockAdapter.js` (Material-UI testids, Image vs Video categories, spelling warnings approval).
-     - `FreepikAdapter.js` (Mandatory save draft loop per asset, AI base models).
-4. **Step 4 (Tier 2 Adapters & Auto-Router)**:
-   - Implement `VecteezyAdapter.js`, `DreamstimeAdapter.js`, `DepositphotosAdapter.js`, and `MiriCanvasAdapter.js`.
+1. **Step 1 (Sub-phase 4.2: Core Adapter Foundation)**:
+   - Implement `src/adapters/dom_helpers.js`: React prototype value setters, native input event synthesis (`input`, `change`, `blur`), custom keyboard event dispatchers, and async `waitForElement` DOM polling helpers.
+   - Implement `src/adapters/BaseAdapter.js`: abstract base interface declaring `isMatch`, `getAssetCards`, `getThumbnailUrl`, `selectCard`, `clearKeywords`, `fillMetadata`, `saveDraft`, `submitForReview`.
+2. **Step 2 (Sub-phase 4.3: Tier 1 Platform Adapters)**:
+   - Implement `AdobeStockAdapter.js` (React Spectrum value setter, 21 categories).
+   - Implement `ShutterstockAdapter.js` (Material-UI selectors, Image vs Video categories, spelling warnings auto-approval).
+   - Implement `FreepikAdapter.js` (Mandatory save draft loop per asset, 47 base models).
+3. **Step 3 (Sub-phase 4.4: Tier 2 Adapters & Registry)**:
+   - Implement `VecteezyAdapter.js`, `DreamstimeAdapter.js`, `DepositphotosAdapter.js`, `MiriCanvasAdapter.js`.
    - Implement `src/adapters/index.js` adapter registry & auto-router.
 
 ---
@@ -101,6 +92,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 25 | 2026-09-07 | `task/platform-adapters` | `feat(popup)` | Aligned Vecteezy software dropdown & Freepik 47 base models catalog in popup UI, bumped storage schema v4 with automated migrations | Sub-phase 4.2: Core Adapter Foundation (dom_helpers.js + BaseAdapter.js) |
 | 24 | 2026-09-07 | `task/vision-service` | `feat(vision)` | Implemented AiService.js, service_worker.js proxy (auth router, multi-key round-robin, exponential retry), and full Phase 3 test suite | Review & merge Phase 3 to dev, then Phase 4 (Platform Adapters) |
 | 23 | 2026-09-07 | `task/vision-service` | `feat(sanitizer)` | Implemented SanitizerService.js (tag rules, title/desc smart clamping, JSON repair) & refined AiPrompt.js schemas | Step 3.3: AiService.js & service_worker.js |
 | 22 | 2026-09-07 | `task/vision-service` | `feat(prompt)` | Implemented AiPrompt.js with official category taxonomies, schemas, 80-keyword prompts, and payload builder | Step 3.2: SanitizerService.js |

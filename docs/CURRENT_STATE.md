@@ -1,8 +1,8 @@
 # Current Project State — RJ AIO Metadata Extension
 
 *Last Updated: 2026-09-07*<br>
-*Active Branch: `task/vision-service` (Phase 3 Complete, ready for review & merge to dev)*<br>
-*Current Milestone: Phase 3 Complete -> Phase 4 [NEXT] (Platform Adapters)*
+*Active Branch: `task/platform-adapters`*<br>
+*Current Milestone: Phase 4: Platform Adapters (Sub-phase 4.1 Complete)*
 
 ---
 
@@ -11,8 +11,8 @@
 - **Phase 0 — Governance & Research**: [COMPLETE] (Repository governance, design system, reference analyses)
 - **Phase 1 — Storage & Popup UI**: [COMPLETE] (Storage engine, background worker, modular platform-dynamic popup UI merged to dev)
 - **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, multi-platform media detection, popup toggle, bidirectional sync merged to dev)
-- **Phase 3 — Universal Vision Service**: [COMPLETE] (Step 3.1 Prompt Engine, Step 3.2 Sanitizer Engine, Step 3.3 Universal Vision Client & Background Proxy Worker complete)
-- **Phase 4 — Platform Adapters**: [NEXT] (DOM injectors for 7 platforms)
+- **Phase 3 — Universal Vision Service**: [COMPLETE] (Step 3.1 Prompt Engine, Step 3.2 Sanitizer Engine, Step 3.3 Universal Vision Client & Background Proxy Worker complete, merged to dev)
+- **Phase 4 — Platform Adapters**: [IN_PROGRESS] (Sub-phase 4.1 Complete: Vecteezy & Freepik popup AI model taxonomies aligned, Schema v4 migrated; Sub-phase 4.2 Core Adapter Foundation next)
 - **Phase 5 — End-to-End Testing & Polish**: [PLANNED] (E2E live verification & packaging)
 
 ---
@@ -22,8 +22,8 @@
 | Branch | Status | Purpose |
 | :--- | :--- | :--- |
 | `main` | Clean (1 empty commit) | Stable production releases only |
-| `dev` | Integration (Phase 0, 1, 2 merged) | Active development integration branch |
-| `task/vision-service` | Active (Phase 3 Complete, ready for review & merge to dev) | Phase 3: Universal Vision AI Service & Prompt Engine |
+| `dev` | Integration (Phase 0, 1, 2, 3 merged) | Active development integration branch |
+| `task/platform-adapters` | Active (Sub-phase 4.1 Complete) | Phase 4: Platform Adapters & Automation Engine |
 
 ---
 
@@ -71,13 +71,13 @@
   - `src/services/AiPrompt.js` — Platform-adaptive prompt engine, official category dictionaries (Adobe Stock 21 IDs, Shutterstock 26 Image / 19 Video, Dreamstime 15 Main & subcategories), dynamic JSON schemas with safety bounds (Adobe/Vecteezy title <=185, Freepik/MiriCanvas title <=90, descriptions <=230), Vecteezy schema strictly restricted to title and keywords without description, flat 80-keyword generator, and multimodal OpenAI payload builder with model-safe parameter guards.
   - `src/services/SanitizerService.js` — Comprehensive microstock sanitizer engine with robust JSON extractor/repairer, keyword validation pipeline (word count <=2, punctuation stripping, Vecteezy/general prohibited terms, custom keyword index-0 priority, case-insensitive deduplication, platform quota clamping), title and description smart boundary clamping (sentence boundary, word boundary without mid-word cuts, trailing period), Shutterstock editorial prefix normalization, and unified metadata facade.
   - `src/services/AiService.js` — Universal OpenAI-compatible multimodal vision client, image base64 converter (Data URL, raw base64, HTTP/Blob), end-to-end generateMetadata pipeline facade, and injectable dispatcher.
-  - `src/services/StorageService.js` — Storage engine with multi-provider config, schema version 3 migration, multi-key round-robin, keyword priority, and loadConfig alias with non-extension environment fallback.
+  - `src/services/StorageService.js` — Storage engine with multi-provider config, schema version 4 migration, official Freepik 47 base models catalog, Vecteezy software generator options, multi-key round-robin, keyword priority, and loadConfig alias with non-extension environment fallback.
   - `src/background/service_worker.js` — ES module background worker with dynamic `/v1/models` fetcher, active tab evaluator, platform navigator, overlay relay, and `GENERATE_VISION_METADATA` proxy router with multi-key round-robin rotation, provider authentication mapping (Gemini, OpenRouter, OpenAI, Mistral, Custom), and exponential backoff retry handler (429/5xx).
   - `src/styles/variables.css` — Raycast Dark Precision design tokens with deep emerald teal (`#079183`) primary accent palette.
   - `src/styles/components.css` — Raycast Dark Precision form components, emerald teal accent interactive states, custom stepper control, floating custom select styles, transparent warning banner, active HUD button outline style (`.rj-btn-active`), top-right stacked toast notification system (`.rj-toast-container`, `.rj-toast-item`, `.rj-toast-text`, `.rj-toast-close`), and disabled states for buttons, inputs, steppers, and switches.
   - `src/popup/popup.html` — Platform-adaptive toolbar popup interface with brand logo image integration, modular dynamic platform settings container, and top-right stacked toast container adhering to `DESIGN.md`.
   - `src/popup/popup.css` — 380px dark canvas popup styling with brand logo image styling and sticky header/footer.
-  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, 100% modular platform-dynamic form rendering, bidirectional storage synchronization (`chrome.storage.onChanged`), model selection guard for Start Automation button, full form disabling during active processing, interactive in-place HUD toggle button with active outline state, and 3-item FIFO stacked toast notification queue with 2-line clamping, auto-dismiss (4500ms), and manual close button.
+  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, 100% modular platform-dynamic form rendering with official Vecteezy software dropdown & conditional custom software input, verified 47 Freepik official base models catalog, bidirectional storage synchronization (`chrome.storage.onChanged`), model selection guard for Start Automation button, full form disabling during active processing, interactive in-place HUD toggle button with active outline state, and 3-item FIFO stacked toast notification queue with 2-line clamping, auto-dismiss (4500ms), and manual close button.
   - `src/popup/custom_select.js` — Zero-dependency progressive dropdown enhancer replacing native OS selects with emerald teal highlights.
   - `src/popup/depositphotos_countries.js` — Complete 237 ISO countries catalog extracted for Depositphotos editorial location settings (omitting commercial option).
   - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed, streamlined pill styling with SVG status icons (`.rj-status-icon-ready`, `.rj-status-icon-layers`, `.rj-status-icon-not-ready`), warning banner styles, spring transition animations (`cubic-bezier(0.16, 1, 0.3, 1)`), adaptive quick form components, live asset counter bar, and disabled control styles.
@@ -98,8 +98,8 @@
 - `src/services/AiPrompt.js` syntax verified with `node --check` and tested with `scratch/test_ai_prompt.mjs` (65/65 assertions passed).
 - `src/services/SanitizerService.js` syntax verified with `node --check` and tested with `scratch/test_sanitizer_service.mjs` (86/86 assertions passed).
 - `src/services/AiService.js` and `src/background/service_worker.js` syntax verified with `node --check` and tested with `scratch/test_ai_service.mjs` (76/76 assertions passed).
-- Entire Phase 3 test suite verified passing 227/227 assertions across `test_ai_prompt.mjs`, `test_sanitizer_service.mjs`, and `test_ai_service.mjs`.
-- Storage schema version 3 migration tested and verified in Node.js (obsolete keys purged, platform keyword limits clamped, legacy models handled).
+- Storage schema version 4 migration and default configuration tested and verified with `scratch/test_storage_v4.mjs` (38/38 assertions passed).
+- Entire Phase 3 and Phase 4.1 test suites verified passing 265/265 assertions across `test_ai_prompt.mjs`, `test_sanitizer_service.mjs`, `test_ai_service.mjs`, and `test_storage_v4.mjs`.
 - Syntax validation passed for `src/overlay/overlay.js`, `src/content/content_main.js`, `src/popup/popup.js`, and `src/services/StorageService.js` via `node --check`.
 - Viewport boundary clamping and storage persistence logic verified.
 - Depositphotos 237 country catalog and custom select progressive enhancement verified.
@@ -112,4 +112,4 @@
 
 ## 7. Immediate Next Step
 
-User review and merge `task/vision-service` into `dev`, then branch `task/platform-adapters` for Phase 4.
+Implement Sub-phase 4.2: Core Adapter Foundation (`src/adapters/dom_helpers.js` and `src/adapters/BaseAdapter.js`).
