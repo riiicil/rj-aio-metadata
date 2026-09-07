@@ -2,7 +2,7 @@
 
 *Last Updated: 2026-09-07*<br>
 *Active Branch: `task/platform-adapters`*<br>
-*Current Milestone: Phase 4: Platform Adapters (Sub-phase 4.3 Complete)*
+*Current Milestone: Phase 4: Platform Adapters (Sub-phase 4.4 Complete)*
 
 ---
 
@@ -12,7 +12,7 @@
 - **Phase 1 — Storage & Popup UI**: [COMPLETE] (Storage engine, background worker, modular platform-dynamic popup UI merged to dev)
 - **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, multi-platform media detection, popup toggle, bidirectional sync merged to dev)
 - **Phase 3 — Universal Vision Service**: [COMPLETE] (Step 3.1 Prompt Engine, Step 3.2 Sanitizer Engine, Step 3.3 Universal Vision Client & Background Proxy Worker complete, merged to dev)
-- **Phase 4 — Platform Adapters**: [IN_PROGRESS] (Sub-phase 4.1 Complete: Vecteezy & Freepik popup AI model taxonomies aligned, Schema v4 migrated; Sub-phase 4.2 Complete: Core Adapter Foundation implemented with dom_helpers.js and BaseAdapter.js; Sub-phase 4.3 Complete: Tier 1 Adapters AdobeStockAdapter.js & ShutterstockAdapter.js implemented; Sub-phase 4.4 Tier 2 Adapters next)
+- **Phase 4 — Platform Adapters**: [IN_PROGRESS] (Sub-phase 4.1 Complete: Vecteezy & Freepik popup AI model taxonomies aligned, Schema v4 migrated; Sub-phase 4.2 Complete: Core Adapter Foundation implemented with dom_helpers.js and BaseAdapter.js; Sub-phase 4.3 Complete: Tier 1 Adapters AdobeStockAdapter.js & ShutterstockAdapter.js implemented; Sub-phase 4.4 Complete: Tier 2 Adapters FreepikAdapter.js & VecteezyAdapter.js implemented; Sub-phase 4.5 Tier 3 Adapters next)
 - **Phase 5 — End-to-End Testing & Polish**: [PLANNED] (E2E live verification & packaging)
 
 ---
@@ -23,7 +23,7 @@
 | :--- | :--- | :--- |
 | `main` | Clean (1 empty commit) | Stable production releases only |
 | `dev` | Integration (Phase 0, 1, 2, 3 merged) | Active development integration branch |
-| `task/platform-adapters` | Active (Sub-phase 4.3 Complete) | Phase 4: Platform Adapters & Automation Engine |
+| `task/platform-adapters` | Active (Sub-phase 4.4 Complete) | Phase 4: Platform Adapters & Automation Engine |
 
 ---
 
@@ -34,8 +34,8 @@
 | **Adobe Stock** | READY | READY | READY | READY | [IMPLEMENTED] |
 | **Shutterstock** | READY | READY | READY | READY | [IMPLEMENTED] |
 | **Dreamstime** | READY | READY | READY | READY | [ANALYSIS_COMPLETE] |
-| **Vecteezy** | READY | READY | READY | READY | [ANALYSIS_COMPLETE] |
-| **Freepik** | READY | READY | READY | READY | [ANALYSIS_COMPLETE] |
+| **Vecteezy** | READY | READY | READY | READY | [IMPLEMENTED] |
+| **Freepik** | READY | READY | READY | READY | [IMPLEMENTED] |
 | **Depositphotos** | READY | READY | READY | READY | [ANALYSIS_COMPLETE] |
 | **MiriCanvas** | READY | READY | READY | READY | [ANALYSIS_COMPLETE] |
 
@@ -87,26 +87,29 @@
   - `src/adapters/BaseAdapter.js` — Abstract base contract class establishing uniform platform interface across 7 platforms (`isMatch`, `getAssetCards`, `getThumbnailUrl`, `selectCard`, `fillMetadata`), virtual lifecycle defaults (`waitForEditorReady`, `clearMetadata`, `clearKeywords`, `saveDraft`, `bulkSave`, `submitForReview`), and built-in cooldown generator (`executeCooldown`) with immediate `AbortSignal` cancellation support.
   - `src/adapters/AdobeStockAdapter.js` — Platform adapter for Adobe Stock Contributor (commercial mode only, React Spectrum prototype value setter, 21 numeric category IDs [10001 - 10988], generative AI declaration + fictional people/property release checkboxes, metadata language mapping [English 1, Japanese 9, German 2, etc.], and bulk save strategy via Select All + Releases to 'no' for non-AI + Save work).
   - `src/adapters/ShutterstockAdapter.js` — Platform adapter for Shutterstock Contributor (shared Photo 26 / Video 19 categories workflow, Material-UI prototype value setter, single-string description with editorial caption prefix support, Category 1 & 2 dropdown selection, keyword chip injection with Enter key simulation, auto-approval of spelling warnings [Mark all as correct], commercial vs editorial switch, and bulk save strategy via last card checkbox + Select page + Save).
+  - `src/adapters/FreepikAdapter.js` — Platform adapter for Freepik Contributor & Magnific (URL matching for contributor.freepik.com / contributor.magnific.com, catalog item cards, thumbnail extraction, title single-string injection clamped to 100 chars, keyword clearing and comma-separated chip injection + Enter key simulation, category omission, AI switch + 47 base models catalog + prompt injection, mandatory per-item save draft with spinner disappearance, and submit for review).
+  - `src/adapters/VecteezyAdapter.js` — Platform adapter for Vecteezy Contributor (URL matching for contributors.vecteezy.com, resource cards, thumbnail extraction, Pro/Free/Editorial license radios, category auto-handling, AI checkbox + software dropdown [Midjourney, Stable Diffusion, DALL·E] and "Other" custom software text injection, title single-string injection clamped to 200 chars, keyword clearing and comma-separated chip injection + Enter key simulation, prohibited terms modal dismissal, and bulk save strategy via Deselect all -> Select all -> Save changes).
 
 ---
 
 ## 5. What Does NOT Exist Yet
 
-- Tier 2/3 platform-specific adapters (`src/adapters/FreepikAdapter.js`, `VecteezyAdapter.js`, `DreamstimeAdapter.js`, `DepositphotosAdapter.js`, `MiriCanvasAdapter.js`) (Sub-phases 4.4 and 4.5).
-- Adapter auto-registry and router (`src/adapters/index.js` full integration) (Sub-phase 4.4).
+- Tier 3 platform-specific adapters (`src/adapters/DreamstimeAdapter.js`, `DepositphotosAdapter.js`, `MiriCanvasAdapter.js`) (Sub-phase 4.5).
+- Adapter auto-registry and router (`src/adapters/index.js` full integration) (Sub-phase 4.5).
 
 ---
 
 ## 6. Testing & Build Verification Status
 
 - Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `overlay/`, `styles/`, `services/`, `adapters/*`).
+- `src/adapters/FreepikAdapter.js` and `src/adapters/VecteezyAdapter.js` syntax verified with `node --check` and tested with `scratch/test_tier2_adapters.mjs` (94/94 assertions passed).
 - `src/adapters/AdobeStockAdapter.js` and `src/adapters/ShutterstockAdapter.js` syntax verified with `node --check` and tested with `scratch/test_tier1_adapters.mjs` (78/78 assertions passed).
 - `src/adapters/utils/dom_helpers.js` and `src/adapters/BaseAdapter.js` syntax verified with `node --check` and tested with `scratch/test_base_adapter.mjs` (65/65 assertions passed).
 - `src/services/AiPrompt.js` syntax verified with `node --check` and tested with `scratch/test_ai_prompt.mjs` (65/65 assertions passed).
 - `src/services/SanitizerService.js` syntax verified with `node --check` and tested with `scratch/test_sanitizer_service.mjs` (86/86 assertions passed).
 - `src/services/AiService.js` and `src/background/service_worker.js` syntax verified with `node --check` and tested with `scratch/test_ai_service.mjs` (76/76 assertions passed).
 - Storage schema version 4 migration and default configuration tested and verified with `scratch/test_storage_v4.mjs` (38/38 assertions passed).
-- Complete test suite verified passing 408/408 assertions across `test_tier1_adapters.mjs`, `test_base_adapter.mjs`, `test_storage_v4.mjs`, `test_ai_prompt.mjs`, `test_sanitizer_service.mjs`, and `test_ai_service.mjs`.
+- Complete test suite verified passing 502/502 assertions across `test_tier2_adapters.mjs`, `test_tier1_adapters.mjs`, `test_base_adapter.mjs`, `test_storage_v4.mjs`, `test_ai_prompt.mjs`, `test_sanitizer_service.mjs`, and `test_ai_service.mjs`.
 - Syntax validation passed for `src/overlay/overlay.js`, `src/content/content_main.js`, `src/popup/popup.js`, and `src/services/StorageService.js` via `node --check`.
 - Viewport boundary clamping and storage persistence logic verified.
 - Depositphotos 237 country catalog and custom select progressive enhancement verified.
@@ -119,4 +122,4 @@
 
 ## 7. Immediate Next Step
 
-Implement Sub-phase 4.4: Tier 2 Platform Adapters (`FreepikAdapter.js` and `VecteezyAdapter.js`).
+Implement Sub-phase 4.5: Tier 3 Platform Adapters (`DreamstimeAdapter.js`, `DepositphotosAdapter.js`, `MiriCanvasAdapter.js`) and Adapter Auto-Registry (`src/adapters/index.js`).
