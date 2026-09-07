@@ -946,76 +946,92 @@ export class OverlayHUD {
         if (statusText) statusText.textContent = 'Processing...';
         if (pillStatus) pillStatus.textContent = `${i + 1}/${total} (${pct}%)`;
 
-        // Step 1: Select Card
-        await adapter.selectCard(card);
-        if (signal.aborted) break;
+        try {
+          // Step 1: Select Card
+          await adapter.selectCard(card);
+          if (signal.aborted) break;
 
-        // Step 2: Wait for Editor Ready
-        await adapter.waitForEditorReady(card, 4000);
-        if (signal.aborted) break;
+          // Step 2: Wait for Editor Ready
+          await adapter.waitForEditorReady(card, 4000);
+          if (signal.aborted) break;
 
-        // Step 3: Extract preview thumbnail
-        const thumb = adapter.getThumbnailUrl(card);
+          // Step 3: Extract preview thumbnail
+          const thumb = adapter.getThumbnailUrl(card);
 
-        // Step 4: AI Metadata Generation
-        if (statusText) statusText.textContent = 'Generating AI...';
+          // Step 4: AI Metadata Generation
+          if (statusText) statusText.textContent = 'Generating AI...';
 
-        const keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 50;
-        const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
-        const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
-        const isAiGenerated = Boolean(this.shadow?.querySelector('#rjToggleAiDeclaration')?.checked);
-        const editorialPrefix = this.currentConfig?.platformSettings?.shutterstock?.editorialPrefix || '';
-        const isVideo = this.platformId === 'shutterstock' && typeof window !== 'undefined' && window.location?.pathname?.includes('/video');
-        const assetType = isVideo ? 'video' : 'image';
+          const keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 50;
+          const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
+          const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
+          const isAiGenerated = Boolean(this.shadow?.querySelector('#rjToggleAiDeclaration')?.checked);
+          const editorialPrefix = this.currentConfig?.platformSettings?.shutterstock?.editorialPrefix || '';
+          const language = this.currentConfig?.platformSettings?.[this.platformId]?.language || 'en';
+          const isVideo = this.platformId === 'shutterstock' && typeof window !== 'undefined' && window.location?.pathname?.includes('/video');
+          const assetType = isVideo ? 'video' : 'image';
 
-        const sanitizedData = await generateMetadata({
-          image: thumb,
-          platformId: this.platformId,
-          assetType,
-          targetKeywordCount: keywordCount,
-          customKeywords,
-          isAiGenerated,
-          editorialPrefix,
-          assetIndex: i,
-          providerConfig: this.currentConfig
-        });
+          const sanitizedData = await generateMetadata({
+            image: thumb,
+            platformId: this.platformId,
+            assetType,
+            targetKeywordCount: keywordCount,
+            customKeywords,
+            isAiGenerated,
+            editorialPrefix,
+            language,
+            assetIndex: i,
+            providerConfig: this.currentConfig
+          });
 
-        if (signal.aborted) break;
+          if (signal.aborted) break;
 
-        // Step 5: Clear existing metadata
-        await adapter.clearMetadata();
-        if (signal.aborted) break;
+          // Step 5: Clear existing metadata
+          await adapter.clearMetadata();
+          if (signal.aborted) break;
 
-        // Step 6: Inject sanitized metadata
-        if (statusText) statusText.textContent = 'Injecting metadata...';
+          // Step 6: Inject sanitized metadata
+          if (statusText) statusText.textContent = 'Injecting metadata...';
 
-        const platformSettings = this.currentConfig?.platformSettings?.[this.platformId] || {};
-        const platformOptions = {
-          ...platformSettings,
-          isAiGenerated
-        };
+          const platformSettings = this.currentConfig?.platformSettings?.[this.platformId] || {};
+          const platformOptions = {
+            ...platformSettings,
+            isAiGenerated,
+            language
+          };
 
-        await adapter.fillMetadata(sanitizedData, platformOptions);
-        if (signal.aborted) break;
+          await adapter.fillMetadata(sanitizedData, platformOptions);
+          if (signal.aborted) break;
 
-        // Step 7: Per-item save (for Freepik and Dreamstime)
-        if (this.platformId === 'freepik' || this.platformId === 'dreamstime') {
-          await adapter.saveDraft();
-        }
-        if (signal.aborted) break;
+          // Step 7: Per-item save (for Freepik and Dreamstime)
+          if (this.platformId === 'freepik' || this.platformId === 'dreamstime') {
+            await adapter.saveDraft();
+          }
+          if (signal.aborted) break;
 
-        // Step 8: Cooldown Delay
-        if (statusText) statusText.textContent = 'Cooldown...';
-        const minWait = this._cooldownMin ?? 1000;
-        const maxWait = this._cooldownMax ?? 5000;
-        await randomDelay(minWait, maxWait, signal);
+          // Step 8: Cooldown Delay
+          if (statusText) statusText.textContent = 'Cooldown...';
+          const minWait = this._cooldownMin ?? 1000;
+          const maxWait = this._cooldownMax ?? 5000;
+          await randomDelay(minWait, maxWait, signal);
 
-        // Dreamstime special carousel navigation
-        if (this.platformId === 'dreamstime') {
-          const navResult = await adapter.navigateToNext();
-          if (navResult?.done) {
+          // Dreamstime special carousel navigation
+          if (this.platformId === 'dreamstime') {
+            const navResult = await adapter.navigateToNext();
+            if (navResult?.done) {
+              break;
+            }
+          }
+        } catch (assetErr) {
+          if (signal.aborted || assetErr?.message === 'ABORTED') {
             break;
           }
+          if (total === 1) {
+            throw assetErr;
+          }
+          console.warn(`[RJ AIO Metadata] Error processing asset ${i + 1}/${total}:`, assetErr);
+          if (statusText) statusText.textContent = `Asset ${i + 1} skipped`;
+          await randomDelay(1000, 2000, signal);
+          continue;
         }
       }
 

@@ -276,7 +276,9 @@ export function simulateEnterKey(element) {
 }
 
 /**
- * Defensively clicks an element via both native .click() and synthetic MouseEvent.
+ * Defensively clicks an element via full pointer and mouse event lifecycle.
+ * Dispatches scrollIntoView, pointerdown, mousedown, pointerup, mouseup, and click
+ * to trigger modern React 18, React Aria (@react-aria/interactions), and Adobe Spectrum handlers.
  *
  * @param {HTMLElement|Object} element - Element to click.
  * @returns {boolean} True if clicked, false if element is null or undefined.
@@ -284,18 +286,44 @@ export function simulateEnterKey(element) {
 export function simulateClick(element) {
   if (!element) return false;
 
-  if (typeof element.click === 'function') {
-    element.click();
+  try {
+    if (typeof element.scrollIntoView === 'function') {
+      element.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+    }
+  } catch {
+    // Ignore scroll errors in non-browser environments
   }
 
-  const clickEvent = typeof MouseEvent !== 'undefined'
-    ? new MouseEvent('click', { bubbles: true, cancelable: true, view: typeof window !== 'undefined' ? window : null })
-    : typeof Event !== 'undefined'
-      ? new Event('click', { bubbles: true, cancelable: true })
-      : { type: 'click', bubbles: true, cancelable: true };
+  const mouseEvents = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
+  for (const evtName of mouseEvents) {
+    try {
+      const isPointer = evtName.startsWith('pointer');
+      const EvtClass = isPointer && typeof PointerEvent !== 'undefined'
+        ? PointerEvent
+        : (typeof MouseEvent !== 'undefined' ? MouseEvent : (typeof Event !== 'undefined' ? Event : null));
 
-  if (typeof element.dispatchEvent === 'function') {
-    element.dispatchEvent(clickEvent);
+      if (EvtClass) {
+        const evt = new EvtClass(evtName, {
+          bubbles: true,
+          cancelable: true,
+          view: typeof window !== 'undefined' ? window : null,
+          button: 0,
+          buttons: 1,
+          pointerId: 1,
+          pointerType: 'mouse',
+          isPrimary: true
+        });
+        if (typeof element.dispatchEvent === 'function') {
+          element.dispatchEvent(evt);
+        }
+      }
+    } catch {
+      // Ignore individual event constructor errors in test mocks
+    }
+  }
+
+  if (typeof element.click === 'function') {
+    element.click();
   }
 
   return true;

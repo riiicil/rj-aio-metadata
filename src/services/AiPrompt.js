@@ -519,6 +519,11 @@ export function buildPrompt({
   const normPlatform = String(platformId).toLowerCase();
   const normAssetType = assetType === 'video' ? 'video' : 'image';
 
+  const resolvedLang = resolveAdobeLanguage(language);
+  const langPromptRule = (normPlatform === 'adobestock' && resolvedLang && resolvedLang.code !== 'en')
+    ? `\n6. TARGET LANGUAGE: All title and keyword fields MUST be strictly generated in ${resolvedLang.name} (${resolvedLang.code}). Do not use English.`
+    : '';
+
   // 1. Universal System Prompt
   const systemPrompt = `You are a world-class microstock contributor SEO specialist and commercial metadata optimizer.
 Your objective is to generate accurate, commercially viable, and high-converting metadata for microstock contributor platforms.
@@ -528,7 +533,7 @@ Universal Microstock Rules:
 2. KEYWORDS COUNT: You MUST generate EXACTLY 80 keywords. Order keywords strictly by relevance from most specific primary subject (first 10 tags) to broader contextual, atmospheric, and conceptual tags (tags 11-80).
 3. KEYWORD STRUCTURE: Each keyword must be a single word or a maximum 2-word phrase (e.g. "coffee cup", "digital nomad"). No full sentences, no special characters, and no punctuation inside tags.
 4. FORBIDDEN KEYWORDS: NEVER include spammy or prohibited terms such as: "best", "top", "isolated", "white background", "no people", "copy space", "copyspace", or registered trademarks and brand names.
-5. FORMATTING: Return strictly valid JSON matching the requested schema. Do not enclose the output in markdown code blocks (\`\`\`json ... \`\`\`), do not provide explanations, notes, or commentary.`;
+5. FORMATTING: Return strictly valid JSON matching the requested schema. Do not enclose the output in markdown code blocks (\`\`\`json ... \`\`\`), do not provide explanations, notes, or commentary.${langPromptRule}`;
 
   // 2. Platform Specific Guidelines & Category Injections
   let categorySection = '';
@@ -542,7 +547,7 @@ Universal Microstock Rules:
 
     const adobeLang = resolveAdobeLanguage(language);
     if (adobeLang.code !== 'en') {
-      languageSection = `IMPORTANT LANGUAGE REQUIREMENT: All generated metadata (title and keywords) MUST be written in ${adobeLang.name} (language code: ${adobeLang.code}). Do not use English.`;
+      languageSection = `CRITICAL LANGUAGE REQUIREMENT: All generated metadata (title and keywords) MUST be strictly written in ${adobeLang.name} (language code: ${adobeLang.code}). Do not use English under any circumstance.`;
     } else {
       languageSection = 'Language: English.';
     }
@@ -603,7 +608,7 @@ ${languageSection}
 Required JSON Output Schema:
 ${schemaString}
 
-Return ONLY the valid JSON object adhering strictly to the schema above.`;
+Return ONLY the valid JSON object adhering strictly to the schema above. All text fields (title and keywords) must strictly adhere to the required language.`;
 
   return {
     systemPrompt,
@@ -635,7 +640,7 @@ export function normalizeBase64Image(base64Str) {
  * @param {string} params.userInstruction - Structured user prompt
  * @param {string} [params.imageBase64] - Base64 encoded image string
  * @param {number} [params.temperature=0.7] - Sampling temperature (omitted for strict models)
- * @param {number} [params.maxTokens=1200] - Max completion tokens
+ * @param {number} [params.maxTokens=1200] - Max tokens / completion tokens
  * @returns {Object} Valid OpenAI POST /v1/chat/completions payload
  */
 export function buildChatPayload({
@@ -646,8 +651,16 @@ export function buildChatPayload({
   temperature = 0.7,
   maxTokens = 1200
 }) {
-  // Reasoning models (o1, o3) and GPT-5 series strictly prohibit custom temperature
-  const isStrictTemperatureModel = /^(o1|o3|gpt-5)/i.test(model || '');
+  const modelStr = model || '';
+
+  // Reasoning models (o1, o3, o4) and GPT-5 family strictly prohibit custom temperature (or only default 1.0)
+  const isStrictTemperatureModel = /^(o1|o3|o4|gpt-5)/i.test(modelStr);
+
+  // Models that require max_completion_tokens (reject max_tokens)
+  const isCompletionTokenModel = /^(o1|o3|o4|gpt-5)/i.test(modelStr);
+
+  // Base legacy GPT-4 models reject response_format: { type: 'json_object' }
+  const supportsResponseFormat = !/^gpt-4(-0613)?$/i.test(modelStr);
 
   const userContent = [{ type: 'text', text: userInstruction }];
 
@@ -663,7 +676,7 @@ export function buildChatPayload({
   }
 
   const payload = {
-    model: model || '',
+    model: modelStr,
     messages: [
       {
         role: 'system',
@@ -673,10 +686,18 @@ export function buildChatPayload({
         role: 'user',
         content: userContent
       }
-    ],
-    response_format: { type: 'json_object' },
-    max_completion_tokens: maxTokens
+    ]
   };
+
+  if (supportsResponseFormat) {
+    payload.response_format = { type: 'json_object' };
+  }
+
+  if (isCompletionTokenModel) {
+    payload.max_completion_tokens = maxTokens;
+  } else {
+    payload.max_tokens = maxTokens;
+  }
 
   if (!isStrictTemperatureModel) {
     payload.temperature = temperature;

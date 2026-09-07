@@ -257,6 +257,40 @@ export async function executeVisionRequestWithRetry({
       throw err;
     }
 
+    // 400 Bad Request: Self-healing parameter adaptation retry
+    if (status === 400 && typeof payload === 'object' && payload !== null && attempt < maxRetries) {
+      const lowerErr = (errText || '').toLowerCase();
+      let changed = false;
+
+      // 1. Temperature parameter rejection (e.g. gpt-5-nano, o-series only support default 1)
+      if (lowerErr.includes('temperature') && 'temperature' in payload) {
+        delete payload.temperature;
+        changed = true;
+      }
+
+      // 2. Token parameter mismatch
+      if (lowerErr.includes('max_completion_tokens') && lowerErr.includes('not supported') && 'max_completion_tokens' in payload) {
+        payload.max_tokens = payload.max_completion_tokens;
+        delete payload.max_completion_tokens;
+        changed = true;
+      } else if (lowerErr.includes('max_tokens') && (lowerErr.includes('not supported') || lowerErr.includes('use max_completion_tokens')) && 'max_tokens' in payload) {
+        payload.max_completion_tokens = payload.max_tokens;
+        delete payload.max_tokens;
+        changed = true;
+      }
+
+      // 3. Response format json_object rejection (e.g. base gpt-4)
+      if (lowerErr.includes('response_format') && 'response_format' in payload) {
+        delete payload.response_format;
+        changed = true;
+      }
+
+      if (changed) {
+        attempt++;
+        continue;
+      }
+    }
+
     // Retryable status codes: 429 (rate limit), 500, 502, 503, 504 (server errors)
     const isRetryable = status === 429 || [500, 502, 503, 504].includes(status);
     if (isRetryable && attempt < maxRetries) {
@@ -351,7 +385,50 @@ export async function handleGenerateVisionMetadata(request, { fetchFn, sleepFn, 
     maxRetries
   });
 
-  const rawContent = json?.choices?.[0]?.message?.content || '';
+  if (json?.error) {
+    const msg = json.error.message || (typeof json.error === 'string' ? json.error : JSON.stringify(json.error));
+    const err = new Error(`Provider API error: ${msg}`);
+    err.code = json.error.code || 'PROVIDER_ERROR';
+    throw err;
+  }
+
+  const choice = json?.choices?.[0];
+  let rawContent = '';
+
+  if (typeof choice?.message?.content === 'string') {
+    rawContent = choice.message.content;
+  } else if (Array.isArray(choice?.message?.content)) {
+    rawContent = choice.message.content
+      .map(part => (typeof part === 'string' ? part : (part?.text || part?.content || '')))
+      .join('');
+  } else if (typeof choice?.text === 'string') {
+    rawContent = choice.text;
+  }
+
+  // Check refusal or finish reason
+  if (!rawContent || !rawContent.trim()) {
+    if (choice?.message?.refusal) {
+      const err = new Error(`AI Model Refusal: ${choice.message.refusal}`);
+      err.code = 'MODEL_REFUSAL';
+      throw err;
+    }
+    if (choice?.finish_reason === 'length') {
+      const err = new Error('Model token limit exceeded before completion (finish_reason: length). Please increase token quota or choose a different model.');
+      err.code = 'TOKEN_LIMIT_EXCEEDED';
+      throw err;
+    }
+    // Check reasoning_content fallback
+    if (typeof choice?.message?.reasoning_content === 'string' && choice.message.reasoning_content.includes('{')) {
+      rawContent = choice.message.reasoning_content;
+    }
+  }
+
+  if (!rawContent || !rawContent.trim()) {
+    const finishReason = choice?.finish_reason || 'unknown';
+    const err = new Error(`Empty AI response content (finish_reason: ${finishReason}).`);
+    err.code = 'EMPTY_AI_RESPONSE';
+    throw err;
+  }
 
   return {
     success: true,

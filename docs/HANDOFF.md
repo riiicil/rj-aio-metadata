@@ -6,33 +6,39 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 4: Platform Adapters (100% COMPLETE -> Phase 5 Next)
+- **Current Milestone**: Phase 4: Platform Adapters (Adobe Stock Live Fixes & Universal AI Parameter Adaptation Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `feat(overlay): wire platform adapters and automation orchestrator to hud`
+- **Latest Commit**: `fix(adobestock): resolve category selection, asset switching, language, and universal ai model parameters`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (666/666 assertions passed across test_subphase_4_6.mjs [57/57], test_tier3_adapters.mjs [107/107], test_tier2_adapters.mjs [94/94], test_tier1_adapters.mjs [78/78], test_base_adapter.mjs [65/65], test_storage_v4.mjs [38/38], test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
+- **Build / Test State**: Verified healthy (699/699 assertions passed across test_adobe_fixes.mjs [33/33], test_subphase_4_6.mjs [57/57], test_tier3_adapters.mjs [107/107], test_tier2_adapters.mjs [94/94], test_tier1_adapters.mjs [78/78], test_base_adapter.mjs [65/65], test_storage_v4.mjs [38/38], test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 4 (Platform Adapters & Automation Orchestrator) is now **100% complete**:
-1. **Platform Adapter Registry (`src/adapters/index.js`)**:
-   - Central registry instantiating and exporting all 7 platform adapters: `AdobeStockAdapter`, `ShutterstockAdapter`, `FreepikAdapter`, `VecteezyAdapter`, `DreamstimeAdapter`, `DepositphotosAdapter`, and `MiriCanvasAdapter`.
-   - Dynamic URL matching via `getAdapterForUrl` covering all contributor domains and subdomains.
-   - Identifier lookup via `getAdapterForPlatform(platformId)` and array access via `getAllAdapters()`.
-2. **In-Page Floating HUD Automation Orchestrator (`src/overlay/overlay.js`)**:
-   - Wired `startAutomation()` and `stopAutomation()` to primary action button (`#rjBtnToggleAutomation`).
-   - AbortController lifecycle integration: provides immediate cancellation via `AbortSignal` across all async steps and human-pacing cooldown delays.
-   - Provider readiness validation guard (`apiKey` + `selectedModel`) and active page adapter matching.
-   - Sequential batch loop: progress bar track updates, asset selection, editor readiness polling, thumbnail extraction, AI metadata generation via `AiService.generateMetadata`, old metadata clearing, single-string instant injection, per-item draft save (`Freepik` and `Dreamstime`), human-pacing cooldown (`randomDelay(1000, 5000, signal)`), and bulk save (`AdobeStock`, `Shutterstock`, `Vecteezy`, `Depositphotos`, `MiriCanvas`).
-   - Dreamstime infinite carousel loop detection via `navigateToNext()`.
-   - Resilient error handling displaying error messages without crashing HUD overlay.
-3. **DOM Helpers (`src/adapters/utils/dom_helpers.js`)**:
-   - Enhanced `sleep` and `randomDelay` with `AbortSignal` listeners for instant cancellation on user stop.
-4. **Verification Test Suite (`scratch/test_subphase_4_6.mjs`)**:
-   - Validated all 57 assertions covering registry routing, orchestrator guards, sequential batch loop, bulk save, per-item save, carousel termination, abort cancellation, button toggle, and error resilience.
-   - All 666/666 total assertions passing cleanly across all 9 repository test suites.
+Phase 4 has completed live in-page bugfixing on Adobe Stock Contributor (`contributor.stock.adobe.com`) and universal model parameter adaptation:
+1. **Adobe Stock Category Dropdown (`src/adapters/AdobeStockAdapter.js`)**:
+   - Resolved category selection failure caused by React Spectrum popovers (`[data-t="content-tagger-category-select"]`).
+   - Mapped all 21 Adobe categories with numeric IDs (`10001` - `10988`) via `resolveAdobeCategory`.
+   - Implemented `_setSpectrumOrNativeDropdown`: clicks trigger button to expand popover, queries `div[role="option"][data-key]`, scrolls into view, and dispatches full pointer event cycle. Synchronizes native fallback `<select>`.
+   - Added auto-category refresh fallback (`button[data-t="refresh-auto-category"]`).
+2. **Asset Switching & Selection (`src/adapters/AdobeStockAdapter.js` & `src/overlay/overlay.js`)**:
+   - Upgraded `selectCard` to target `.upload-tile [role="option"]`, inspect `aria-selected`, and dispatch the full pointer event sequence (`pointerdown` -> `mousedown` -> `pointerup` -> `mouseup` -> `click`) with button 0 and pointerType 'mouse' to trigger React Aria / Spectrum listeners.
+   - Settle buffer added in `waitForEditorReady` (350ms) to allow React state transition to complete before metadata inspection.
+   - Wrapped inner per-asset loop in `try/catch` in `overlay.js` so if one card encounters an issue, automation logs status and continues sequentially to the remaining assets instead of halting the entire batch.
+3. **Language Selection & Propagation (`src/overlay/overlay.js`, `src/services/AiPrompt.js`, `src/adapters/AdobeStockAdapter.js`)**:
+   - `overlay.js` reads `language` from platform configuration (`platformSettings[platformId].language || 'en'`) and passes it to both `generateMetadata` and `fillMetadata`.
+   - `AiPrompt.js` injects strict system prompt requirements and `CRITICAL LANGUAGE REQUIREMENT` user instructions when language is not English (e.g. Korean), ensuring AI models output metadata in the requested language.
+   - `AdobeStockAdapter.js` synchronizes Adobe Stock's "Title & keywords language" dropdown (`button[data-t="content-tagger-keywords-language-select"]`) to matching language codes (e.g. Korean `'14'` / `'한국'`).
+4. **Universal AI Model Parameter Adaptation (`src/services/AiPrompt.js` & `src/background/service_worker.js`)**:
+   - Probed and cataloged live parameter requirements across OpenAI (131 models), Gemini, Mistral (46 models), and OpenRouter.
+   - Direct OpenAI `gpt-5-nano` and `o4-mini` strictly reject `temperature: 0.7` with HTTP 400 (`Unsupported value: 'temperature' does not support 0.7 with this model. Only the default (1) value is supported`) and reject `max_tokens` (`Use 'max_completion_tokens' instead`).
+   - Direct OpenAI `gpt-5.4-nano` accepts `temperature: 0.7`, rejects `max_tokens`, requires `max_completion_tokens`.
+   - Direct Google Gemini (`gemini-2.5-flash`, `gemini-3-flash-preview`, `gemini-3.5-flash`) supports both `max_tokens` and `max_completion_tokens`.
+   - OpenRouter (`openai/gpt-5`, `openai/gpt-5-mini`, `openai/gpt-5-nano`, `google/gemini-2.5-flash`) standardizes parameters.
+   - `AiPrompt.js` guards payload: strict temperature models (`/^(o1|o3|o4|gpt-5)/i`) omit `temperature`, reasoning/gpt-5 models allocate `max_completion_tokens: 4096`, legacy base `gpt-4` omits `response_format`.
+   - `service_worker.js` features automatic 400 Bad Request parameter self-healing: automatically strips `temperature`, swaps `max_tokens` <-> `max_completion_tokens`, or removes `response_format` and retries immediately.
+   - Robust content extraction parses string or array of parts, detects `choice.message.refusal` (`MODEL_REFUSAL`), and detects `choice.finish_reason === 'length'` (`TOKEN_LIMIT_EXCEEDED`).
 
 ---
 
