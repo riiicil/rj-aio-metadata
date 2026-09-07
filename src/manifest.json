@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "RJ AIO Metadata — Microstock AI Assistant",
+  "name": "RJ AIO Metadata",
   "version": "0.1.0",
-  "description": "All-in-one AI metadata generator and auto-fill assistant for microstock contributor dashboards.",
+  "description": "All-in-one AI metadata generator and auto-fill assistant for microstock contributors.",
   "permissions": [
     "storage",
     "activeTab",
@@ -31,7 +31,7 @@
   },
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "RJ AIO Metadata Assistant",
+    "default_title": "RJ AIO Metadata",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -44,7 +44,9 @@
         "http://*/*",
         "https://*/*"
       ],
-      "js": ["content/content_main.js"],
+      "js": [
+        "content/content_main.js"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -54,7 +56,8 @@
         "overlay/*",
         "styles/*",
         "icons/*",
-        "services/*"
+        "services/*",
+        "adapters/*"
       ],
       "matches": [
         "<all_urls>"

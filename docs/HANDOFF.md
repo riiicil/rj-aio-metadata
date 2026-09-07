@@ -6,44 +6,44 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 4: Platform Adapters (Sub-phase 4.1 Complete -> Sub-phase 4.2 Next)
+- **Current Milestone**: Phase 4: Platform Adapters (Sub-phase 4.2 Complete -> Sub-phase 4.3 Next)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `feat(popup): align vecteezy and freepik ai model taxonomies`
+- **Latest Commit**: `feat(adapter): implement base adapter interface and dom helpers`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (265/265 assertions passed across test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], test_storage_v4.mjs [38/38], zero emoji clean)
+- **Build / Test State**: Verified healthy (330/330 assertions passed across test_base_adapter.mjs [65/65], test_storage_v4.mjs [38/38], test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Sub-phase 4.1 (Popup AI Model Taxonomies Alignment) is now **100% complete**:
-1. **Vecteezy Software Dropdown Alignment**:
-   - Replaced generic single text input with an official Software dropdown (`Midjourney`, `Stable Diffusion`, `DALL·E`, `Other`).
-   - Implemented conditional custom software text input (`#vecteezy_customAiSoftwareGroup`) appearing only when AI generation is active and `Other` is selected.
-   - Placeholder aligned: `e.g. Flux.1, Adobe Firefly, Leonardo.ai`.
-2. **Freepik Base Models Alignment**:
-   - Replaced legacy 6-model list and completely purged the custom "Other" text input (`#freepik_customAiModelGroup` and `#freepik_customAiModel`), matching Freepik contributor platform constraints.
-   - Populated complete 47 verified official base models catalog extracted from `rekaman-freepik-20260907_184356.json`.
-   - Default model set to `'Midjourney 6'`.
-3. **Storage Engine Schema Version 4**:
-   - Bumped `_schemaVersion: 4` in `DEFAULT_CONFIG`.
-   - Updated `DEFAULT_CONFIG.platformSettings`: `vecteezy.aiSoftware: 'Midjourney'`, `vecteezy.customAiSoftware: ''` (purged `aiToolName`); `freepik.aiModel: 'Midjourney 6'` (purged `customAiModel`).
-   - Implemented automated migration in `StorageService._processLoadedConfig` for `loadedSchema < 4`: normalizes legacy `vecteezy.aiToolName` into `aiSoftware` + `customAiSoftware`, strips `customAiModel` from `freepik`, and fallback resets legacy `'Custom'` or uncataloged models to `'Midjourney 6'`.
-   - Exported `FREEPIK_BASE_MODELS` (47 models) and `VECTEEZY_AI_SOFTWARE` (4 options) constants.
+Sub-phase 4.2 (Core Adapter Foundation) is now **100% complete**:
+1. **DOM Helpers Utility (`src/adapters/utils/dom_helpers.js`)**:
+   - Universal single-string text injector (`setNativeValue`): sets controlled input/textarea values by extracting the prototype property descriptor setter (`HTMLInputElement.prototype` / `HTMLTextAreaElement.prototype`) and automatically dispatching synthetic `input`, `change`, and `blur` events.
+   - Async DOM polling helpers (`waitForElement`, `waitForElementToDisappear`): observes dynamic DOM additions and removals via `MutationObserver` with timeout guards and immediate resolution when already matching.
+   - Universal Cooldown Generator (`randomDelay`, `sleep`): provides randomized delays (default 1-5s) to mimic human contributor pacing and prevent bot detection.
+   - Interactive Input Dispatchers: `simulateEnterKey` dispatches keyboard events (`keydown`, `keypress`, `keyup` with keyCode 13) to convert raw text into platform tag chips; `simulateClick` safely dispatches native `.click()` and synthetic `MouseEvent`.
+   - Defensive Thumbnail URL Extractor (`extractThumbnailUrl`): robust fallback hierarchy (`img.src` -> `img.dataset.src` -> `img.dataset.original` -> `img.currentSrc` -> parent card `querySelector('img')`).
+2. **Base Adapter Abstract Contract (`src/adapters/BaseAdapter.js`)**:
+   - Constructor establishes `platformId` and `platformName`.
+   - Strictly enforces abstract method implementations: throws descriptive errors if `isMatch`, `getAssetCards`, `getThumbnailUrl`, `selectCard`, or `fillMetadata` are invoked on un-implemented subclasses.
+   - Provides safe virtual lifecycle defaults: `waitForEditorReady` (resolves true), `clearMetadata` / `clearKeywords` (resolves true), `saveDraft` (resolves true), `bulkSave` (resolves true), and `submitForReview` (safely returns false to prevent accidental user submission).
+   - Built-in `executeCooldown(minMs, maxMs, abortSignal)` executes random delays and supports immediate abort via `AbortSignal` without waiting full delay duration.
+3. **Manifest Configuration Update (`src/manifest.json`)**:
+   - Added `"adapters/*"` to `web_accessible_resources` allowing content scripts to dynamically import adapter modules without `ERR_BLOCKED_BY_CLIENT` browser errors.
 
 ---
 
 ## 3. Actionable Next Steps for Incoming Agent (Phase 4)
 
-1. **Step 1 (Sub-phase 4.2: Core Adapter Foundation)**:
-   - Implement `src/adapters/dom_helpers.js`: React prototype value setters, native input event synthesis (`input`, `change`, `blur`), custom keyboard event dispatchers, and async `waitForElement` DOM polling helpers.
-   - Implement `src/adapters/BaseAdapter.js`: abstract base interface declaring `isMatch`, `getAssetCards`, `getThumbnailUrl`, `selectCard`, `clearKeywords`, `fillMetadata`, `saveDraft`, `submitForReview`.
-2. **Step 2 (Sub-phase 4.3: Tier 1 Platform Adapters)**:
-   - Implement `AdobeStockAdapter.js` (React Spectrum value setter, 21 categories).
+1. **Step 1 (Sub-phase 4.3: Tier 1 Platform Adapters)**:
+   - Implement `AdobeStockAdapter.js` (React Spectrum value setter, 21 categories, non-English prompts).
    - Implement `ShutterstockAdapter.js` (Material-UI selectors, Image vs Video categories, spelling warnings auto-approval).
+2. **Step 2 (Sub-phase 4.4: Tier 2 Platform Adapters & Registry)**:
    - Implement `FreepikAdapter.js` (Mandatory save draft loop per asset, 47 base models).
-3. **Step 3 (Sub-phase 4.4: Tier 2 Adapters & Registry)**:
-   - Implement `VecteezyAdapter.js`, `DreamstimeAdapter.js`, `DepositphotosAdapter.js`, `MiriCanvasAdapter.js`.
+   - Implement `VecteezyAdapter.js` (Automatic filetype category, prohibited terms handling, AI 'Other' model input).
+   - Implement `DreamstimeAdapter.js` (15 Main / 182 Subcategories tree, Mode A vs Mode B loop).
+   - Implement `DepositphotosAdapter.js` (160 items/page paginator, raw tag paste trigger, editorial country/city AJAX).
+   - Implement `MiriCanvasAdapter.js` (1,000 items/page batching, ContentType & Tier radios).
    - Implement `src/adapters/index.js` adapter registry & auto-router.
 
 ---
@@ -92,6 +92,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 26 | 2026-09-07 | `task/platform-adapters` | `feat(adapter)` | Implemented dom_helpers.js, BaseAdapter.js abstract contract, updated manifest web_accessible_resources | Sub-phase 4.3: Tier 1 Adapters (AdobeStockAdapter & ShutterstockAdapter) |
 | 25 | 2026-09-07 | `task/platform-adapters` | `feat(popup)` | Aligned Vecteezy software dropdown & Freepik 47 base models catalog in popup UI, bumped storage schema v4 with automated migrations | Sub-phase 4.2: Core Adapter Foundation (dom_helpers.js + BaseAdapter.js) |
 | 24 | 2026-09-07 | `task/vision-service` | `feat(vision)` | Implemented AiService.js, service_worker.js proxy (auth router, multi-key round-robin, exponential retry), and full Phase 3 test suite | Review & merge Phase 3 to dev, then Phase 4 (Platform Adapters) |
 | 23 | 2026-09-07 | `task/vision-service` | `feat(sanitizer)` | Implemented SanitizerService.js (tag rules, title/desc smart clamping, JSON repair) & refined AiPrompt.js schemas | Step 3.3: AiService.js & service_worker.js |

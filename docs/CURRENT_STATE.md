@@ -2,7 +2,7 @@
 
 *Last Updated: 2026-09-07*<br>
 *Active Branch: `task/platform-adapters`*<br>
-*Current Milestone: Phase 4: Platform Adapters (Sub-phase 4.1 Complete)*
+*Current Milestone: Phase 4: Platform Adapters (Sub-phase 4.2 Complete)*
 
 ---
 
@@ -12,7 +12,7 @@
 - **Phase 1 — Storage & Popup UI**: [COMPLETE] (Storage engine, background worker, modular platform-dynamic popup UI merged to dev)
 - **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, multi-platform media detection, popup toggle, bidirectional sync merged to dev)
 - **Phase 3 — Universal Vision Service**: [COMPLETE] (Step 3.1 Prompt Engine, Step 3.2 Sanitizer Engine, Step 3.3 Universal Vision Client & Background Proxy Worker complete, merged to dev)
-- **Phase 4 — Platform Adapters**: [IN_PROGRESS] (Sub-phase 4.1 Complete: Vecteezy & Freepik popup AI model taxonomies aligned, Schema v4 migrated; Sub-phase 4.2 Core Adapter Foundation next)
+- **Phase 4 — Platform Adapters**: [IN_PROGRESS] (Sub-phase 4.1 Complete: Vecteezy & Freepik popup AI model taxonomies aligned, Schema v4 migrated; Sub-phase 4.2 Complete: Core Adapter Foundation implemented with dom_helpers.js and BaseAdapter.js; Sub-phase 4.3 Tier 1 Adapters next)
 - **Phase 5 — End-to-End Testing & Polish**: [PLANNED] (E2E live verification & packaging)
 
 ---
@@ -23,7 +23,7 @@
 | :--- | :--- | :--- |
 | `main` | Clean (1 empty commit) | Stable production releases only |
 | `dev` | Integration (Phase 0, 1, 2, 3 merged) | Active development integration branch |
-| `task/platform-adapters` | Active (Sub-phase 4.1 Complete) | Phase 4: Platform Adapters & Automation Engine |
+| `task/platform-adapters` | Active (Sub-phase 4.2 Complete) | Phase 4: Platform Adapters & Automation Engine |
 
 ---
 
@@ -83,23 +83,27 @@
   - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed, streamlined pill styling with SVG status icons (`.rj-status-icon-ready`, `.rj-status-icon-layers`, `.rj-status-icon-not-ready`), warning banner styles, spring transition animations (`cubic-bezier(0.16, 1, 0.3, 1)`), adaptive quick form components, live asset counter bar, and disabled control styles.
   - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, live asset scanner with specific Depositphotos and Shutterstock subtab media detection (`32 Images Detected`, `3 Videos Detected`), Dreamstime single-asset ID detection (`In ID 473814624`), pill Layers icon on detected assets, checkmark on empty ready tab, non-microstock warning state and labels (`Unknown Page`, `Assets Not Detected`), adaptive quick form controls (stepper, specific keywords, adaptive AI declaration), model selection guard for automation toggle, processing state field disabling, and bidirectional synchronization via `chrome.storage.onChanged`.
   - `src/content/content_main.js` — Content script router importing OverlayHUD via dynamic import, auto-mounting HUD, and handling background toggle, ping, and status messages.
+  - `src/adapters/utils/dom_helpers.js` — Reusable DOM utility functions: single-string instant text injection (`setNativeValue` with React prototype setter and synthetic `input`/`change`/`blur` events), element appearance and disappearance async polling (`waitForElement`, `waitForElementToDisappear` via `MutationObserver`), universal cooldown delay generators (`sleep`, `randomDelay`), keyboard Enter simulation (`simulateEnterKey`), click dispatching (`simulateClick`), and defensive thumbnail URL extractor (`extractThumbnailUrl` with fallback hierarchy).
+  - `src/adapters/BaseAdapter.js` — Abstract base contract class establishing uniform platform interface across 7 platforms (`isMatch`, `getAssetCards`, `getThumbnailUrl`, `selectCard`, `fillMetadata`), virtual lifecycle defaults (`waitForEditorReady`, `clearMetadata`, `clearKeywords`, `saveDraft`, `bulkSave`, `submitForReview`), and built-in cooldown generator (`executeCooldown`) with immediate `AbortSignal` cancellation support.
 
 ---
 
 ## 5. What Does NOT Exist Yet
 
-- `src/adapters/` — Platform DOM injector adapters (Adobe, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas) (Phase 4).
+- Platform-specific adapters (`src/adapters/AdobeStockAdapter.js`, `ShutterstockAdapter.js`, `FreepikAdapter.js`, `VecteezyAdapter.js`, `DreamstimeAdapter.js`, `DepositphotosAdapter.js`, `MiriCanvasAdapter.js`) (Sub-phases 4.3 and 4.4).
+- Adapter auto-registry and router (`src/adapters/index.js` full integration) (Sub-phase 4.4).
 
 ---
 
 ## 6. Testing & Build Verification Status
 
-- Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `overlay/`, `styles/`, `services/`).
+- Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `overlay/`, `styles/`, `services/`, `adapters/*`).
+- `src/adapters/utils/dom_helpers.js` and `src/adapters/BaseAdapter.js` syntax verified with `node --check` and tested with `scratch/test_base_adapter.mjs` (65/65 assertions passed).
 - `src/services/AiPrompt.js` syntax verified with `node --check` and tested with `scratch/test_ai_prompt.mjs` (65/65 assertions passed).
 - `src/services/SanitizerService.js` syntax verified with `node --check` and tested with `scratch/test_sanitizer_service.mjs` (86/86 assertions passed).
 - `src/services/AiService.js` and `src/background/service_worker.js` syntax verified with `node --check` and tested with `scratch/test_ai_service.mjs` (76/76 assertions passed).
 - Storage schema version 4 migration and default configuration tested and verified with `scratch/test_storage_v4.mjs` (38/38 assertions passed).
-- Entire Phase 3 and Phase 4.1 test suites verified passing 265/265 assertions across `test_ai_prompt.mjs`, `test_sanitizer_service.mjs`, `test_ai_service.mjs`, and `test_storage_v4.mjs`.
+- Complete test suite verified passing 330/330 assertions across `test_base_adapter.mjs`, `test_storage_v4.mjs`, `test_ai_prompt.mjs`, `test_sanitizer_service.mjs`, and `test_ai_service.mjs`.
 - Syntax validation passed for `src/overlay/overlay.js`, `src/content/content_main.js`, `src/popup/popup.js`, and `src/services/StorageService.js` via `node --check`.
 - Viewport boundary clamping and storage persistence logic verified.
 - Depositphotos 237 country catalog and custom select progressive enhancement verified.
@@ -112,4 +116,4 @@
 
 ## 7. Immediate Next Step
 
-Implement Sub-phase 4.2: Core Adapter Foundation (`src/adapters/dom_helpers.js` and `src/adapters/BaseAdapter.js`).
+Implement Sub-phase 4.3: Tier 1 Adapters (`AdobeStockAdapter.js` and `ShutterstockAdapter.js`).
