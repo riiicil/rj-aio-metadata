@@ -933,6 +933,13 @@ export class OverlayHUD {
         return;
       }
 
+      console.log(
+        '%c[RJ AIO Metadata] Automation started on %s with %d assets',
+        'color: #079183; font-weight: bold;',
+        this.platformId,
+        total
+      );
+
       // 6. Sequential Asset Processing Loop
       for (let i = 0; i < total; i++) {
         if (signal.aborted) break;
@@ -946,14 +953,23 @@ export class OverlayHUD {
         if (statusText) statusText.textContent = 'Processing...';
         if (pillStatus) pillStatus.textContent = `${i + 1}/${total} (${pct}%)`;
 
+        console.log(
+          '%c[RJ AIO Metadata] --- Processing asset %d of %d ---',
+          'color: #57c1ff; font-weight: bold;',
+          i + 1,
+          total
+        );
+
         try {
           // Step 1: Select Card
           await adapter.selectCard(card);
           if (signal.aborted) break;
+          await sleep(600);
 
           // Step 2: Wait for Editor Ready
           await adapter.waitForEditorReady(card, 4000);
           if (signal.aborted) break;
+          await sleep(300);
 
           // Step 3: Extract preview thumbnail
           const thumb = adapter.getThumbnailUrl(card);
@@ -984,10 +1000,12 @@ export class OverlayHUD {
           });
 
           if (signal.aborted) break;
+          await sleep(500);
 
           // Step 5: Clear existing metadata
           await adapter.clearMetadata();
           if (signal.aborted) break;
+          await sleep(300);
 
           // Step 6: Inject sanitized metadata
           if (statusText) statusText.textContent = 'Injecting metadata...';
@@ -1001,12 +1019,20 @@ export class OverlayHUD {
 
           await adapter.fillMetadata(sanitizedData, platformOptions);
           if (signal.aborted) break;
+          await sleep(800);
 
           // Step 7: Per-item save (for Freepik and Dreamstime)
           if (this.platformId === 'freepik' || this.platformId === 'dreamstime') {
             await adapter.saveDraft();
           }
           if (signal.aborted) break;
+
+          console.log(
+            '%c[RJ AIO Metadata] Completed asset %d of %d',
+            'color: #59d499; font-weight: bold;',
+            i + 1,
+            total
+          );
 
           // Step 8: Cooldown Delay
           if (statusText) statusText.textContent = 'Cooldown...';
@@ -1040,9 +1066,18 @@ export class OverlayHUD {
         // Bulk save for platforms that support it
         const bulkSavePlatforms = ['adobestock', 'shutterstock', 'vecteezy', 'depositphotos', 'miricanvas'];
         if (bulkSavePlatforms.includes(this.platformId)) {
+          console.log(
+            '%c[RJ AIO Metadata] All assets processed. Triggering bulk save for %s...',
+            'color: #079183; font-weight: bold;',
+            this.platformId
+          );
           if (statusText) statusText.textContent = 'Saving all...';
+          await sleep(1000);
           await adapter.bulkSave();
+          await sleep(1000);
         }
+
+        console.log('%c[RJ AIO Metadata] Automation completed successfully!', 'color: #59d499; font-weight: bold;');
 
         // Completion status
         if (progressFill) progressFill.style.width = '100%';

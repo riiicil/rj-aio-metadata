@@ -649,7 +649,7 @@ export function buildChatPayload({
   userInstruction,
   imageBase64,
   temperature = 0.7,
-  maxTokens = 1200
+  maxTokens = null
 }) {
   const modelStr = model || '';
 
@@ -658,6 +658,11 @@ export function buildChatPayload({
 
   // Models that require max_completion_tokens (reject max_tokens)
   const isCompletionTokenModel = /^(o1|o3|o4|gpt-5)/i.test(modelStr);
+
+  // Allocate sufficient token budget: reasoning models consume completion tokens for thinking
+  const effectiveMaxTokens = maxTokens !== null
+    ? maxTokens
+    : (isCompletionTokenModel ? 8192 : 4096);
 
   // Base legacy GPT-4 models reject response_format: { type: 'json_object' }
   const supportsResponseFormat = !/^gpt-4(-0613)?$/i.test(modelStr);
@@ -694,9 +699,9 @@ export function buildChatPayload({
   }
 
   if (isCompletionTokenModel) {
-    payload.max_completion_tokens = maxTokens;
+    payload.max_completion_tokens = effectiveMaxTokens;
   } else {
-    payload.max_tokens = maxTokens;
+    payload.max_tokens = effectiveMaxTokens;
   }
 
   if (!isStrictTemperatureModel) {

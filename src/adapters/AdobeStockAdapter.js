@@ -16,7 +16,8 @@ import {
   setNativeValue,
   waitForElement,
   simulateClick,
-  extractThumbnailUrl
+  extractThumbnailUrl,
+  sleep
 } from './utils/dom_helpers.js';
 
 /**
@@ -28,57 +29,113 @@ export const ADOBE_CATEGORIES = {
   10162: 'Business',
   10209: 'Drinks',
   10235: 'The Environment',
-  10255: 'States of Mind',
-  10283: 'Food',
-  10432: 'Graphic Resources',
-  10486: 'Hobbies and Leisure',
-  10556: 'Industry',
+  10287: 'States of Mind',
+  10317: 'Food',
+  10389: 'Graphic Resources',
+  10444: 'Hobbies and Leisure',
+  10489: 'Industry',
   10584: 'Landscapes',
-  10631: 'Lifestyle',
-  10683: 'People',
-  10733: 'Plants and Flowers',
-  10778: 'Culture and Religion',
-  10797: 'Science',
-  10834: 'Social Issues',
-  10868: 'Sports',
+  10632: 'Lifestyle',
+  10688: 'People',
+  10741: 'Plants and Flowers',
+  10787: 'Culture and Religion',
+  10822: 'Science',
+  10850: 'Social Issues',
+  10884: 'Sports',
   10927: 'Technology',
-  10958: 'Transport',
+  10960: 'Transport',
   10988: 'Travel'
 };
 
 /**
- * Resolves category ID and name from category name or ID string/number
- * @param {string|number} catOrId
- * @returns {{id: string, name: string}|null}
+ * Maps input string or numeric ID to an official Adobe category ID and label.
+ * @param {string|number} catOrId - Category name or numeric ID
+ * @returns {{ id: string, name: string }|null}
  */
 export function resolveAdobeCategory(catOrId) {
   if (!catOrId) return null;
   const str = String(catOrId).trim();
+
+  // 1. Direct match by numeric ID
   if (ADOBE_CATEGORIES[str]) {
     return { id: str, name: ADOBE_CATEGORIES[str] };
   }
+
+  // 2. Match by exact or partial name (case-insensitive)
+  const lower = str.toLowerCase();
   for (const [id, name] of Object.entries(ADOBE_CATEGORIES)) {
-    if (name.toLowerCase() === str.toLowerCase() || name.toLowerCase().includes(str.toLowerCase())) {
+    const nameLower = name.toLowerCase();
+    if (nameLower === lower || nameLower.includes(lower) || lower.includes(nameLower)) {
       return { id, name };
     }
   }
+
+  // 3. Common aliases
+  if (lower.includes('animal') || lower.includes('pet') || lower.includes('wildlife')) return { id: '10001', name: 'Animals' };
+  if (lower.includes('build') || lower.includes('architect') || lower.includes('house') || lower.includes('city')) return { id: '10092', name: 'Buildings and Architecture' };
+  if (lower.includes('business') || lower.includes('finance') || lower.includes('office') || lower.includes('work')) return { id: '10162', name: 'Business' };
+  if (lower.includes('drink') || lower.includes('beverage') || lower.includes('coffee') || lower.includes('tea')) return { id: '10209', name: 'Drinks' };
+  if (lower.includes('nature') || lower.includes('environment') || lower.includes('ecology')) return { id: '10235', name: 'The Environment' };
+  if (lower.includes('food') || lower.includes('fruit') || lower.includes('vegetable') || lower.includes('meal')) return { id: '10317', name: 'Food' };
+  if (lower.includes('graphic') || lower.includes('background') || lower.includes('abstract') || lower.includes('texture') || lower.includes('pattern') || lower.includes('vector')) return { id: '10389', name: 'Graphic Resources' };
+  if (lower.includes('hobby') || lower.includes('leisure') || lower.includes('game') || lower.includes('craft')) return { id: '10444', name: 'Hobbies and Leisure' };
+  if (lower.includes('industry') || lower.includes('manufactur') || lower.includes('construction')) return { id: '10489', name: 'Industry' };
+  if (lower.includes('landscape') || lower.includes('scenery') || lower.includes('mountain') || lower.includes('sea') || lower.includes('beach') || lower.includes('sky')) return { id: '10584', name: 'Landscapes' };
+  if (lower.includes('life') || lower.includes('daily') || lower.includes('home') || lower.includes('family')) return { id: '10632', name: 'Lifestyle' };
+  if (lower.includes('people') || lower.includes('person') || lower.includes('man') || lower.includes('woman') || lower.includes('portrait')) return { id: '10688', name: 'People' };
+  if (lower.includes('plant') || lower.includes('flower') || lower.includes('tree') || lower.includes('leaf') || lower.includes('garden')) return { id: '10741', name: 'Plants and Flowers' };
+  if (lower.includes('religion') || lower.includes('church') || lower.includes('temple') || lower.includes('culture') || lower.includes('tradition')) return { id: '10787', name: 'Culture and Religion' };
+  if (lower.includes('science') || lower.includes('medical') || lower.includes('health') || lower.includes('hospital') || lower.includes('lab')) return { id: '10822', name: 'Science' };
+  if (lower.includes('sport') || lower.includes('fitness') || lower.includes('exercise') || lower.includes('gym')) return { id: '10884', name: 'Sports' };
+  if (lower.includes('tech') || lower.includes('computer') || lower.includes('digital') || lower.includes('internet') || lower.includes('phone')) return { id: '10927', name: 'Technology' };
+  if (lower.includes('transport') || lower.includes('car') || lower.includes('vehicle') || lower.includes('road') || lower.includes('plane') || lower.includes('train')) return { id: '10960', name: 'Transport' };
+  if (lower.includes('travel') || lower.includes('vacation') || lower.includes('tourism') || lower.includes('holiday')) return { id: '10988', name: 'Travel' };
+
   return null;
 }
 
 /**
- * Adobe Stock language ID lookup map
+ * Adobe Stock language dropdown mapping
  */
 export const ADOBE_LANGUAGE_MAP = {
-  '1': '1', 'en': '1', 'english': '1',
-  '2': '2', 'de': '2', 'german': '2', 'deutsch': '2',
-  '4': '4', 'fr': '4', 'french': '4', 'francais': '4',
-  '5': '5', 'es': '5', 'spanish': '5', 'espanol': '5',
-  '6': '6', 'it': '6', 'italian': '6', 'italiano': '6',
-  '7': '7', 'pt': '7', 'portuguese': '7', 'portugues': '7',
-  '9': '9', 'ja': '9', 'japanese': '9',
-  '10': '10', 'pl': '10', 'polish': '10',
-  '14': '14', 'ko': '14', 'korean': '14', '한국': '14', '한국어': '14',
-  'zh': '14', 'zh-tw': '14', 'chinese': '14', 'traditional_chinese': '14'
+  en: '1',
+  english: '1',
+  '1': '1',
+  de: '2',
+  german: '2',
+  deutsch: '2',
+  '2': '2',
+  fr: '4',
+  french: '4',
+  français: '4',
+  '4': '4',
+  es: '5',
+  spanish: '5',
+  español: '5',
+  '5': '5',
+  it: '6',
+  italian: '6',
+  italiano: '6',
+  '6': '6',
+  pt: '7',
+  portuguese: '7',
+  português: '7',
+  '7': '7',
+  ja: '9',
+  japanese: '9',
+  '日本語': '9',
+  '9': '9',
+  pl: '10',
+  polish: '10',
+  polski: '10',
+  '10': '10',
+  ko: '14',
+  korean: '14',
+  '한국': '14',
+  '한국어': '14',
+  '14': '14',
+  zh: '14',
+  chinese: '14'
 };
 
 export class AdobeStockAdapter extends BaseAdapter {
@@ -97,12 +154,24 @@ export class AdobeStockAdapter extends BaseAdapter {
   }
 
   /**
-   * Scans and retrieves all upload grid cards.
+   * Scans and retrieves distinct upload grid cards without duplicate nested matches.
    * @returns {HTMLElement[]} Array of asset card elements.
    */
   getAssetCards() {
     if (typeof document === 'undefined') return [];
-    return Array.from(document.querySelectorAll('div.upload-tile, div[data-t="upload-tile"], div.content-grid-elements'));
+
+    const container = document.querySelector('div.content-grid[data-t="assets-content-grid"]');
+    if (container) {
+      const cards = Array.from(container.querySelectorAll('div.content-grid-elements'));
+      if (cards.length > 0) return cards;
+    }
+
+    const gridElements = Array.from(document.querySelectorAll('div.content-grid-elements'));
+    if (gridElements.length > 0) return gridElements;
+
+    // Fallback: distinct upload tiles (filter out nested elements to prevent duplicate counts)
+    const tiles = Array.from(document.querySelectorAll('div.upload-tile, div[data-t="upload-tile"]'));
+    return tiles.filter((el, idx, arr) => !arr.some(other => other !== el && typeof other?.contains === 'function' && other.contains(el)));
   }
 
   /**
@@ -118,12 +187,13 @@ export class AdobeStockAdapter extends BaseAdapter {
 
   /**
    * Selects an asset card in the grid to display its metadata editor.
-   * Targets .upload-tile [role="option"] and scrolls into center view.
+   * Targets .upload-tile [role="option"], polls for aria-selected="true" confirmation.
    *
    * @param {HTMLElement} cardElement - Card element to select.
+   * @returns {Promise<boolean>} True if selection confirmed.
    */
-  selectCard(cardElement) {
-    if (!cardElement) return;
+  async selectCard(cardElement) {
+    if (!cardElement) return false;
 
     try {
       if (typeof cardElement.scrollIntoView === 'function') {
@@ -135,13 +205,47 @@ export class AdobeStockAdapter extends BaseAdapter {
 
     const uploadTile = cardElement.querySelector?.('.upload-tile [role="option"]')
       || cardElement.querySelector?.('[role="option"]')
-      || cardElement.querySelector?.('img.upload-tile__thumbnail')
       || cardElement;
 
-    if (uploadTile) {
+    // Only click uploadTile if not already selected
+    const isAlreadySelected = uploadTile?.getAttribute?.('aria-selected') === 'true';
+    if (!isAlreadySelected && uploadTile) {
       simulateClick(uploadTile);
+      await sleep(400);
+    } else if (!uploadTile) {
+      simulateClick(cardElement);
+      await sleep(400);
     }
-    simulateClick(cardElement);
+
+    // Poll up to 6 times (total ~1200ms) verifying aria-selected === 'true'
+    let active = false;
+    for (let i = 0; i < 6; i++) {
+      const currentTile = cardElement.querySelector?.('.upload-tile [role="option"]')
+        || cardElement.querySelector?.('[role="option"]');
+      if (currentTile && currentTile.getAttribute('aria-selected') === 'true') {
+        active = true;
+        break;
+      }
+      await sleep(200);
+    }
+
+    if (!active && uploadTile) {
+      // Retry click once if not yet active
+      simulateClick(uploadTile);
+      await sleep(400);
+      const currentTile = cardElement.querySelector?.('.upload-tile [role="option"]')
+        || cardElement.querySelector?.('[role="option"]');
+      active = currentTile?.getAttribute?.('aria-selected') === 'true';
+    }
+
+    console.log(
+      '%c[RJ AIO Metadata] Card selection confirmed: %s',
+      'color: #079183;',
+      active ? 'OK' : 'Unconfirmed (Proceeding)'
+    );
+
+    await sleep(300);
+    return active;
   }
 
   /**
@@ -158,7 +262,7 @@ export class AdobeStockAdapter extends BaseAdapter {
         timeoutMs
       );
       // Settle buffer for React state synchronization
-      await new Promise(r => setTimeout(r, 350));
+      await sleep(500);
       return true;
     } catch {
       return false;
@@ -281,48 +385,7 @@ export class AdobeStockAdapter extends BaseAdapter {
   async fillMetadata(metadata, options = {}) {
     if (typeof document === 'undefined' || !metadata) return false;
 
-    // 1. Category (Adobe Spectrum 21 numeric category IDs: 10001 - 10988)
-    const categoryVal = metadata.categoryId || metadata.category;
-    const resolvedCat = resolveAdobeCategory(categoryVal);
-
-    if (resolvedCat) {
-      await this._setSpectrumOrNativeDropdown({
-        buttonSelector: 'button[data-t="content-tagger-category-select"], div[data-t="content-tagger-category-wrapper"] button',
-        selectSelector: 'select[name="category"], select[data-t="content-tagger-category-select"]',
-        targetKey: resolvedCat.id,
-        targetText: resolvedCat.name
-      });
-    } else {
-      // Fallback: Click Adobe AI auto-category refresh button if present
-      const refreshBtn = document.querySelector('button[data-t="refresh-auto-category"], button[aria-label="Refresh Category"]');
-      if (refreshBtn) simulateClick(refreshBtn);
-    }
-
-    // 2. Generative AI Declaration & Fictional Property Release Checkbox
-    const aiCheckbox = document.querySelector(
-      '#content-tagger-generative-ai-checkbox, input[name="content-tagger-generative-ai-checkbox"], input[data-t="content-tagger-generative-ai-checkbox"]'
-    );
-    const isAi = Boolean(options.isAiGenerated);
-
-    if (aiCheckbox) {
-      if (isAi && !aiCheckbox.checked) {
-        aiCheckbox.click();
-      } else if (!isAi && aiCheckbox.checked) {
-        aiCheckbox.click();
-      }
-
-      if (isAi) {
-        // Automatically check fictional people/property release checkbox
-        const propCheckbox = document.querySelector(
-          '#content-tagger-generative-ai-property-release-checkbox, input[name="content-tagger-generative-ai-property-release-checkbox"], input[data-t="content-tagger-generative-ai-property-release-checkbox"]'
-        );
-        if (propCheckbox && !propCheckbox.checked) {
-          propCheckbox.click();
-        }
-      }
-    }
-
-    // 3. Metadata Language Dropdown
+    // 1. Metadata Language Dropdown (Sequential Step 1)
     const rawLang = options.language || options.languageId;
     if (rawLang !== undefined && rawLang !== null) {
       const normalizedLangKey = String(rawLang).toLowerCase().trim();
@@ -331,6 +394,7 @@ export class AdobeStockAdapter extends BaseAdapter {
       const targetText = isKorean ? '한국' : (mappedLangId === '1' ? 'English' : null);
       const altKeys = isKorean ? ['14', '10'] : [];
 
+      console.log('%c[RJ AIO Metadata] Setting language dropdown: %s', 'color: #079183;', targetText || mappedLangId);
       await this._setSpectrumOrNativeDropdown({
         buttonSelector: 'button[data-t="content-tagger-keywords-language-select"], div[data-t="content-tagger-keywords-language-wrapper"] button',
         selectSelector: 'select[name="language"], select[data-t="content-tagger-keywords-language-select"]',
@@ -338,6 +402,50 @@ export class AdobeStockAdapter extends BaseAdapter {
         targetText,
         altKeys
       });
+      await sleep(500);
+    }
+
+    // 2. Category (Sequential Step 2: Adobe Spectrum 21 numeric category IDs: 10001 - 10988)
+    const categoryVal = metadata.categoryId || metadata.category;
+    const resolvedCat = resolveAdobeCategory(categoryVal);
+
+    if (resolvedCat) {
+      console.log('%c[RJ AIO Metadata] Setting category: %s (%s)', 'color: #079183;', resolvedCat.name, resolvedCat.id);
+      await this._setSpectrumOrNativeDropdown({
+        buttonSelector: 'button[data-t="content-tagger-category-select"], div[data-t="content-tagger-category-wrapper"] button',
+        selectSelector: 'select[name="category"], select[data-t="content-tagger-category-select"]',
+        targetKey: resolvedCat.id,
+        targetText: resolvedCat.name
+      });
+      await sleep(800);
+    }
+
+    // 3. Generative AI Declaration & Fictional Property Release Checkbox (Sequential Step 3)
+    const aiCheckbox = document.querySelector(
+      '#content-tagger-generative-ai-checkbox, input[name="content-tagger-generative-ai-checkbox"], input[data-t="content-tagger-generative-ai-checkbox"]'
+    );
+    const isAi = Boolean(options.isAiGenerated);
+
+    if (aiCheckbox) {
+      if (isAi && !aiCheckbox.checked) {
+        aiCheckbox.click();
+        await sleep(300);
+      } else if (!isAi && aiCheckbox.checked) {
+        aiCheckbox.click();
+        await sleep(300);
+      }
+
+      if (isAi) {
+        const propCheckbox = document.querySelector(
+          '#content-tagger-generative-ai-property-release-checkbox, input[name="content-tagger-generative-ai-property-release-checkbox"], input[data-t="content-tagger-generative-ai-property-release-checkbox"]'
+        );
+        if (propCheckbox && !propCheckbox.checked) {
+          propCheckbox.click();
+          await sleep(300);
+        }
+      }
+      console.log('%c[RJ AIO Metadata] Setting Generative AI: %s', 'color: #079183;', isAi ? 'Checked' : 'Unchecked');
+      await sleep(500);
     }
 
     // 4. Commercial Mode Guard (Ensure illustrative editorial is NOT checked)
@@ -346,30 +454,43 @@ export class AdobeStockAdapter extends BaseAdapter {
     );
     if (editorialCheckbox && editorialCheckbox.checked) {
       editorialCheckbox.click();
+      await sleep(300);
     }
 
-    // 5. Title (Single-string instant injection, clamped to 200 chars max)
+    // 5. Title (Sequential Step 4: Clear existing if present -> type clean title)
     if (metadata.title) {
       const titleEl = document.querySelector(
         'textarea[data-t="asset-title-content-tagger"], textarea[name="title"], div.mobile-tagger-details textarea'
       );
       if (titleEl) {
+        if (titleEl.value && String(titleEl.value).trim()) {
+          setNativeValue(titleEl, '');
+          await sleep(200);
+        }
         const cleanTitle = String(metadata.title).slice(0, 200);
+        console.log('%c[RJ AIO Metadata] Setting title: %s', 'color: #079183;', cleanTitle);
         setNativeValue(titleEl, cleanTitle);
+        await sleep(500);
       }
     }
 
-    // 6. Keywords (Single-string instant injection, clamped to 49 tags max)
+    // 6. Keywords (Sequential Step 5: Clear existing if present -> type comma-separated keywords)
     if (metadata.keywords) {
       const kwEl = document.querySelector(
         '#content-keywords-ui-textarea, textarea[name="keywordsUITextArea"], textarea[data-t="content-keywords-ui-textarea"]'
       );
       if (kwEl) {
+        if (kwEl.value && String(kwEl.value).trim()) {
+          setNativeValue(kwEl, '');
+          await sleep(200);
+        }
         const tagList = Array.isArray(metadata.keywords)
           ? metadata.keywords
           : String(metadata.keywords).split(',').map((t) => t.trim()).filter(Boolean);
         const kwString = tagList.slice(0, 49).join(', ');
+        console.log('%c[RJ AIO Metadata] Setting %d keywords: %s', 'color: #079183;', tagList.length, kwString.slice(0, 60) + '...');
         setNativeValue(kwEl, kwString);
+        await sleep(500);
       }
     }
 
@@ -403,18 +524,32 @@ export class AdobeStockAdapter extends BaseAdapter {
     if (typeof document === 'undefined') return true;
 
     // 1. Select All
-    const selectAllCheckbox = document.querySelector(
-      'input[data-t="select-all-checkbox"], div.upload-tile__select-all input, div.content-tagger__select-all input'
-    );
-    if (selectAllCheckbox && !selectAllCheckbox.checked) {
-      simulateClick(selectAllCheckbox);
+    const selectAllText = Array.from(document.querySelectorAll('div.text-sregular.margin-left-xsmall.left'))
+      .find(el => el.textContent.trim() === 'Select All');
+
+    if (selectAllText) {
+      const icon = selectAllText.previousElementSibling;
+      if (icon && icon.classList.contains('icon-checkbox-inactive')) {
+        simulateClick(icon);
+        await sleep(500);
+      }
+    } else {
+      const selectAllCheckbox = document.querySelector(
+        'input[data-t="select-all-checkbox"], div.upload-tile__select-all input, div.content-tagger__select-all input'
+      );
+      if (selectAllCheckbox && !selectAllCheckbox.checked) {
+        simulateClick(selectAllCheckbox);
+        await sleep(500);
+      }
     }
+    await sleep(1000);
 
     // 2. Releases switch to "no" (for non-AI assets)
     if (!isAiGenerated) {
-      const noReleaseRadio = document.querySelector('input[name="hasReleases"][value="no"]');
+      const noReleaseRadio = document.querySelector('input[data-t="has-release-no"], input[name="hasReleases"][value="no"]');
       if (noReleaseRadio && !noReleaseRadio.checked) {
         simulateClick(noReleaseRadio);
+        await sleep(500);
       }
     }
 
@@ -422,6 +557,8 @@ export class AdobeStockAdapter extends BaseAdapter {
     const saveBtn = document.querySelector('button[data-t="save-work"], button.button--action');
     if (saveBtn && !saveBtn.disabled) {
       simulateClick(saveBtn);
+      console.log('%c[RJ AIO Metadata] Bulk save executed successfully', 'color: #59d499; font-weight: bold;');
+      await sleep(1000);
       return true;
     }
 

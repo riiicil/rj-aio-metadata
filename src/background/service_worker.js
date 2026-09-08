@@ -286,6 +286,7 @@ export async function executeVisionRequestWithRetry({
       }
 
       if (changed) {
+        console.warn('[RJ AIO Metadata] Retrying after parameter adaptation (attempt %d): %s', attempt + 1, errText.slice(0, 100));
         attempt++;
         continue;
       }
@@ -295,12 +296,15 @@ export async function executeVisionRequestWithRetry({
     const isRetryable = status === 429 || [500, 502, 503, 504].includes(status);
     if (isRetryable && attempt < maxRetries) {
       const delay = calculateBackoffDelay(attempt, baseDelay);
+      console.warn('[RJ AIO Metadata] Retrying after error %d (attempt %d in %dms)...', status, attempt + 1, delay);
       await sleepFn(delay);
       attempt++;
       continue;
     }
 
     // Retries exhausted or unrecoverable error
+    console.error('[RJ AIO Metadata] Background API Error (%d): %s', status, errText);
+
     if (status === 429) {
       const err = new Error('Rate limit exceeded. Try adding multiple API keys in settings for round-robin rotation.');
       err.code = 'RATE_LIMIT_EXCEEDED';

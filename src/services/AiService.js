@@ -127,7 +127,8 @@ export async function generateMetadata({
   isAiGenerated = false,
   editorialPrefix = '',
   assetIndex = 0,
-  providerConfig = null
+  providerConfig = null,
+  maxTokens = null
 } = {}) {
   // 1. Convert image to base64 Data URL
   const imageBase64 = image ? await imageToBase64(image) : '';
@@ -172,8 +173,17 @@ export async function generateMetadata({
     model: provider.selectedModel,
     systemPrompt,
     userInstruction,
-    imageBase64
+    imageBase64,
+    maxTokens
   });
+
+  console.log(
+    '%c[RJ AIO Metadata] Requesting AI metadata for asset %d to %s (%s)...',
+    'color: #079183; font-weight: bold;',
+    (assetIndex ?? 0) + 1,
+    activeProviderKey,
+    provider.selectedModel
+  );
 
   // 6. Dispatch request
   let rawContent = '';
@@ -185,6 +195,7 @@ export async function generateMetadata({
       const msg = res?.error?.message || res?.error || 'Vision metadata generation failed';
       const err = new Error(msg);
       err.code = code;
+      console.error('%c[RJ AIO Metadata] API Error (%s): %s', 'color: #ff5c5c; font-weight: bold;', code, msg);
       throw err;
     }
     rawContent = res.rawContent || '';
@@ -209,6 +220,7 @@ export async function generateMetadata({
       const msg = res?.error?.message || res?.error || 'Vision metadata generation failed';
       const err = new Error(msg);
       err.code = code;
+      console.error('%c[RJ AIO Metadata] API Error (%s): %s', 'color: #ff5c5c; font-weight: bold;', code, msg);
       throw err;
     }
     rawContent = res.rawContent || '';
@@ -219,6 +231,14 @@ export async function generateMetadata({
     rawContent = res.rawContent || '';
   }
 
+  // Log raw parsed content
+  try {
+    const rawParsed = JSON.parse(rawContent);
+    console.log('%c[RJ AIO Metadata] Raw metadata from AI:', 'color: #57c1ff;', rawParsed);
+  } catch {
+    console.log('%c[RJ AIO Metadata] Raw metadata from AI (text):', 'color: #57c1ff;', rawContent);
+  }
+
   // 7. Sanitize output
   const sanitized = sanitizeMetadata(rawContent, {
     platformId,
@@ -226,6 +246,13 @@ export async function generateMetadata({
     customKeywords,
     editorialPrefix
   });
+
+  console.log(
+    '%c[RJ AIO Metadata] Sanitized metadata for asset %d:',
+    'color: #59d499;',
+    (assetIndex ?? 0) + 1,
+    sanitized
+  );
 
   // 8. Return sanitized metadata object
   return sanitized;
