@@ -6,21 +6,21 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 4: Platform Adapters (Adobe Stock Live Bugfixes Round 2, Card Deduplication, Sequential Timing & Logging System Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (Adobe Stock Live Bugfixes Round 3, Category Sync with rrweb Recording, Alias Removal & Single Console Logging Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(adobestock): card deduplication, reasoning token quota, sequential timing, and console logging`
+- **Latest Commit**: `fix(adobestock): align category ids with rrweb recording, remove alias heuristics, and consolidate page console logging`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (700/700 assertions passed across test_adobe_fixes.mjs [34/34], test_subphase_4_6.mjs [57/57], test_tier3_adapters.mjs [107/107], test_tier2_adapters.mjs [94/94], test_tier1_adapters.mjs [78/78], test_base_adapter.mjs [65/65], test_storage_v4.mjs [38/38], test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
+- **Build / Test State**: Verified healthy (708/708 assertions passed across test_adobe_fixes.mjs [42/42], test_subphase_4_6.mjs [57/57], test_tier3_adapters.mjs [107/107], test_tier2_adapters.mjs [94/94], test_tier1_adapters.mjs [78/78], test_base_adapter.mjs [65/65], test_storage_v4.mjs [38/38], test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 4 has completed live in-page bugfixing Round 1 & 2 on Adobe Stock Contributor (`contributor.stock.adobe.com`) and universal model parameter adaptation:
+Phase 4 has completed live in-page bugfixing Rounds 1, 2 & 3 on Adobe Stock Contributor (`contributor.stock.adobe.com`) and universal model parameter adaptation:
 1. **Asset Card Deduplication (`src/adapters/AdobeStockAdapter.js`)**:
    - Resolved the critical bug where 35 assets were detected as 70 assets in the automation loop (`asset 1/70`).
    - Root cause: `getAssetCards()` queried both `div.content-grid-elements` and child `div.upload-tile`, returning 2 entries per asset and causing Card 1 to be re-processed at index 1, shifting all subsequent card selections.
-   - Fixed by targeting `div.content-grid-elements` within `div.content-grid[data-t="assets-content-grid"]` and filtering out any nested descendant elements.
+   - Fixed by targeting `div.content-grid[data-t="assets-content-grid"] div.content-grid-elements` and filtering out any nested descendant elements.
 2. **Card Selection Confirmation Polling (`src/adapters/AdobeStockAdapter.js`)**:
    - Upgraded `selectCard` to poll up to 6 times (~1200ms) verifying `aria-selected === 'true'` on `.upload-tile [role="option"]`.
    - Eliminated redundant secondary container clicks that previously caused desynchronization.
@@ -41,13 +41,12 @@ Phase 4 has completed live in-page bugfixing Round 1 & 2 on Adobe Stock Contribu
      - Clear and set keywords $\rightarrow$ `sleep(500ms)`
      - Set Generative AI & fictional checkboxes $\rightarrow$ `sleep(500ms)`
      - Post-loop bulk save: Select All $\rightarrow$ `sleep(1000ms)` $\rightarrow$ releases switch $\rightarrow$ `sleep(500ms)` $\rightarrow$ Save work $\rightarrow$ `sleep(1000ms)`.
-6. **Structured Console Logging System (`src/services/AiService.js`, `src/adapters/AdobeStockAdapter.js`, `src/overlay/overlay.js`)**:
-   - Implemented rich, styled console logging with `[RJ AIO Metadata]` prefix:
-     - Log asset selection and loop progression: `[RJ AIO Metadata] --- Processing asset 1 of 35 ---`
-     - Log AI request details: `[RJ AIO Metadata] Requesting AI metadata for asset 1 to OpenAI (gpt-5-nano)...`
-     - Log raw and sanitized responses: `[RJ AIO Metadata] Raw metadata from AI: ...`, `[RJ AIO Metadata] Sanitized metadata for asset 1: ...`
-     - Log form element operations: `Setting category: ...`, `Setting title: ...`, `Setting keywords: ...`, `Setting Generative AI: ...`
-     - Log bulk save and errors with HTTP status.
+6. **Category Synchronization with rrweb Recording (`src/adapters/AdobeStockAdapter.js`)**:
+   - Replaced legacy category IDs in `ADOBE_CATEGORIES` with the official IDs verified from `dev-tools/recordings/rekaman-adobestock-20260901_225753.json` and `bahan/analysis_adobestock.md`: States of Mind `10255`, Food `10283`, Graphic Resources `10432`, Hobbies and Leisure `10486`, Industry `10556`, Lifestyle `10631`, People `10683`, Plants and Flowers `10733`, Culture and Religion `10778`, Science `10797`, Social Issues `10834`, Sports `10868`, Transport `10958`.
+   - Removed redundant, imprecise category alias fallback heuristics in `resolveAdobeCategory`.
+7. **Consolidated Single Main Page Console Logging (`src/background/service_worker.js` & `src/services/AiService.js`)**:
+   - Purged background console noise from `service_worker.js`.
+   - Returns parameter adaptations and errors through the runtime message response; all logging (`[RJ AIO Metadata]`) appears exclusively in the webpage DevTools console for seamless single-window developer experience.
 
 ---
 

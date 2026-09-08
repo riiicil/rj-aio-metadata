@@ -205,6 +205,7 @@ export async function executeVisionRequestWithRetry({
   baseDelay = 1000
 }) {
   let attempt = 0;
+  const adaptations = [];
 
   while (attempt <= maxRetries) {
     let response;
@@ -228,6 +229,9 @@ export async function executeVisionRequestWithRetry({
 
     if (response.ok) {
       const json = await response.json();
+      if (json && typeof json === 'object') {
+        json._adaptations = adaptations;
+      }
       return json;
     }
 
@@ -266,6 +270,7 @@ export async function executeVisionRequestWithRetry({
       if (lowerErr.includes('temperature') && 'temperature' in payload) {
         delete payload.temperature;
         changed = true;
+        adaptations.push(`Auto-removed unsupported temperature parameter (${errText.slice(0, 80)})`);
       }
 
       // 2. Token parameter mismatch
@@ -273,20 +278,22 @@ export async function executeVisionRequestWithRetry({
         payload.max_tokens = payload.max_completion_tokens;
         delete payload.max_completion_tokens;
         changed = true;
+        adaptations.push('Swapped max_completion_tokens to max_tokens');
       } else if (lowerErr.includes('max_tokens') && (lowerErr.includes('not supported') || lowerErr.includes('use max_completion_tokens')) && 'max_tokens' in payload) {
         payload.max_completion_tokens = payload.max_tokens;
         delete payload.max_tokens;
         changed = true;
+        adaptations.push('Swapped max_tokens to max_completion_tokens');
       }
 
       // 3. Response format json_object rejection (e.g. base gpt-4)
       if (lowerErr.includes('response_format') && 'response_format' in payload) {
         delete payload.response_format;
         changed = true;
+        adaptations.push('Auto-removed unsupported response_format');
       }
 
       if (changed) {
-        console.warn('[RJ AIO Metadata] Retrying after parameter adaptation (attempt %d): %s', attempt + 1, errText.slice(0, 100));
         attempt++;
         continue;
       }
@@ -296,15 +303,12 @@ export async function executeVisionRequestWithRetry({
     const isRetryable = status === 429 || [500, 502, 503, 504].includes(status);
     if (isRetryable && attempt < maxRetries) {
       const delay = calculateBackoffDelay(attempt, baseDelay);
-      console.warn('[RJ AIO Metadata] Retrying after error %d (attempt %d in %dms)...', status, attempt + 1, delay);
       await sleepFn(delay);
       attempt++;
       continue;
     }
 
     // Retries exhausted or unrecoverable error
-    console.error('[RJ AIO Metadata] Background API Error (%d): %s', status, errText);
-
     if (status === 429) {
       const err = new Error('Rate limit exceeded. Try adding multiple API keys in settings for round-robin rotation.');
       err.code = 'RATE_LIMIT_EXCEEDED';
@@ -439,7 +443,8 @@ export async function handleGenerateVisionMetadata(request, { fetchFn, sleepFn, 
     rawContent,
     provider: activeProviderKey,
     model: payload.model,
-    usedKeyIndex: assetIndex
+    usedKeyIndex: assetIndex,
+    adaptations: json?._adaptations || []
   };
 }
 

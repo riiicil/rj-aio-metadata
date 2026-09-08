@@ -29,21 +29,21 @@ export const ADOBE_CATEGORIES = {
   10162: 'Business',
   10209: 'Drinks',
   10235: 'The Environment',
-  10287: 'States of Mind',
-  10317: 'Food',
-  10389: 'Graphic Resources',
-  10444: 'Hobbies and Leisure',
-  10489: 'Industry',
+  10255: 'States of Mind',
+  10283: 'Food',
+  10432: 'Graphic Resources',
+  10486: 'Hobbies and Leisure',
+  10556: 'Industry',
   10584: 'Landscapes',
-  10632: 'Lifestyle',
-  10688: 'People',
-  10741: 'Plants and Flowers',
-  10787: 'Culture and Religion',
-  10822: 'Science',
-  10850: 'Social Issues',
-  10884: 'Sports',
+  10631: 'Lifestyle',
+  10683: 'People',
+  10733: 'Plants and Flowers',
+  10778: 'Culture and Religion',
+  10797: 'Science',
+  10834: 'Social Issues',
+  10868: 'Sports',
   10927: 'Technology',
-  10960: 'Transport',
+  10958: 'Transport',
   10988: 'Travel'
 };
 
@@ -69,27 +69,6 @@ export function resolveAdobeCategory(catOrId) {
       return { id, name };
     }
   }
-
-  // 3. Common aliases
-  if (lower.includes('animal') || lower.includes('pet') || lower.includes('wildlife')) return { id: '10001', name: 'Animals' };
-  if (lower.includes('build') || lower.includes('architect') || lower.includes('house') || lower.includes('city')) return { id: '10092', name: 'Buildings and Architecture' };
-  if (lower.includes('business') || lower.includes('finance') || lower.includes('office') || lower.includes('work')) return { id: '10162', name: 'Business' };
-  if (lower.includes('drink') || lower.includes('beverage') || lower.includes('coffee') || lower.includes('tea')) return { id: '10209', name: 'Drinks' };
-  if (lower.includes('nature') || lower.includes('environment') || lower.includes('ecology')) return { id: '10235', name: 'The Environment' };
-  if (lower.includes('food') || lower.includes('fruit') || lower.includes('vegetable') || lower.includes('meal')) return { id: '10317', name: 'Food' };
-  if (lower.includes('graphic') || lower.includes('background') || lower.includes('abstract') || lower.includes('texture') || lower.includes('pattern') || lower.includes('vector')) return { id: '10389', name: 'Graphic Resources' };
-  if (lower.includes('hobby') || lower.includes('leisure') || lower.includes('game') || lower.includes('craft')) return { id: '10444', name: 'Hobbies and Leisure' };
-  if (lower.includes('industry') || lower.includes('manufactur') || lower.includes('construction')) return { id: '10489', name: 'Industry' };
-  if (lower.includes('landscape') || lower.includes('scenery') || lower.includes('mountain') || lower.includes('sea') || lower.includes('beach') || lower.includes('sky')) return { id: '10584', name: 'Landscapes' };
-  if (lower.includes('life') || lower.includes('daily') || lower.includes('home') || lower.includes('family')) return { id: '10632', name: 'Lifestyle' };
-  if (lower.includes('people') || lower.includes('person') || lower.includes('man') || lower.includes('woman') || lower.includes('portrait')) return { id: '10688', name: 'People' };
-  if (lower.includes('plant') || lower.includes('flower') || lower.includes('tree') || lower.includes('leaf') || lower.includes('garden')) return { id: '10741', name: 'Plants and Flowers' };
-  if (lower.includes('religion') || lower.includes('church') || lower.includes('temple') || lower.includes('culture') || lower.includes('tradition')) return { id: '10787', name: 'Culture and Religion' };
-  if (lower.includes('science') || lower.includes('medical') || lower.includes('health') || lower.includes('hospital') || lower.includes('lab')) return { id: '10822', name: 'Science' };
-  if (lower.includes('sport') || lower.includes('fitness') || lower.includes('exercise') || lower.includes('gym')) return { id: '10884', name: 'Sports' };
-  if (lower.includes('tech') || lower.includes('computer') || lower.includes('digital') || lower.includes('internet') || lower.includes('phone')) return { id: '10927', name: 'Technology' };
-  if (lower.includes('transport') || lower.includes('car') || lower.includes('vehicle') || lower.includes('road') || lower.includes('plane') || lower.includes('train')) return { id: '10960', name: 'Transport' };
-  if (lower.includes('travel') || lower.includes('vacation') || lower.includes('tourism') || lower.includes('holiday')) return { id: '10988', name: 'Travel' };
 
   return null;
 }

@@ -187,6 +187,7 @@ export async function generateMetadata({
 
   // 6. Dispatch request
   let rawContent = '';
+  let adaptations = [];
 
   if (customDispatcher) {
     const res = await customDispatcher({ payload, providerConfig: config, assetIndex });
@@ -199,6 +200,7 @@ export async function generateMetadata({
       throw err;
     }
     rawContent = res.rawContent || '';
+    adaptations = res.adaptations || [];
   } else if (typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
     const res = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage(
@@ -224,11 +226,19 @@ export async function generateMetadata({
       throw err;
     }
     rawContent = res.rawContent || '';
+    adaptations = res.adaptations || [];
   } else {
     // Non-extension environment without mock dispatcher: direct executor fallback
     const { handleGenerateVisionMetadata } = await import('../background/service_worker.js');
     const res = await handleGenerateVisionMetadata({ payload, providerConfig: config, assetIndex });
     rawContent = res.rawContent || '';
+    adaptations = res.adaptations || [];
+  }
+
+  if (adaptations && adaptations.length > 0) {
+    for (const note of adaptations) {
+      console.warn('%c[RJ AIO Metadata] Parameter auto-adapted: %s', 'color: #f5a623;', note);
+    }
   }
 
   // Log raw parsed content
