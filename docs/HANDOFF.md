@@ -6,9 +6,9 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 4: Platform Adapters (Adobe Stock Live Bugfixes Round 3, Category Sync with rrweb Recording, Alias Removal & Single Console Logging Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (Adobe Stock Live Bugfixes Round 4: Strict Element Interaction Sequence, Graceful Stop with Active Card Completion and Bulk Save, and 16K Reasoning Headroom Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(adobestock): align category ids with rrweb recording, remove alias heuristics, and consolidate page console logging`
+- **Latest Commit**: `fix(overlay): graceful stop with bulk save and adobe stock element interaction sequence`
 - **Working Tree**: Clean local branch
 - **Build / Test State**: Verified healthy (708/708 assertions passed across test_adobe_fixes.mjs [42/42], test_subphase_4_6.mjs [57/57], test_tier3_adapters.mjs [107/107], test_tier2_adapters.mjs [94/94], test_tier1_adapters.mjs [78/78], test_base_adapter.mjs [65/65], test_storage_v4.mjs [38/38], test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
 
@@ -16,7 +16,7 @@
 
 ## 2. Active In-Flight Context
 
-Phase 4 has completed live in-page bugfixing Rounds 1, 2 & 3 on Adobe Stock Contributor (`contributor.stock.adobe.com`) and universal model parameter adaptation:
+Phase 4 has completed live in-page bugfixing Rounds 1, 2, 3 & 4 on Adobe Stock Contributor (`contributor.stock.adobe.com`) and universal model parameter adaptation:
 1. **Asset Card Deduplication (`src/adapters/AdobeStockAdapter.js`)**:
    - Resolved the critical bug where 35 assets were detected as 70 assets in the automation loop (`asset 1/70`).
    - Root cause: `getAssetCards()` queried both `div.content-grid-elements` and child `div.upload-tile`, returning 2 entries per asset and causing Card 1 to be re-processed at index 1, shifting all subsequent card selections.
@@ -26,25 +26,28 @@ Phase 4 has completed live in-page bugfixing Rounds 1, 2 & 3 on Adobe Stock Cont
    - Eliminated redundant secondary container clicks that previously caused desynchronization.
 3. **AI Reasoning Token Quota Headroom (`src/services/AiPrompt.js` & `src/services/AiService.js`)**:
    - Resolved `Model token limit exceeded before completion (finish_reason: length)` on reasoning models (`gpt-5-nano`, `o1`, `o3`, `o4`).
-   - Increased default `max_completion_tokens` from 1200 to `8192` for reasoning/GPT-5 models (and `4096` for standard models), providing ample headroom for internal thinking tokens while outputting full JSON metadata.
+   - Increased default `max_completion_tokens` from 8192 to `16384` for reasoning/GPT-5 models (and `4096` for standard models), providing ample headroom for internal thinking tokens while outputting full JSON metadata.
 4. **Auto-Category Refresh Removal (`src/adapters/AdobeStockAdapter.js`)**:
    - Completely removed fallback click on `button[data-t="refresh-auto-category"]` that triggered Adobe Stock's `"The auto-category has been regenerated."` notice.
-5. **Sequential Execution Timing & Discrete Delays (`src/adapters/AdobeStockAdapter.js` & `src/overlay/overlay.js`)**:
-   - Enforced strict sequential DOM interactions with discrete delays:
-     - Card selection confirmed $\rightarrow$ `sleep(600ms)`
-     - Editor ready confirmed $\rightarrow$ `sleep(300ms)`
-     - Thumbnail extraction & AI request $\rightarrow$ `sleep(500ms)`
-     - Clear old metadata $\rightarrow$ `sleep(300ms)`
-     - Set language dropdown $\rightarrow$ `sleep(500ms)`
-     - Set category Spectrum dropdown $\rightarrow$ `sleep(800ms)`
-     - Clear and set title $\rightarrow$ `sleep(500ms)`
-     - Clear and set keywords $\rightarrow$ `sleep(500ms)`
-     - Set Generative AI & fictional checkboxes $\rightarrow$ `sleep(500ms)`
-     - Post-loop bulk save: Select All $\rightarrow$ `sleep(1000ms)` $\rightarrow$ releases switch $\rightarrow$ `sleep(500ms)` $\rightarrow$ Save work $\rightarrow$ `sleep(1000ms)`.
-6. **Category Synchronization with rrweb Recording (`src/adapters/AdobeStockAdapter.js`)**:
+5. **Strict Sequential Element Execution Order on Adobe Stock (`src/adapters/AdobeStockAdapter.js`)**:
+   - Enforced strict sequential DOM interactions matching professional contributor workflows:
+     `AI Result & Sanitize` $\rightarrow$ `1. Category Spectrum dropdown (800ms)` $\rightarrow$ `2. Generative AI & Property Release checkboxes (500ms, conditional)` $\rightarrow$ `3. Language dropdown (500ms)` $\rightarrow$ `4. Clear old title (if exists, 200ms) -> Set new title (500ms)` $\rightarrow$ `5. Clear old keywords (if exists, 200ms) -> Set new keywords (500ms)` $\rightarrow$ `Done / Loop next`.
+   - Prevents modifying title and keywords before category and language are committed, ensuring Adobe Stock's tagger does not trigger auto-category recomputation.
+6. **Graceful Stop with Active Card Completion and Bulk Save (`src/overlay/overlay.js`)**:
+   - Upgraded `startAutomation()` and `stopAutomation()` to implement professional microstock graceful shutdown:
+     - When Stop is requested while a card is actively being processed (`this.isCardProcessing === true`), the system enters `this.isStopping = true`.
+     - The active in-flight card is allowed to complete its metadata injection cleanly (no half-filled cards).
+     - Upon finishing the active card, the asset loop breaks out and triggers `adapter.bulkSave()`:
+       - Clicks "Select all" (or checkbox icon).
+       - Checks releases switch if needed.
+       - Clicks "Save work" button.
+     - If user clicks Stop during cooldown delay, the delay is interrupted immediately to trigger bulk save without idle waiting.
+     - If user clicks Stop a second time while in "Stopping..." state, immediate hard abort is performed via `AbortController`.
+     - `this.isAutomationRunning` is properly transitioned so the UI indicates stopping status and synchronous HUD controls remain responsive.
+7. **Category Synchronization with rrweb Recording (`src/adapters/AdobeStockAdapter.js`)**:
    - Replaced legacy category IDs in `ADOBE_CATEGORIES` with the official IDs verified from `dev-tools/recordings/rekaman-adobestock-20260901_225753.json` and `bahan/analysis_adobestock.md`: States of Mind `10255`, Food `10283`, Graphic Resources `10432`, Hobbies and Leisure `10486`, Industry `10556`, Lifestyle `10631`, People `10683`, Plants and Flowers `10733`, Culture and Religion `10778`, Science `10797`, Social Issues `10834`, Sports `10868`, Transport `10958`.
    - Removed redundant, imprecise category alias fallback heuristics in `resolveAdobeCategory`.
-7. **Consolidated Single Main Page Console Logging (`src/background/service_worker.js` & `src/services/AiService.js`)**:
+8. **Consolidated Single Main Page Console Logging (`src/background/service_worker.js` & `src/services/AiService.js`)**:
    - Purged background console noise from `service_worker.js`.
    - Returns parameter adaptations and errors through the runtime message response; all logging (`[RJ AIO Metadata]`) appears exclusively in the webpage DevTools console for seamless single-window developer experience.
 

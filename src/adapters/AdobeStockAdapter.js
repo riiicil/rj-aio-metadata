@@ -364,27 +364,7 @@ export class AdobeStockAdapter extends BaseAdapter {
   async fillMetadata(metadata, options = {}) {
     if (typeof document === 'undefined' || !metadata) return false;
 
-    // 1. Metadata Language Dropdown (Sequential Step 1)
-    const rawLang = options.language || options.languageId;
-    if (rawLang !== undefined && rawLang !== null) {
-      const normalizedLangKey = String(rawLang).toLowerCase().trim();
-      const mappedLangId = ADOBE_LANGUAGE_MAP[normalizedLangKey] || String(rawLang);
-      const isKorean = normalizedLangKey === 'ko' || normalizedLangKey === 'korean';
-      const targetText = isKorean ? '한국' : (mappedLangId === '1' ? 'English' : null);
-      const altKeys = isKorean ? ['14', '10'] : [];
-
-      console.log('%c[RJ AIO Metadata] Setting language dropdown: %s', 'color: #079183;', targetText || mappedLangId);
-      await this._setSpectrumOrNativeDropdown({
-        buttonSelector: 'button[data-t="content-tagger-keywords-language-select"], div[data-t="content-tagger-keywords-language-wrapper"] button',
-        selectSelector: 'select[name="language"], select[data-t="content-tagger-keywords-language-select"]',
-        targetKey: mappedLangId,
-        targetText,
-        altKeys
-      });
-      await sleep(500);
-    }
-
-    // 2. Category (Sequential Step 2: Adobe Spectrum 21 numeric category IDs: 10001 - 10988)
+    // 1. Category (Sequential Step 1: Adobe Spectrum 21 numeric category IDs)
     const categoryVal = metadata.categoryId || metadata.category;
     const resolvedCat = resolveAdobeCategory(categoryVal);
 
@@ -399,7 +379,7 @@ export class AdobeStockAdapter extends BaseAdapter {
       await sleep(800);
     }
 
-    // 3. Generative AI Declaration & Fictional Property Release Checkbox (Sequential Step 3)
+    // 2. Generative AI Declaration & Fictional Property Release Checkbox (Sequential Step 2: Kondisional)
     const aiCheckbox = document.querySelector(
       '#content-tagger-generative-ai-checkbox, input[name="content-tagger-generative-ai-checkbox"], input[data-t="content-tagger-generative-ai-checkbox"]'
     );
@@ -427,7 +407,7 @@ export class AdobeStockAdapter extends BaseAdapter {
       await sleep(500);
     }
 
-    // 4. Commercial Mode Guard (Ensure illustrative editorial is NOT checked)
+    // Commercial Mode Guard (Ensure illustrative editorial is NOT checked)
     const editorialCheckbox = document.querySelector(
       'input[data-t="content-tagger-illustrative-editorial-checkbox"], div[data-t="content-tagger-illustrative-editorial"] input[type="checkbox"]'
     );
@@ -436,7 +416,27 @@ export class AdobeStockAdapter extends BaseAdapter {
       await sleep(300);
     }
 
-    // 5. Title (Sequential Step 4: Clear existing if present -> type clean title)
+    // 3. Metadata Language Dropdown (Sequential Step 3)
+    const rawLang = options.language || options.languageId;
+    if (rawLang !== undefined && rawLang !== null) {
+      const normalizedLangKey = String(rawLang).toLowerCase().trim();
+      const mappedLangId = ADOBE_LANGUAGE_MAP[normalizedLangKey] || String(rawLang);
+      const isKorean = normalizedLangKey === 'ko' || normalizedLangKey === 'korean';
+      const targetText = isKorean ? '한국' : (mappedLangId === '1' ? 'English' : null);
+      const altKeys = isKorean ? ['14', '10'] : [];
+
+      console.log('%c[RJ AIO Metadata] Setting language dropdown: %s', 'color: #079183;', targetText || mappedLangId);
+      await this._setSpectrumOrNativeDropdown({
+        buttonSelector: 'button[data-t="content-tagger-keywords-language-select"], div[data-t="content-tagger-keywords-language-wrapper"] button',
+        selectSelector: 'select[name="language"], select[data-t="content-tagger-keywords-language-select"]',
+        targetKey: mappedLangId,
+        targetText,
+        altKeys
+      });
+      await sleep(500);
+    }
+
+    // 4. Title (Sequential Step 4: Hapus title lama jika ada -> isi title baru)
     if (metadata.title) {
       const titleEl = document.querySelector(
         'textarea[data-t="asset-title-content-tagger"], textarea[name="title"], div.mobile-tagger-details textarea'
@@ -453,7 +453,7 @@ export class AdobeStockAdapter extends BaseAdapter {
       }
     }
 
-    // 6. Keywords (Sequential Step 5: Clear existing if present -> type comma-separated keywords)
+    // 5. Keywords (Sequential Step 5: Hapus keyword lama jika ada -> isi keyword baru)
     if (metadata.keywords) {
       const kwEl = document.querySelector(
         '#content-keywords-ui-textarea, textarea[name="keywordsUITextArea"], textarea[data-t="content-keywords-ui-textarea"]'

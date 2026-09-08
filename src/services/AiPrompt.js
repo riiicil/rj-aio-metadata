@@ -662,7 +662,7 @@ export function buildChatPayload({
   // Allocate sufficient token budget: reasoning models consume completion tokens for thinking
   const effectiveMaxTokens = maxTokens !== null
     ? maxTokens
-    : (isCompletionTokenModel ? 8192 : 4096);
+    : (isCompletionTokenModel ? 16384 : 4096);
 
   // Base legacy GPT-4 models reject response_format: { type: 'json_object' }
   const supportsResponseFormat = !/^gpt-4(-0613)?$/i.test(modelStr);
