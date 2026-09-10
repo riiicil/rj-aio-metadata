@@ -1046,11 +1046,16 @@ export class OverlayHUD {
         // If stop was requested while processing this card, finish here and proceed to bulk save
         if (this.isStopping || signal.aborted) break;
 
-        // Step 8: Cooldown Delay
+        // Step 8: Cooldown Delay (Responsive to graceful stop)
         if (statusText) statusText.textContent = 'Cooldown...';
         const minWait = this._cooldownMin ?? 1000;
         const maxWait = this._cooldownMax ?? 5000;
-        await randomDelay(minWait, maxWait, signal);
+        const cooldownTarget = Math.floor(Math.random() * (maxWait - minWait + 1)) + minWait;
+        const cooldownStart = Date.now();
+        while (Date.now() - cooldownStart < cooldownTarget) {
+          if (this.isStopping || signal.aborted) break;
+          await sleep(100).catch(() => {});
+        }
 
         if (this.isStopping || signal.aborted) break;
 

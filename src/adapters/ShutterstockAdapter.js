@@ -123,22 +123,57 @@ export class ShutterstockAdapter extends BaseAdapter {
   }
 
   /**
+   * Detects whether existing keyword chips are present in the sidebar.
+   * @returns {HTMLElement[]} Array of existing keyword chip elements.
+   */
+  _getExistingKeywordChips() {
+    if (typeof document === 'undefined') return [];
+
+    // 1. Primary: Selected keyword chips with data-testid
+    const chips = Array.from(document.querySelectorAll(
+      '.MuiChip-root[data-testid^="selected-keyword-"], div[data-testid^="selected-keyword-"], [data-testid^="selected-keyword-"]'
+    ));
+
+    if (chips.length > 0) return chips;
+
+    // 2. Secondary fallback: Chips inside keywords container
+    const kwContainer = document.querySelector(
+      'div[data-testid="keyword-input"], div[data-testid="keywords-block-all"], div[data-testid="keyword-input-text"]'
+    )?.closest('div.MuiGrid-root, form, div.MuiStack-root');
+
+    if (kwContainer) {
+      return Array.from(kwContainer.querySelectorAll(
+        '.MuiChip-root, [class*="MuiChip-root"]'
+      )).filter((el) => {
+        return Boolean(el.querySelector('svg[data-testid="ClearIcon"], svg.MuiChip-deleteIcon'));
+      });
+    }
+
+    return [];
+  }
+
+  /**
    * Clears keyword chips using Shutterstock's 3-dots action menu.
-   * Checks for existing chips first. If present, clicks 3-dots menu -> 'Clear keywords'.
-   * @returns {Promise<boolean>} True if cleared.
+   * Strictly verifies presence of existing keyword chips before opening menu or clearing.
+   * If no chips exist, exits immediately without triggering clear actions.
+   *
+   * @returns {Promise<boolean>} True if cleared or no chips were present.
    */
   async clearKeywords() {
     if (typeof document === 'undefined') return true;
 
-    const existingChips = Array.from(document.querySelectorAll(
-      '.MuiChip-root[data-testid^="selected-keyword-"], div[data-testid^="selected-keyword-"]'
-    ));
+    const existingChips = this._getExistingKeywordChips();
+
+    // If no keyword chips are present, skip clearing entirely
+    if (existingChips.length === 0) {
+      return true;
+    }
 
     const moreBtn = document.querySelector(
       'button[data-testid="more-keyword-actions-button"], #more-keyword-actions-button'
     );
 
-    if (moreBtn && (!moreBtn.disabled || existingChips.length > 0)) {
+    if (moreBtn && !moreBtn.disabled) {
       simulateClick(moreBtn);
       await sleep(250);
 
@@ -151,16 +186,21 @@ export class ShutterstockAdapter extends BaseAdapter {
         simulateClick(clearAction);
         await sleep(350);
         (this.logger || logger).step('keywords', 'Cleared existing chips');
-      } else {
-        // Fallback: click individual chip delete buttons if clear action menu is missing
-        const deleteIcons = Array.from(document.querySelectorAll(
-          '.MuiChip-root[data-testid^="selected-keyword-"] svg[data-testid="ClearIcon"]'
-        ));
-        for (const icon of deleteIcons) {
-          const btn = icon.closest('button') || icon.parentElement;
-          if (btn) simulateClick(btn);
-        }
+        return true;
       }
+    }
+
+    // Fallback: click individual chip delete buttons if clear action menu is missing
+    const deleteIcons = Array.from(document.querySelectorAll(
+      '.MuiChip-root[data-testid^="selected-keyword-"] svg[data-testid="ClearIcon"], .MuiChip-root svg.MuiChip-deleteIcon'
+    ));
+    if (deleteIcons.length > 0) {
+      for (const icon of deleteIcons) {
+        const btn = icon.closest('button') || icon.parentElement;
+        if (btn) simulateClick(btn);
+      }
+      await sleep(250);
+      (this.logger || logger).step('keywords', 'Cleared existing chips (manual)');
     }
 
     return true;
@@ -339,9 +379,9 @@ export class ShutterstockAdapter extends BaseAdapter {
         simulateEnterKey(kwInput);
         (this.logger || logger).step('keywords', `${Math.min(tagList.length, 50)} tags`);
 
-        // Auto-approve spelling warnings after chips render
-        await sleep(500);
-        this.approveSpellingWarnings();
+        // Auto-approve spelling warnings after chips render with polling
+        await sleep(600);
+        await this.approveSpellingWarnings();
       }
     }
 
@@ -414,24 +454,55 @@ export class ShutterstockAdapter extends BaseAdapter {
 
   /**
    * Approves spelling warnings by clicking "Mark all as correct" or "Mark all keywords as correct".
-   * @returns {boolean} True if button was clicked.
+   * Polls asynchronously until the warning button appears, or exits cleanly if no error chip is detected.
+   *
+   * @param {number} [maxWaitMs=3500] - Maximum wait time in milliseconds.
+   * @param {number} [pollIntervalMs=250] - Interval between checks in milliseconds.
+   * @returns {Promise<boolean>} True if button was clicked.
    */
-  approveSpellingWarnings() {
+  async approveSpellingWarnings(maxWaitMs = 3500, pollIntervalMs = 250) {
     if (typeof document === 'undefined') return false;
 
-    const candidateButtons = Array.from(document.querySelectorAll(
-      'button[data-testid="mark-all-correct-button"], button[data-testid="button"], button'
-    ));
+    const findMarkCorrectBtn = () => {
+      const candidateButtons = Array.from(document.querySelectorAll(
+        'button[data-testid="mark-all-correct-button"], button[data-testid="button"], button'
+      ));
 
-    const markCorrectBtn = candidateButtons.find((btn) => {
-      const text = btn.textContent?.trim().toLowerCase() || '';
-      return text.includes('mark all keywords as correct') || text.includes('mark all as correct');
-    });
+      return candidateButtons.find((btn) => {
+        const text = btn.textContent?.trim().toLowerCase() || '';
+        return text.includes('mark all keywords as correct') || text.includes('mark all as correct');
+      });
+    };
 
-    if (markCorrectBtn && !markCorrectBtn.disabled) {
-      simulateClick(markCorrectBtn);
-      (this.logger || logger).step('approving spelling warnings', 'Approved');
-      return true;
+    const startTime = Date.now();
+    let hasDetectedError = false;
+
+    while (Date.now() - startTime < maxWaitMs) {
+      const markCorrectBtn = findMarkCorrectBtn();
+      if (markCorrectBtn && !markCorrectBtn.disabled) {
+        simulateClick(markCorrectBtn);
+        (this.logger || logger).step('approving spelling warnings', 'Approved');
+        await sleep(500);
+        return true;
+      }
+
+      // Check for red error chips or spelling warning indicator in DOM
+      if (!hasDetectedError) {
+        const errorChip = document.querySelector(
+          '.MuiChip-colorError, .MuiChip-filledError, [data-testid*="error"], [class*="chip"][class*="error"]'
+        );
+        const hasSpellingNotice = document.querySelector('div[data-testid="keyword-input-text"]')
+          ?.parentElement?.textContent?.toLowerCase?.()?.includes('spelling');
+
+        if (errorChip || hasSpellingNotice) {
+          hasDetectedError = true;
+        } else if (Date.now() - startTime > 1500) {
+          // If no error chips or spelling warning appeared after 1.5s, continue
+          break;
+        }
+      }
+
+      await sleep(pollIntervalMs);
     }
 
     return false;
@@ -462,7 +533,9 @@ export class ShutterstockAdapter extends BaseAdapter {
    * 1. On target card (first or specified card), click selection checkbox.
    * 2. In the toolbar, click "Select page" (if more than 1 card).
    * 3. In the sidebar, click "Save".
-   * 4. Close drawer if close button exists.
+   * 4. Wait for save spinner to finish and button to return to normal.
+   * 5. Click "Deselect page" in the toolbar.
+   * 6. Close drawer if close button exists.
    *
    * @param {HTMLElement} [lastCardElement=null] - Optional reference to card element.
    * @returns {Promise<boolean>} True if bulk save triggered.
@@ -510,9 +583,87 @@ export class ShutterstockAdapter extends BaseAdapter {
 
     if (saveBtn && !saveBtn.disabled) {
       simulateClick(saveBtn);
-      await sleep(1500);
+      (this.logger || logger).step('bulk save', 'Clicked Save, waiting for completion...');
+      await sleep(350);
 
-      // 4. Close drawer if close button exists
+      // 4. Wait for save button spinner to resolve and button to return to normal
+      const isSaveBusy = () => {
+        const currentSaveBtn = document.querySelector('button[data-testid="edit-dialog-save-button"]') || saveBtn;
+        if (!currentSaveBtn || (typeof document.body?.contains === 'function' && !document.body.contains(currentSaveBtn))) {
+          return false;
+        }
+        const hasSpinner = Boolean(
+          currentSaveBtn.querySelector?.('svg.MuiCircularProgress-svg, .MuiCircularProgress-root, [role="progressbar"], .MuiLoadingButton-loadingIndicator') ||
+          document.querySelector?.('div.MuiDialog-root [role="progressbar"], [data-testid="save-loading"]')
+        );
+        const isDisabled = currentSaveBtn.disabled ||
+          currentSaveBtn.classList?.contains?.('Mui-disabled') ||
+          currentSaveBtn.getAttribute?.('aria-busy') === 'true';
+        const isSavingText = currentSaveBtn.textContent && /saving/i.test(currentSaveBtn.textContent);
+
+        return Boolean(hasSpinner || isDisabled || isSavingText);
+      };
+
+      const maxSaveWaitMs = 20000;
+      const saveStartTime = Date.now();
+      let wasBusy = isSaveBusy();
+
+      while (Date.now() - saveStartTime < maxSaveWaitMs) {
+        const busy = isSaveBusy();
+        if (busy) {
+          wasBusy = true;
+        } else if (wasBusy || Date.now() - saveStartTime >= 1000) {
+          break;
+        }
+        await sleep(300);
+      }
+
+      (this.logger || logger).step('bulk save', 'Save finished, button back to normal');
+      await sleep(400);
+
+      // 5. Click "Deselect page" in toolbar
+      const findDeselectButton = () => {
+        const direct = document.querySelector(
+          'button[data-testid="deselect-page-button"], button[data-testid="deselect-all-button"]'
+        );
+        if (direct) return direct;
+
+        const allButtons = Array.from(document.querySelectorAll('div.MuiGrid-root button, button'));
+        const textMatch = allButtons.find((btn) => {
+          const txt = btn.textContent?.trim().toLowerCase() || '';
+          return txt.includes('deselect page') || txt.includes('deselect all') || txt === 'deselect';
+        });
+        if (textMatch) return textMatch;
+
+        const selectPageBtn = document.querySelector('button[data-testid="select-page-button"]');
+        if (selectPageBtn) {
+          const txt = selectPageBtn.textContent?.trim().toLowerCase() || '';
+          if (txt.includes('deselect')) return selectPageBtn;
+        }
+
+        return null;
+      };
+
+      let deselectBtn = findDeselectButton();
+      if (!deselectBtn) {
+        const deselectStart = Date.now();
+        while (Date.now() - deselectStart < 2000) {
+          await sleep(250);
+          deselectBtn = findDeselectButton();
+          if (deselectBtn) break;
+        }
+      }
+
+      if (deselectBtn) {
+        simulateClick(deselectBtn);
+        (this.logger || logger).step('bulk save', 'Deselected page');
+        await sleep(400);
+      } else if (cardCheckbox && cardCheckbox.checked) {
+        simulateClick(cardCheckbox);
+        await sleep(300);
+      }
+
+      // 6. Close drawer if close button exists
       const closeBtn = document.querySelector('button svg[data-testid="close-icon"]')?.closest('button');
       if (closeBtn) {
         simulateClick(closeBtn);

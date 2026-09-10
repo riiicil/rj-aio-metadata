@@ -6,11 +6,11 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 4: Platform Adapters (Shutterstock CORS Background Proxy & Deep MUI Selectors Complete; Adobe Stock Live Verified)
+- **Current Milestone**: Phase 4: Platform Adapters (Shutterstock Spelling Polling, Save Spinner Resolution & Deselect Page Complete; Adobe Stock Live Verified)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(shutterstock): bypass CORS via background image proxy, refactor deep MUI selectors, and wire LoggerService`
+- **Latest Commit**: `fix(shutterstock): poll spelling warnings, wait for save spinner, and deselect page on bulk save`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (666/666 assertions passed across all 9 test suites, zero emoji clean)
+- **Build / Test State**: Verified healthy (667/667 assertions passed across all test suites, zero emoji clean)
 
 ---
 
@@ -23,11 +23,12 @@ Phase 4 has resolved the cross-origin thumbnail fetch barrier and completed live
    - Retained local `blob:` URLs and unit test direct fetch fallbacks in `imageToBase64()`.
 2. **Deep Material-UI Selectors & Workflow in `ShutterstockAdapter.js` (`src/adapters/ShutterstockAdapter.js`)**:
    - Targeted innermost elements: `textarea.MuiInputBase-input`, `div[role="button"]` / `[role="combobox"]` for Category 1 & 2 with text normalization ("The Arts" <-> "Arts"), `keyword-input-text input.MuiInputBase-input` with Enter simulation, and spelling warning approval ("Mark all as correct" / "Mark all keywords as correct").
+   - Added active asynchronous polling to `approveSpellingWarnings()` (up to 3.5s) to allow asynchronous chip error rendering and spellcheck latency before clicking mark all correct.
    - Usage toggle: Material-UI toggle buttons `button[data-testid="button-editorial"]` vs `button[data-testid="button-commercial"]` inside `div[data-testid="usage-toggle"]`.
    - Integrated sequential keyword clearing via 3-dots menu (`button[data-testid="more-keyword-actions-button"]` -> `[data-testid="clear-action"]`).
-   - Bulk save: Target first card checkbox, toolbar `button[data-testid="select-page-button"]`, sidebar `button[data-testid="edit-dialog-save-button"]`, and close drawer.
+   - Bulk save: Target first card checkbox, toolbar `button[data-testid="select-page-button"]`, sidebar `button[data-testid="edit-dialog-save-button"]`, waits for save spinner to resolve and button to normalize, clicks toolbar "Deselect page", and closes drawer.
+   - Verified auto-saving on graceful stop mid-batch, with 100ms responsive stop checking during cooldown in `overlay.js`.
    - Video (19 categories) vs Image (26 categories) shared workflow supported.
-   - Tightened interaction delays (~200ms-400ms).
 3. **Centralized LoggerService Integration**:
    - `ShutterstockAdapter.js` now uses `(this.logger || logger).step()`, `.info()`, and `.success()` across every single interaction step.
 4. **Adobe Stock Live Fixes Round 1-5 Verified**:
@@ -40,7 +41,7 @@ Phase 4 has resolved the cross-origin thumbnail fetch barrier and completed live
 1. **Step 1 (Live Browser Verification on Shutterstock)**:
    - Contributor reloads unpacked extension (`chrome://extensions`).
    - Runs automation on `submit.shutterstock.com/portfolio/not_submitted/photo` or `/video`.
-   - Confirms zero CORS errors, accurate field filling, and console log output.
+   - Confirms zero CORS errors, spelling error auto-correct polling, post-save spinner wait, and deselect page completion.
 2. **Step 2 (Branch Review & Integration)**:
    - Contributor reviews Phase 4 changes on `task/platform-adapters` and merges into `dev` using `git merge --no-ff`.
 
@@ -50,6 +51,7 @@ Phase 4 has resolved the cross-origin thumbnail fetch barrier and completed live
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 33 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Async spelling auto-correct polling, save button spinner resolution wait, post-save deselect page, responsive cooldown stop | Live browser testing on Shutterstock |
 | 32 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Background CORS image proxy, deepest MUI selectors, sequential clearing, tightened delays, LoggerService wired, 666/666 tests pass | Live browser testing on Shutterstock |
 | 31 | 2026-09-10 | `task/platform-adapters` | `feat(logging)` | Implemented LoggerService.js, wired into AdobeStockAdapter, disabled global clearMetadata in overlay, verified 336/336 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 2. **Step 2 (Phase 5: End-to-End Live Browser Testing & Polish)**:

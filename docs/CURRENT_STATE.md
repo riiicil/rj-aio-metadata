@@ -2,7 +2,7 @@
 
 *Last Updated: 2026-09-10*<br>
 *Active Branch: `task/platform-adapters`*<br>
-*Current Milestone: Phase 4: Platform Adapters (Shutterstock CORS Background Proxy, Deep MUI Refactoring & LoggerService Complete; Adobe Stock Live Fixes Verified)*
+*Current Milestone: Phase 4: Platform Adapters (Shutterstock Spelling Polling, Save Spinner Resolution & Deselect Page Complete; Adobe Stock Live Fixes Verified)*
 
 ---
 
@@ -12,7 +12,7 @@
 - **Phase 1 — Storage & Popup UI**: [COMPLETE] (Storage engine, background worker, modular platform-dynamic popup UI merged to dev)
 - **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, multi-platform media detection, popup toggle, bidirectional sync merged to dev)
 - **Phase 3 — Universal Vision Service**: [COMPLETE] (Step 3.1 Prompt Engine, Step 3.2 Sanitizer Engine, Step 3.3 Universal Vision Client & Background Proxy Worker complete, merged to dev)
-- **Phase 4 — Platform Adapters**: [COMPLETE] (Sub-phase 4.1 Complete: Vecteezy & Freepik popup AI model taxonomies aligned, Schema v4 migrated; Sub-phase 4.2 Complete: Core Adapter Foundation implemented with dom_helpers.js and BaseAdapter.js; Sub-phase 4.3 Complete: Tier 1 Adapters AdobeStockAdapter.js & ShutterstockAdapter.js implemented; Sub-phase 4.4 Complete: Tier 2 Adapters FreepikAdapter.js & VecteezyAdapter.js implemented; Sub-phase 4.5 Complete: Tier 3 Adapters DreamstimeAdapter.js, DepositphotosAdapter.js, and MiriCanvasAdapter.js implemented; Sub-phase 4.6 Complete: Adapter Registry index.js, In-Page HUD Wiring & Automation Orchestrator overlay.js; Adobe Stock Live Fixes Round 1-5 Verified; Shutterstock CORS Bypass via Background Image Proxy, Deep MUI Selectors, Sequential Keyword Clearing & LoggerService Integrated)
+- **Phase 4 — Platform Adapters**: [COMPLETE] (Sub-phase 4.1 Complete: Vecteezy & Freepik popup AI model taxonomies aligned, Schema v4 migrated; Sub-phase 4.2 Complete: Core Adapter Foundation implemented with dom_helpers.js and BaseAdapter.js; Sub-phase 4.3 Complete: Tier 1 Adapters AdobeStockAdapter.js & ShutterstockAdapter.js implemented; Sub-phase 4.4 Complete: Tier 2 Adapters FreepikAdapter.js & VecteezyAdapter.js implemented; Sub-phase 4.5 Complete: Tier 3 Adapters DreamstimeAdapter.js, DepositphotosAdapter.js, and MiriCanvasAdapter.js implemented; Sub-phase 4.6 Complete: Adapter Registry index.js, In-Page HUD Wiring & Automation Orchestrator overlay.js; Adobe Stock Live Fixes Round 1-5 Verified; Shutterstock CORS Bypass via Background Image Proxy, Deep MUI Selectors, Sequential Keyword Clearing, Spelling Warning Polling, Save Spinner Wait & Deselect Page Wired, LoggerService Integrated)
 - **Phase 5 — End-to-End Testing & Polish**: [PLANNED] (E2E live verification & packaging)
 
 ---
