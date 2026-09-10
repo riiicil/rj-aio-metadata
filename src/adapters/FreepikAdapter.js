@@ -68,40 +68,87 @@ export class FreepikAdapter extends BaseAdapter {
 
   /**
    * Selects an asset card in the catalog grid to open its sidebar editor.
-   * Targets the innermost thumbnail element to reliably trigger Vue item selection.
+   * Targets the thumbnail preview image to trigger Vue item selection.
+   * Defensively guards against double-clicking an already selected card.
    *
    * @param {HTMLElement} cardElement - Card element to select.
    */
   selectCard(cardElement) {
     if (!cardElement) return;
     logger.step('Freepik: Selecting asset card');
+
+    try {
+      if (typeof cardElement.scrollIntoView === 'function') {
+        cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } catch {
+      // Ignore scroll errors
+    }
+
+    // Check if card is already selected; if so, do not re-click to avoid toggling off
+    const isAlreadySelected = cardElement.classList?.contains('selected') ||
+      (cardElement.getAttribute?.('class') || '').includes('selected');
+
+    if (isAlreadySelected) {
+      logger.info('Freepik: Asset card is already selected');
+      return;
+    }
+
+    // Click innermost thumbnail image or container; bubbling handles card selection in Vue
     const clickTarget = cardElement.querySelector?.(
       '.thumbnail img[data-cy*="preitemImg"], div.thumbnail img, .thumbnail img, div.thumbnail, .content'
     ) || cardElement;
+
     simulateClick(clickTarget);
-    if (clickTarget !== cardElement) {
-      simulateClick(cardElement);
-    }
   }
 
   /**
-   * Waits for the catalog sidebar editor form to become interactive.
+   * Waits for the catalog sidebar editor form to become interactive for the selected asset.
+   * Verifies that the sidebar is visible, textarea is present, card is selected, and not "Select 0".
+   *
    * @param {HTMLElement} [cardElement=null] - Selected asset card.
    * @param {number} [timeoutMs=4000] - Timeout in milliseconds.
    * @returns {Promise<boolean>} True if ready, false on timeout.
    */
   async waitForEditorReady(cardElement = null, timeoutMs = 4000) {
-    try {
-      await waitForElement(
-        'aside.catalog__sidebar, div.inputTitle textarea, aside.catalog__sidebar textarea',
-        typeof document !== 'undefined' ? document : null,
-        timeoutMs
+    if (typeof document === 'undefined') return true;
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeoutMs) {
+      const sidebar = document.querySelector('aside.catalog__sidebar');
+      const textarea = document.querySelector(
+        'div.inputTitle textarea, aside.catalog__sidebar textarea'
       );
-      await sleep(300);
-      return true;
-    } catch {
-      return false;
+
+      const isCardSelected = cardElement
+        ? (cardElement.classList?.contains('selected') || (cardElement.getAttribute?.('class') || '').includes('selected'))
+        : true;
+
+      const sidebarText = sidebar?.textContent || '';
+      const isZeroSelected = /select\s+0\s*\//i.test(sidebarText);
+
+      // Ready when sidebar & textarea exist, card is selected, and not "Select 0"
+      if (sidebar && textarea && isCardSelected && !isZeroSelected) {
+        await sleep(250);
+        return true;
+      }
+
+      // If card was not selected and time is passing (>1s), try fallback click on checkbox indicator
+      if (cardElement && !isCardSelected && Date.now() - startTime > 1000) {
+        const fallbackTarget = cardElement.querySelector?.(
+          'span.checkbox__indicator, label.checkbox, .thumbnail img'
+        );
+        if (fallbackTarget) {
+          simulateClick(fallbackTarget);
+          await sleep(250);
+        }
+      }
+
+      await sleep(150);
     }
+
+    // Fallback check after timeout
+    return Boolean(document.querySelector('aside.catalog__sidebar, div.inputTitle textarea'));
   }
 
   /**
@@ -202,14 +249,25 @@ export class FreepikAdapter extends BaseAdapter {
     );
 
     if (aiSwitch) {
-      if (isAi && !aiSwitch.checked) {
-        logger.step('Generative AI', 'Enabled');
-        simulateClick(aiSwitch);
-        await sleep(100);
-      } else if (!isAi && aiSwitch.checked) {
-        logger.step('Generative AI', 'Disabled');
-        simulateClick(aiSwitch);
-        await sleep(100);
+      const isCurrentlyChecked = Boolean(
+        aiSwitch.checked ||
+        aiSwitch.getAttribute('checked') !== null ||
+        aiSwitch.value === 'true' ||
+        aiSwitch.closest?.('label.switch')?.classList?.contains('active')
+      );
+
+      try {
+        if (isAi && !isCurrentlyChecked) {
+          logger.step('Generative AI', 'Enabled');
+          simulateClick(aiSwitch);
+          await sleep(100);
+        } else if (!isAi && isCurrentlyChecked) {
+          logger.step('Generative AI', 'Disabled');
+          simulateClick(aiSwitch);
+          await sleep(100);
+        }
+      } catch (err) {
+        logger.warn('Freepik: AI declaration switch toggle warning', err.message);
       }
 
       if (isAi) {

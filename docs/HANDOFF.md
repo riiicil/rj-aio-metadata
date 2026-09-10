@@ -8,7 +8,7 @@
 
 - **Current Milestone**: Phase 4: Platform Adapters (Freepik / Magnific Rebranding & Live Bugfixes Complete; Shutterstock & Adobe Stock Live Fixes Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(freepik): filter fake cards, avoid ai icon in thumbnail extraction, and auto-clear metadata`
+- **Latest Commit**: `fix(freepik): eliminate card double-click, deduplicate simulateClick, and verify active asset selection`
 - **Working Tree**: Clean local branch
 - **Build / Test State**: Verified healthy (672/672 assertions passed across all test suites, zero emoji clean)
 
@@ -17,12 +17,17 @@
 ## 2. Active In-Flight Context
 
 Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1 platforms, and extended Freepik support to the Magnific rebranding:
-1. **Freepik (Magnific) Live Bugfixes (`contributor.magnific.com`)**:
+1. **Freepik (Magnific) Card Selection & simulateClick Deduplication (`contributor.magnific.com`)**:
+   - Resolved `"Select 0/2"` and blocked metadata form by removing redundant second click on `cardElement` in `FreepikAdapter.js:selectCard()`.
+   - Fixed `simulateClick()` in `src/adapters/utils/dom_helpers.js` which previously fired both synthetic `click` MouseEvent and native `element.click()`, causing double clicks in browser environments.
+   - Added active selection verification and polling in `FreepikAdapter.js:waitForEditorReady()` with fallback checkbox click.
+   - Added `if (isAlreadySelected) return;` guard preventing accidental deselection of active cards.
+   - Guarded AI switch toggle in `fillMetadata()` against unhandled Vue validator exceptions.
+2. **Freepik (Magnific) Live Bugfixes (`contributor.magnific.com`)**:
    - Filtered out 20 empty `.catalog__item--fake` placeholder cards from `detectAssetCount()` (`src/overlay/overlay.js`) and `getAssetCards()` (`src/adapters/FreepikAdapter.js`), correcting asset count from 22 to 2 and stopping unhandled Vue validator exceptions (`TypeError: Cannot read properties of undefined (reading 'length')` in `catalog.validator.ts`).
    - Targeted artwork preview `.thumbnail img[data-cy*="preitemImg"]` and excluded SVG badges (`aiGenerated.svg`) in `getThumbnailUrl()`, eliminating Vision API 400 Bad Request errors.
-   - Updated `selectCard()` to click innermost thumbnail elements before container click for reliable Vue sidebar expansion.
    - Added robust `findTrashButton()` in `clearMetadata()` and automated pre-injection clearing in `fillMetadata()` with 200ms settle delay, resolving keyword count overflow (172/50 red chips).
-2. **Freepik Rebranding to Magnific (`contributor.magnific.com`)**:
+3. **Freepik Rebranding to Magnific (`contributor.magnific.com`)**:
    - Updated `src/manifest.json` `host_permissions` with `*://*.magnific.com/*`.
    - Updated `src/overlay/overlay.js` `detectPlatformId()`, `detectPlatform()`, and `detectAssetCount()` to match `host.includes('magnific.com')`, displaying `"Freepik (Magnific)"` and detecting asset cards accurately.
    - Updated `src/background/service_worker.js` with `hostPatterns: ['contributor.freepik.com', 'contributor.magnific.com']` and new catalog URL `https://contributor.magnific.com/catalog/pending-files/1`.

@@ -294,8 +294,9 @@ export function simulateClick(element) {
     // Ignore scroll errors in non-browser environments
   }
 
-  const mouseEvents = ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'];
-  for (const evtName of mouseEvents) {
+  // Pointer and mouse events leading up to click
+  const pointerAndMouseEvents = ['pointerdown', 'mousedown', 'pointerup', 'mouseup'];
+  for (const evtName of pointerAndMouseEvents) {
     try {
       const isPointer = evtName.startsWith('pointer');
       const EvtClass = isPointer && typeof PointerEvent !== 'undefined'
@@ -322,8 +323,31 @@ export function simulateClick(element) {
     }
   }
 
+  // Trigger the click: prefer native element.click() in browser, fallback to dispatchEvent('click')
+  let clickTriggered = false;
   if (typeof element.click === 'function') {
     element.click();
+    clickTriggered = true;
+  }
+
+  // In test mocks or non-browser environments, dispatch synthetic click MouseEvent for compatibility
+  if (!clickTriggered || typeof window === 'undefined') {
+    try {
+      const EvtClass = typeof MouseEvent !== 'undefined' ? MouseEvent : (typeof Event !== 'undefined' ? Event : null);
+      if (EvtClass && typeof element.dispatchEvent === 'function') {
+        const evt = new EvtClass('click', {
+          bubbles: true,
+          cancelable: true,
+          view: typeof window !== 'undefined' ? window : null,
+          button: 0,
+          buttons: 1,
+          isPrimary: true
+        });
+        element.dispatchEvent(evt);
+      }
+    } catch {
+      // Ignore
+    }
   }
 
   return true;
