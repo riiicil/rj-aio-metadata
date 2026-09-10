@@ -174,6 +174,20 @@ export class VecteezyAdapter extends BaseAdapter {
   selectCard(cardElement) {
     if (!cardElement) return;
 
+    // Defensively close any lingering popovers before selecting a new card
+    if (typeof document !== 'undefined') {
+      const lingeringPopover = document.querySelector('div.MuiPopover-root, div.MuiMenu-root');
+      if (lingeringPopover) {
+        const backdrop = document.querySelector('div.MuiBackdrop-root, div.MuiModal-backdrop');
+        if (backdrop && typeof backdrop.click === 'function') {
+          try { backdrop.click(); } catch {}
+        }
+        try {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true }));
+        } catch {}
+      }
+    }
+
     // Guard: Do not click if already selected (clicking toggles selection off!)
     if (cardElement.classList?.contains('is-selected')) {
       this.logger.info('Vecteezy: Asset card is already selected');
@@ -540,11 +554,68 @@ export class VecteezyAdapter extends BaseAdapter {
 
               if (customInput) {
                 setNativeValue(customInput, customSoftwareName);
+                await sleep(50);
+
+                // Simulate Enter key to confirm text value and commit software name
+                this.logger.info('Vecteezy: Dispatching Enter key on custom software input');
+                simulateEnterKey(customInput);
+
+                const enterInit = {
+                  key: 'Enter',
+                  code: 'Enter',
+                  keyCode: 13,
+                  which: 13,
+                  bubbles: true,
+                  cancelable: true
+                };
+                const createEnterEv = (type) => {
+                  if (typeof KeyboardEvent !== 'undefined') {
+                    try { return new KeyboardEvent(type, enterInit); } catch {}
+                  }
+                  if (typeof Event !== 'undefined') {
+                    const ev = new Event(type, { bubbles: true, cancelable: true });
+                    Object.assign(ev, enterInit);
+                    return ev;
+                  }
+                  return { type, ...enterInit };
+                };
+                try {
+                  customInput.dispatchEvent(createEnterEv('keydown'));
+                  customInput.dispatchEvent(createEnterEv('keypress'));
+                  customInput.dispatchEvent(createEnterEv('keyup'));
+                } catch {}
+                await sleep(50);
+
+                if (typeof customInput.blur === 'function') {
+                  customInput.blur();
+                }
                 await sleep(100);
               } else {
                 this.logger.warn('Vecteezy: Custom software text input not found in popover');
               }
             }
+          }
+
+          // Ensure any lingering dropdown popover is dismissed before moving forward
+          const lingeringPopover = document.querySelector(
+            'div.MuiPopover-root, div.MuiMenu-root, ul[role="listbox"]'
+          );
+          if (lingeringPopover) {
+            this.logger.info('Vecteezy: Dismissing lingering AI dropdown popover');
+            const backdrop = document.querySelector('div.MuiBackdrop-root, div.MuiModal-backdrop');
+            if (backdrop) {
+              try {
+                backdrop.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+                backdrop.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+                backdrop.click();
+              } catch {}
+            }
+            try {
+              const escInit = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
+              document.dispatchEvent(new KeyboardEvent('keydown', escInit));
+              document.dispatchEvent(new KeyboardEvent('keyup', escInit));
+            } catch {}
+            await sleep(150);
           }
         } else {
           this.logger.warn(`Vecteezy: Option for "${software}" (${targetDataVal}) not found in dropdown list`);
