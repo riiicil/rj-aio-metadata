@@ -379,11 +379,11 @@ export class AdobeStockAdapter extends BaseAdapter {
       await sleep(800);
     }
 
-    // 2. Generative AI Declaration & Fictional Property Release Checkbox (Sequential Step 2: Kondisional)
+    // 2. Generative AI Declaration / Property Release or Non-AI Releases Switch (Sequential Step 2: Kondisional)
+    const isAi = Boolean(options.isAiGenerated);
     const aiCheckbox = document.querySelector(
       '#content-tagger-generative-ai-checkbox, input[name="content-tagger-generative-ai-checkbox"], input[data-t="content-tagger-generative-ai-checkbox"]'
     );
-    const isAi = Boolean(options.isAiGenerated);
 
     if (aiCheckbox) {
       if (isAi && !aiCheckbox.checked) {
@@ -404,8 +404,48 @@ export class AdobeStockAdapter extends BaseAdapter {
         }
       }
       console.log('%c[RJ AIO Metadata] Setting Generative AI: %s', 'color: #079183;', isAi ? 'Checked' : 'Unchecked');
-      await sleep(500);
+      await sleep(300);
     }
+
+    // For Non-AI assets: Set 'Recognizable people or property?' to 'No'
+    if (!isAi) {
+      const noReleaseRadio = document.querySelector(
+        'input[data-t="has-release-no"], input[name="hasReleases"][value="no"]'
+      );
+      if (noReleaseRadio) {
+        if (!noReleaseRadio.checked) {
+          const clickTarget = noReleaseRadio.parentElement?.querySelector?.('label, .switch__body') || noReleaseRadio;
+          simulateClick(clickTarget);
+          if (clickTarget !== noReleaseRadio) simulateClick(noReleaseRadio);
+          try {
+            noReleaseRadio.checked = true;
+            noReleaseRadio.dispatchEvent(new Event('change', { bubbles: true }));
+          } catch {
+            // Ignore dispatch errors
+          }
+          console.log('%c[RJ AIO Metadata] Setting Recognizable people or property: No', 'color: #079183;');
+          await sleep(300);
+        }
+      } else {
+        // Fallback: search within elements mentioning Recognizable people or property
+        const candidateContainers = Array.from(document.querySelectorAll('div, fieldset, section')).filter(el =>
+          el.querySelector?.('input[name="hasReleases"]') ||
+          (el.textContent && el.textContent.includes('Recognizable people or property'))
+        );
+        for (const container of candidateContainers) {
+          const noBtn = Array.from(container.querySelectorAll('label, span, button')).find(
+            b => b.textContent?.trim() === 'No'
+          );
+          if (noBtn) {
+            simulateClick(noBtn);
+            console.log('%c[RJ AIO Metadata] Setting Recognizable people or property: No (container match)', 'color: #079183;');
+            await sleep(300);
+            break;
+          }
+        }
+      }
+    }
+    await sleep(500);
 
     // Commercial Mode Guard (Ensure illustrative editorial is NOT checked)
     const editorialCheckbox = document.querySelector(
@@ -477,13 +517,35 @@ export class AdobeStockAdapter extends BaseAdapter {
   }
 
   /**
+   * Helper to strictly find the Save Work button, explicitly avoiding the Submit button.
+   * @private
+   */
+  _findSaveWorkButton() {
+    if (typeof document === 'undefined') return null;
+
+    // 1. Direct attribute match
+    const directSaveBtn = document.querySelector('button[data-t="save-work"]');
+    if (directSaveBtn && !directSaveBtn.disabled) return directSaveBtn;
+
+    // 2. Filter buttons strictly matching 'Save work' or 'Save' text, excluding 'submit'
+    const candidateButtons = Array.from(document.querySelectorAll('button'));
+    return candidateButtons.find((btn) => {
+      const dataT = (btn.getAttribute('data-t') || '').toLowerCase();
+      if (dataT.includes('submit')) return false;
+
+      const txt = (btn.textContent || '').trim().toLowerCase();
+      return (txt === 'save work' || txt === 'save') && !btn.disabled;
+    }) || null;
+  }
+
+  /**
    * Saves draft for currently selected asset.
    * @returns {Promise<boolean>}
    */
   async saveDraft() {
     if (typeof document === 'undefined') return true;
-    const saveBtn = document.querySelector('button[data-t="save-work"], button.button--action');
-    if (saveBtn && !saveBtn.disabled) {
+    const saveBtn = this._findSaveWorkButton();
+    if (saveBtn) {
       simulateClick(saveBtn);
       return true;
     }
@@ -526,15 +588,31 @@ export class AdobeStockAdapter extends BaseAdapter {
     // 2. Releases switch to "no" (for non-AI assets)
     if (!isAiGenerated) {
       const noReleaseRadio = document.querySelector('input[data-t="has-release-no"], input[name="hasReleases"][value="no"]');
-      if (noReleaseRadio && !noReleaseRadio.checked) {
-        simulateClick(noReleaseRadio);
-        await sleep(500);
+      if (noReleaseRadio) {
+        if (!noReleaseRadio.checked) {
+          const clickTarget = noReleaseRadio.parentElement?.querySelector?.('label, .switch__body') || noReleaseRadio;
+          simulateClick(clickTarget);
+          if (clickTarget !== noReleaseRadio) simulateClick(noReleaseRadio);
+          try {
+            noReleaseRadio.checked = true;
+            noReleaseRadio.dispatchEvent(new Event('change', { bubbles: true }));
+          } catch {
+            // Ignore dispatch errors
+          }
+          await sleep(500);
+        }
       }
     }
 
-    // 3. Save work button
-    const saveBtn = document.querySelector('button[data-t="save-work"], button.button--action');
-    if (saveBtn && !saveBtn.disabled) {
+    // 3. Save work button (Strictly Save work, NEVER Submit)
+    let saveBtn = null;
+    for (let i = 0; i < 6; i++) {
+      saveBtn = this._findSaveWorkButton();
+      if (saveBtn) break;
+      await sleep(500);
+    }
+
+    if (saveBtn) {
       simulateClick(saveBtn);
       console.log('%c[RJ AIO Metadata] Bulk save executed successfully', 'color: #59d499; font-weight: bold;');
       await sleep(1000);

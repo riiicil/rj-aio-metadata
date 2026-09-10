@@ -6,50 +6,26 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 4: Platform Adapters (Adobe Stock Live Bugfixes Round 4: Strict Element Interaction Sequence, Graceful Stop with Active Card Completion and Bulk Save, and 16K Reasoning Headroom Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (Adobe Stock Live Bugfixes Round 5: Non-AI Release Switch, Strict Save Work Button Selector, and Deferred In-Form Clearing Verified)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(overlay): graceful stop with bulk save and adobe stock element interaction sequence`
+- **Latest Commit**: `fix(adobestock): non-ai release switch, strict save work button selector, and skip premature metadata clearing`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (708/708 assertions passed across test_adobe_fixes.mjs [42/42], test_subphase_4_6.mjs [57/57], test_tier3_adapters.mjs [107/107], test_tier2_adapters.mjs [94/94], test_tier1_adapters.mjs [78/78], test_base_adapter.mjs [65/65], test_storage_v4.mjs [38/38], test_ai_prompt.mjs [65/65], test_sanitizer_service.mjs [86/86], test_ai_service.mjs [76/76], zero emoji clean)
+- **Build / Test State**: Verified healthy (336/336 assertions passed across test_subphase_4_6.mjs [57/57], test_tier1_adapters.mjs [78/78], test_tier2_adapters.mjs [94/94], test_tier3_adapters.mjs [107/107], zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 4 has completed live in-page bugfixing Rounds 1, 2, 3 & 4 on Adobe Stock Contributor (`contributor.stock.adobe.com`) and universal model parameter adaptation:
-1. **Asset Card Deduplication (`src/adapters/AdobeStockAdapter.js`)**:
-   - Resolved the critical bug where 35 assets were detected as 70 assets in the automation loop (`asset 1/70`).
-   - Root cause: `getAssetCards()` queried both `div.content-grid-elements` and child `div.upload-tile`, returning 2 entries per asset and causing Card 1 to be re-processed at index 1, shifting all subsequent card selections.
-   - Fixed by targeting `div.content-grid[data-t="assets-content-grid"] div.content-grid-elements` and filtering out any nested descendant elements.
-2. **Card Selection Confirmation Polling (`src/adapters/AdobeStockAdapter.js`)**:
-   - Upgraded `selectCard` to poll up to 6 times (~1200ms) verifying `aria-selected === 'true'` on `.upload-tile [role="option"]`.
-   - Eliminated redundant secondary container clicks that previously caused desynchronization.
-3. **AI Reasoning Token Quota Headroom (`src/services/AiPrompt.js` & `src/services/AiService.js`)**:
-   - Resolved `Model token limit exceeded before completion (finish_reason: length)` on reasoning models (`gpt-5-nano`, `o1`, `o3`, `o4`).
-   - Increased default `max_completion_tokens` from 8192 to `16384` for reasoning/GPT-5 models (and `4096` for standard models), providing ample headroom for internal thinking tokens while outputting full JSON metadata.
-4. **Auto-Category Refresh Removal (`src/adapters/AdobeStockAdapter.js`)**:
-   - Completely removed fallback click on `button[data-t="refresh-auto-category"]` that triggered Adobe Stock's `"The auto-category has been regenerated."` notice.
-5. **Strict Sequential Element Execution Order on Adobe Stock (`src/adapters/AdobeStockAdapter.js`)**:
-   - Enforced strict sequential DOM interactions matching professional contributor workflows:
-     `AI Result & Sanitize` $\rightarrow$ `1. Category Spectrum dropdown (800ms)` $\rightarrow$ `2. Generative AI & Property Release checkboxes (500ms, conditional)` $\rightarrow$ `3. Language dropdown (500ms)` $\rightarrow$ `4. Clear old title (if exists, 200ms) -> Set new title (500ms)` $\rightarrow$ `5. Clear old keywords (if exists, 200ms) -> Set new keywords (500ms)` $\rightarrow$ `Done / Loop next`.
-   - Prevents modifying title and keywords before category and language are committed, ensuring Adobe Stock's tagger does not trigger auto-category recomputation.
-6. **Graceful Stop with Active Card Completion and Bulk Save (`src/overlay/overlay.js`)**:
-   - Upgraded `startAutomation()` and `stopAutomation()` to implement professional microstock graceful shutdown:
-     - When Stop is requested while a card is actively being processed (`this.isCardProcessing === true`), the system enters `this.isStopping = true`.
-     - The active in-flight card is allowed to complete its metadata injection cleanly (no half-filled cards).
-     - Upon finishing the active card, the asset loop breaks out and triggers `adapter.bulkSave()`:
-       - Clicks "Select all" (or checkbox icon).
-       - Checks releases switch if needed.
-       - Clicks "Save work" button.
-     - If user clicks Stop during cooldown delay, the delay is interrupted immediately to trigger bulk save without idle waiting.
-     - If user clicks Stop a second time while in "Stopping..." state, immediate hard abort is performed via `AbortController`.
-     - `this.isAutomationRunning` is properly transitioned so the UI indicates stopping status and synchronous HUD controls remain responsive.
-7. **Category Synchronization with rrweb Recording (`src/adapters/AdobeStockAdapter.js`)**:
-   - Replaced legacy category IDs in `ADOBE_CATEGORIES` with the official IDs verified from `dev-tools/recordings/rekaman-adobestock-20260901_225753.json` and `bahan/analysis_adobestock.md`: States of Mind `10255`, Food `10283`, Graphic Resources `10432`, Hobbies and Leisure `10486`, Industry `10556`, Lifestyle `10631`, People `10683`, Plants and Flowers `10733`, Culture and Religion `10778`, Science `10797`, Social Issues `10834`, Sports `10868`, Transport `10958`.
-   - Removed redundant, imprecise category alias fallback heuristics in `resolveAdobeCategory`.
-8. **Consolidated Single Main Page Console Logging (`src/background/service_worker.js` & `src/services/AiService.js`)**:
-   - Purged background console noise from `service_worker.js`.
-   - Returns parameter adaptations and errors through the runtime message response; all logging (`[RJ AIO Metadata]`) appears exclusively in the webpage DevTools console for seamless single-window developer experience.
+Phase 4 has completed live in-page bugfixing Rounds 1-5 on Adobe Stock Contributor (`contributor.stock.adobe.com`):
+1. **Deferred Metadata Clearing (`src/overlay/overlay.js` & `src/adapters/AdobeStockAdapter.js`)**:
+   - Step 5 in `overlay.js` is skipped for Adobe Stock (`this.platformId !== 'adobestock'`), ensuring existing title and keywords are not cleared prematurely before Category, Releases, and Language are configured.
+   - Title and keywords are cleared surgically inside `fillMetadata()` right before new values are typed.
+2. **Strict Save Work Button Targeting (`src/adapters/AdobeStockAdapter.js`)**:
+   - Avoided accidental click of the green moderation submit button (`Submit N files`).
+   - Implemented `_findSaveWorkButton()` to query `button[data-t="save-work"]` and filter button text matching "Save work" / "Save" while strictly rejecting any button containing "submit", "kirim", or "review".
+3. **Non-AI Release Switch Handling (`src/adapters/AdobeStockAdapter.js`)**:
+   - When `isAiGenerated === false`, unchecks AI declaration and automatically selects the "No" radio button for *"Recognizable people or property?"* (`input[data-t="has-release-no"]`, `input[name="hasReleases"][value="no"]`), with switch label container fallbacks.
+   - Applied in both per-card `fillMetadata()` and post-automation `bulkSave()`.
 
 ---
 
@@ -58,6 +34,14 @@ Phase 4 has completed live in-page bugfixing Rounds 1, 2, 3 & 4 on Adobe Stock C
 1. **Step 1 (Branch Review & Integration)**:
    - User reviews Phase 4 changes on `task/platform-adapters` and merges into `dev` using `git merge --no-ff`.
    - Switch or branch off `dev` for `task/phase5-e2e-testing`.
+
+---
+
+## 6. Recent Session Handoff Log
+
+| Session | Date | Branch | Commit | Summary | Next Focus |
+| :---: | :---: | :--- | :--- | :--- | :--- |
+| 31 | 2026-09-10 | `task/platform-adapters` | `fix(adobestock)` | Non-AI release switch to No, strict Save work button selector (avoid submit), deferred in-form clearing for Adobe Stock, verified 336/336 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 2. **Step 2 (Phase 5: End-to-End Live Browser Testing & Polish)**:
    - Load unpacked extension into Chromium browser (`chrome://extensions`).
    - Live browser testing across available contributor dashboards (Adobe Stock, Shutterstock, Freepik, Vecteezy, Dreamstime, Depositphotos, MiriCanvas).

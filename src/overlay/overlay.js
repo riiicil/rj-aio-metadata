@@ -1009,10 +1009,12 @@ export class OverlayHUD {
           if (signal.aborted) break;
           await sleep(500);
 
-          // Step 5: Clear existing metadata (Adobe Stock handles title/keyword clear inside fillMetadata)
-          await adapter.clearMetadata();
-          if (signal.aborted) break;
-          await sleep(300);
+          // Step 5: Clear existing metadata (Adobe Stock handles title/keyword clearing sequentially inside fillMetadata)
+          if (this.platformId !== 'adobestock') {
+            await adapter.clearMetadata();
+            if (signal.aborted) break;
+            await sleep(300);
+          }
 
           // Step 6: Inject sanitized metadata
           if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving card)...' : 'Injecting metadata...';
