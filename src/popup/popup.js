@@ -303,7 +303,12 @@ function saveActiveFormStateToMemory(platformId) {
   } else if (platformId === 'freepik') {
     const ai = platformDynamicForm.querySelector('#freepik_isAiGenerated');
     const model = platformDynamicForm.querySelector('#freepik_aiModel');
-    if (ai) settings.isAiGenerated = ai.checked;
+    if (ai) {
+      settings.isAiGenerated = ai.checked;
+      if (ai.checked && settings.keywordCount > 49) {
+        settings.keywordCount = 49;
+      }
+    }
     if (model) settings.aiModel = model.value;
     delete settings.customAiModel;
   } else if (platformId === 'vecteezy') {
@@ -350,8 +355,15 @@ function renderPlatformDynamicForm(platformId) {
   platformSettingsHeaderTitle.textContent = `${platName} Settings`;
 
   const settings = currentConfig.platformSettings[platformId] || {};
-  const limits = PLATFORM_LIMITS[platformId] || { min: 8, max: 50 };
-  const currentCount = (typeof settings.keywordCount === 'number') ? settings.keywordCount : limits.max;
+  let limits = PLATFORM_LIMITS[platformId] || { min: 8, max: 50, hint: 'Min 8, Max 50' };
+  if (platformId === 'freepik' && settings.isAiGenerated) {
+    limits = { min: 8, max: 49, hint: 'Min 8, Max 49 (Freepik AI limit)' };
+  }
+  let currentCount = (typeof settings.keywordCount === 'number') ? settings.keywordCount : limits.max;
+  if (platformId === 'freepik' && settings.isAiGenerated && currentCount > 49) {
+    currentCount = 49;
+    settings.keywordCount = 49;
+  }
 
   // Universal Controls: Stepper (1) & Specific Keywords (2)
   let html = `
@@ -646,11 +658,34 @@ function renderPlatformDynamicForm(platformId) {
     if (aiToggle && modelGroup && modelSelect) {
       aiToggle.addEventListener('change', () => {
         const checked = aiToggle.checked;
+        const countInput = platformDynamicForm.querySelector('#keywordCountInput');
+        const hintEl = platformDynamicForm.querySelector('#keywordCountLimitHint');
+
         if (checked) {
           modelGroup.classList.add('rj-visible');
           CustomSelect.refresh(modelSelect);
+          if (hintEl) hintEl.textContent = 'Min 8, Max 49 (Freepik AI limit)';
+          if (countInput) {
+            countInput.max = '49';
+            if (Number(countInput.value) >= 50) {
+              countInput.value = '49';
+              if (currentConfig.platformSettings?.freepik) {
+                currentConfig.platformSettings.freepik.keywordCount = 49;
+              }
+            }
+          }
         } else {
           modelGroup.classList.remove('rj-visible');
+          if (hintEl) hintEl.textContent = 'Min 8, Max 50';
+          if (countInput) {
+            countInput.max = '50';
+            if (Number(countInput.value) === 49) {
+              countInput.value = '50';
+              if (currentConfig.platformSettings?.freepik) {
+                currentConfig.platformSettings.freepik.keywordCount = 50;
+              }
+            }
+          }
         }
       });
     }

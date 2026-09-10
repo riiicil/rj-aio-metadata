@@ -8,8 +8,8 @@
  * - Keyword clearing (trash icon / remove buttons) and comma-separated chip injection + Enter key simulation.
  * - AI declaration toggle switch, base model selection (from 47 official models), and prompt injection.
  * - Category is 100% omitted (automatically categorized by Freepik).
- * - MANDATORY PER-ITEM SAVE DRAFT: Triggers button.button-paste-draft ("Create draft")
- *   and awaits spinner disappearance (waitForElementToDisappear) and button disabled state.
+ * - MANDATORY PER-ITEM PERSISTENCE: Triggers button[data-cy="savePreitems"] (icon--save)
+ *   and awaits save completion and button disabled state.
  */
 
 import { BaseAdapter } from './BaseAdapter.js';
@@ -152,61 +152,114 @@ export class FreepikAdapter extends BaseAdapter {
   }
 
   /**
+   * Dismisses any unexpected "Create a draft" modal dialog that might have been opened.
+   */
+  dismissDraftModal() {
+    if (typeof document === 'undefined') return;
+    const modal = document.querySelector('div.modal, div.modal--dialog, div[data-cy="draftModal"]');
+    if (modal) {
+      const closeBtn = modal.querySelector(
+        'button.modal__close, button[data-cy="closeModal"], button.modal__close--top-right, button:has(i.icon--cross), button.nostyle'
+      ) || Array.from(modal.querySelectorAll('button')).find((b) => Boolean(b.querySelector?.('i.icon--cross')));
+      if (closeBtn) {
+        logger.info('Freepik: Dismissing unexpected draft modal');
+        simulateClick(closeBtn);
+      }
+    }
+  }
+
+  /**
    * Clears old metadata fields (title, keywords) prior to new injection.
-   * Clears title and keyword chips via trash button or individual remove buttons.
+   * Strictly avoids clicking template draft buttons.
+   * Only clears keywords if keyword chips exist and deleteTags button is active.
+   *
    * @returns {Promise<boolean>} True if cleared.
    */
   async clearMetadata() {
     if (typeof document === 'undefined') return true;
-    logger.step('Freepik: Clearing existing title and keywords');
+    logger.step('Freepik: Checking and clearing existing title and keywords');
 
-    // Helper to locate trash button in title or keyword section
-    const findTrashButton = (sectionSelector) => {
-      const section = document.querySelector(sectionSelector);
-      if (!section) return null;
-      const buttons = Array.from(section.querySelectorAll('button'));
-      return buttons.find((b) => {
-        if (b.disabled || b.classList?.contains('disabled') || (b.getAttribute?.('class') || '').includes('disabled')) return false;
-        const cls = b.getAttribute?.('class') || b.className || '';
-        if (cls.includes('icon--trash')) return true;
-        return Boolean(b.querySelector?.('i.icon--trash, .icon--trash'));
-      }) || null;
-    };
+    // 0. Dismiss any unexpected draft modal first
+    this.dismissDraftModal();
 
-    // 1. Clear title: click trash button in title group if present, or clear textarea
-    const titleTrash = findTrashButton('div.inputTitle');
+    // 1. Clear title: check if title delete button exists and is active
+    const titleInput = document.querySelector(
+      'textarea[data-cy="editTitle"], div.inputTitle textarea, textarea[placeholder*="title"], textarea[placeholder*="Enter the title"]'
+    );
+    const hasTitle = Boolean(titleInput && titleInput.value && titleInput.value.trim().length > 0);
 
-    if (titleTrash) {
+    const titleTrash = document.querySelector(
+      'button[data-cy="deleteTitle"], div.inputTitle button:has(i.icon--trash)'
+    ) || Array.from(document.querySelectorAll('div.inputTitle button')).find((b) => {
+      const cls = b.getAttribute?.('class') || b.className || '';
+      if (cls.includes('disabled') || b.disabled) return false;
+      return cls.includes('icon--trash') || Boolean(b.querySelector?.('i.icon--trash, .icon--trash'));
+    });
+
+    const isTitleTrashDisabled = titleTrash ? Boolean(
+      titleTrash.disabled ||
+      titleTrash.classList?.contains('disabled') ||
+      (titleTrash.getAttribute?.('class') || '').includes('disabled')
+    ) : true;
+
+    if (titleTrash && !isTitleTrashDisabled && hasTitle) {
       logger.info('Freepik: Clicking title trash button');
       simulateClick(titleTrash);
       await sleep(150);
-    } else {
-      const titleEl = document.querySelector(
-        'div.inputTitle textarea, textarea[placeholder*="title"], textarea[placeholder*="Enter the title"]'
-      );
-      if (titleEl && titleEl.value) {
-        logger.info('Freepik: Clearing title textarea');
-        setNativeValue(titleEl, '');
-        await sleep(100);
-      }
+    } else if (titleInput && titleInput.value) {
+      logger.info('Freepik: Clearing title textarea via native value');
+      setNativeValue(titleInput, '');
+      await sleep(100);
     }
 
-    // 2. Clear keywords: click trash button in tag group if present, or click individual remove buttons
-    const kwTrash = findTrashButton('div.inputTag');
+    // 2. Clear keywords:
+    // Check if chips are present in the DOM
+    const chips = Array.from(document.querySelectorAll(
+      'div.inputTag__item, div[data-cy="commonTag"], .inputTag__item'
+    ));
 
-    if (kwTrash) {
-      logger.info('Freepik: Clicking keyword trash button');
-      simulateClick(kwTrash);
-      await sleep(150);
-    } else {
-      const removeButtons = Array.from(document.querySelectorAll('button.inputTag__remove'));
-      if (removeButtons.length > 0) {
-        logger.info(`Freepik: Removing ${removeButtons.length} individual tag chips`);
-        for (const btn of removeButtons) {
-          simulateClick(btn);
+    const kwTrash = document.querySelector(
+      'button[data-cy="deleteTags"], div.inputTag button:has(i.icon--trash)'
+    ) || Array.from(document.querySelectorAll('div.inputTag button')).find((b) => {
+      const cls = b.getAttribute?.('class') || b.className || '';
+      if (cls.includes('disabled') || b.disabled) return false;
+      return cls.includes('icon--trash') || Boolean(b.querySelector?.('i.icon--trash, .icon--trash'));
+    });
+
+    const isKwTrashDisabled = kwTrash ? Boolean(
+      kwTrash.disabled ||
+      kwTrash.classList?.contains('disabled') ||
+      (kwTrash.getAttribute?.('class') || '').includes('disabled')
+    ) : true;
+
+    if (chips.length > 0) {
+      if (kwTrash && !isKwTrashDisabled) {
+        logger.info(`Freepik: Clicking keyword trash button (${chips.length} chips present)`);
+        simulateClick(kwTrash);
+        await sleep(200);
+      } else {
+        // Fallback: Remove remaining individual tag chips if trash button is disabled or absent
+        const removeButtons = Array.from(document.querySelectorAll(
+          'button[data-cy="deleteTag"], button.inputTag__remove'
+        ));
+        if (removeButtons.length > 0) {
+          logger.info(`Freepik: Removing ${removeButtons.length} individual tag chips`);
+          for (const btn of removeButtons) {
+            simulateClick(btn);
+          }
+          await sleep(150);
         }
-        await sleep(150);
       }
+    } else {
+      logger.info('Freepik: No existing keyword chips found, skipping keyword clear');
+    }
+
+    // Clear any leftover raw text in the keyword input field
+    const rawTagInput = document.querySelector(
+      'input[data-cy="editTags"], #inputTag, div.inputTag input'
+    );
+    if (rawTagInput && rawTagInput.value) {
+      setNativeValue(rawTagInput, '');
     }
 
     return true;
@@ -225,7 +278,7 @@ export class FreepikAdapter extends BaseAdapter {
    * - Category: 100% omitted (automatically categorized by Freepik).
    * - AI declaration switch, base model selection, and prompt injection.
    * - Title single-string injection (clamped to max 100 characters).
-   * - Keyword comma-separated injection + Enter key simulation (max 50 tags).
+   * - Keyword comma-separated injection (clamped to 49 for AI assets, 50 for non-AI) + Enter key simulation.
    *
    * @param {Object} metadata - Sanitized metadata payload.
    * @param {Object} [options={}] - Options (isAiGenerated, aiModel, aiPrompt, etc.).
@@ -234,7 +287,10 @@ export class FreepikAdapter extends BaseAdapter {
   async fillMetadata(metadata, options = {}) {
     if (typeof document === 'undefined' || !metadata) return false;
 
-    // 0. Explicitly clear previous title & keywords before injecting new metadata
+    // 0. Dismiss any unexpected draft modal first
+    this.dismissDraftModal();
+
+    // Explicitly clear previous title & keywords before injecting new metadata
     await this.clearMetadata();
     await sleep(200);
 
@@ -244,69 +300,87 @@ export class FreepikAdapter extends BaseAdapter {
 
     // 2. Generative AI Declaration
     const isAi = Boolean(options.isAiGenerated ?? metadata.isAiGenerated);
-    const aiSwitch = document.querySelector(
+    const aiInput = document.querySelector(
       'div.aiSelector--container input.switch__input, label.switch.switch--sm input, label.switch input'
     );
+    const aiSwitchIndicator = document.querySelector(
+      'div.aiSelector--container span.switch__indicator, label.switch.aiSelector--check, div.aiSelector--container label.switch'
+    );
+    const isCurrentlyChecked = Boolean(
+      aiInput?.checked ||
+      aiInput?.getAttribute?.('checked') === 'true' ||
+      aiInput?.getAttribute?.('checked') === true ||
+      aiInput?.value === 'true' ||
+      aiInput?.closest?.('label.switch')?.classList?.contains('active')
+    );
 
-    if (aiSwitch) {
-      const isCurrentlyChecked = Boolean(
-        aiSwitch.checked ||
-        aiSwitch.getAttribute('checked') !== null ||
-        aiSwitch.value === 'true' ||
-        aiSwitch.closest?.('label.switch')?.classList?.contains('active')
-      );
-
-      try {
-        if (isAi && !isCurrentlyChecked) {
-          logger.step('Generative AI', 'Enabled');
-          simulateClick(aiSwitch);
-          await sleep(100);
-        } else if (!isAi && isCurrentlyChecked) {
-          logger.step('Generative AI', 'Disabled');
-          simulateClick(aiSwitch);
-          await sleep(100);
+    try {
+      if (isAi && !isCurrentlyChecked) {
+        logger.step('Generative AI', 'Enabled');
+        const clickTarget = aiSwitchIndicator || aiInput;
+        if (clickTarget) {
+          simulateClick(clickTarget);
+          if (aiInput) aiInput.checked = true;
+          await sleep(200);
         }
-      } catch (err) {
-        logger.warn('Freepik: AI declaration switch toggle warning', err.message);
+      } else if (!isAi && isCurrentlyChecked) {
+        logger.step('Generative AI', 'Disabled');
+        const clickTarget = aiSwitchIndicator || aiInput;
+        if (clickTarget) {
+          simulateClick(clickTarget);
+          if (aiInput) aiInput.checked = false;
+          await sleep(200);
+        }
       }
+    } catch (err) {
+      logger.warn('Freepik: AI declaration switch toggle warning', err.message);
+    }
 
-      if (isAi) {
-        // AI Base Model Selection
-        const targetModel = options.aiModel || metadata.aiModel || 'Midjourney 6';
-        logger.step('AI Model', targetModel);
-        const modelSelect = document.querySelector('div.selector_base_model select');
+    if (isAi) {
+      // AI Base Model Selection
+      const targetModel = options.aiModel || metadata.aiModel || 'Midjourney 6';
+      logger.step('AI Model', targetModel);
 
-        if (modelSelect) {
-          modelSelect.value = targetModel;
-          modelSelect.dispatchEvent(new Event('change', { bubbles: true }));
-        } else {
-          // Fallback for custom dropdown menu
-          const dropdownBtn = document.querySelector('div.selector_base_model div.dropdown__button');
-          if (dropdownBtn) {
+      const modelSelect = document.querySelector('div.selector_base_model select');
+      if (modelSelect) {
+        modelSelect.value = targetModel;
+        modelSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      } else {
+        // Custom dropdown: div.selector_base_model div.dropdown__button
+        const dropdownBtn = document.querySelector(
+          'div.selector_base_model div.dropdown__button, div.dropdown__container div.dropdown__button'
+        );
+        if (dropdownBtn) {
+          const currentBtnText = dropdownBtn.textContent?.trim().toLowerCase() || '';
+          if (!currentBtnText.includes(targetModel.toLowerCase())) {
             simulateClick(dropdownBtn);
-            await sleep(80);
+            await sleep(150);
 
             const optionsList = Array.from(document.querySelectorAll(
               'div.selector_base_model li, ul.dropdown__list li, div.dropdown__select li'
             ));
             const matchingOption = optionsList.find(
-              (li) => li.textContent?.trim().toLowerCase() === targetModel.toLowerCase()
+              (li) => (li.getAttribute?.('data-value') || '').toLowerCase() === targetModel.toLowerCase() ||
+                li.textContent?.trim().toLowerCase() === targetModel.toLowerCase()
             );
 
             if (matchingOption) {
               simulateClick(matchingOption);
+              await sleep(100);
             }
           }
         }
+      }
 
-        // AI Prompt injection
-        const promptText = options.aiPrompt || metadata.aiPrompt || options.prompt || '';
-        if (promptText) {
-          logger.step('AI Prompt', promptText.slice(0, 50) + (promptText.length > 50 ? '...' : ''));
-          const promptInput = document.querySelector('textarea#aiPrompt, textarea[placeholder*="prompt"]');
-          if (promptInput) {
-            setNativeValue(promptInput, promptText);
-          }
+      // AI Prompt injection
+      const promptText = options.aiPrompt || metadata.aiPrompt || options.prompt || '';
+      if (promptText) {
+        logger.step('AI Prompt', promptText.slice(0, 50) + (promptText.length > 50 ? '...' : ''));
+        const promptInput = document.querySelector(
+          'textarea#aiPrompt, textarea[placeholder*="prompt"], textarea[placeholder*="Enter your prompt"]'
+        );
+        if (promptInput) {
+          setNativeValue(promptInput, promptText);
         }
       }
     }
@@ -314,7 +388,7 @@ export class FreepikAdapter extends BaseAdapter {
     // 3. Title (Single-string instant injection, clamped to max 100 characters)
     if (metadata.title) {
       const titleInput = document.querySelector(
-        'div.inputTitle textarea, textarea[placeholder*="title"], textarea[placeholder*="Enter the title"]'
+        'textarea[data-cy="editTitle"], div.inputTitle textarea, textarea[placeholder*="title"], textarea[placeholder*="Enter the title"]'
       );
       if (titleInput) {
         const cleanTitle = String(metadata.title).slice(0, 100);
@@ -323,16 +397,17 @@ export class FreepikAdapter extends BaseAdapter {
       }
     }
 
-    // 4. Keywords (Comma-separated chip injection clamped to 50 tags max + Enter key)
+    // 4. Keywords (Comma-separated chip injection clamped to 49 tags for AI, 50 tags for non-AI + Enter key)
     if (metadata.keywords) {
-      const tagInput = document.querySelector('#inputTag, div.inputTag input');
+      const tagInput = document.querySelector('input[data-cy="editTags"], #inputTag, div.inputTag input');
       if (tagInput) {
+        const maxAllowedTags = isAi ? 49 : 50;
         const tagList = Array.isArray(metadata.keywords)
           ? metadata.keywords
           : String(metadata.keywords).split(',').map((t) => t.trim()).filter(Boolean);
-        const tagsString = tagList.slice(0, 50).join(', ') + ',';
+        const tagsString = tagList.slice(0, maxAllowedTags).join(', ') + ',';
 
-        logger.step('Keywords', `${tagList.slice(0, 50).length} tags injected`);
+        logger.step('Keywords', `${tagList.slice(0, maxAllowedTags).length} tags injected (max ${maxAllowedTags} for ${isAi ? 'AI asset' : 'standard asset'})`);
         setNativeValue(tagInput, tagsString);
         simulateEnterKey(tagInput);
       }
@@ -342,45 +417,73 @@ export class FreepikAdapter extends BaseAdapter {
   }
 
   /**
-   * Saves metadata draft for currently selected asset.
+   * Saves metadata for currently selected asset.
    * MANDATORY PER-ITEM PERSISTENCE:
-   * Triggers button.button-paste-draft ("Create draft"), awaits spinner completion,
-   * and awaits button disabled state before proceeding to next card.
+   * Triggers button[data-cy="savePreitems"] (containing i.icon--save) in sidebar header.
+   * Strictly avoids button.button-paste-draft ("Create draft") which is a template management modal.
    *
-   * @returns {Promise<boolean>} True if draft saved successfully.
+   * @returns {Promise<boolean>} True if saved successfully.
    */
   async saveDraft() {
     if (typeof document === 'undefined') return true;
-    logger.step('Freepik: Saving item draft ("Create draft")');
+    logger.step('Freepik: Saving item metadata');
 
-    const draftBtn = document.querySelector('button.button-paste-draft') ||
-      Array.from(document.querySelectorAll('button')).find(
-        (b) => b.textContent && b.textContent.includes('Create draft')
+    // First dismiss any unexpected draft modal if open
+    this.dismissDraftModal();
+
+    // Locate the actual save button (data-cy="savePreitems" with icon--save)
+    let saveBtn = document.querySelector(
+      'button[data-cy="savePreitems"], aside.catalog__sidebar button:has(i.icon--save), button:has(i.icon--save)'
+    );
+
+    if (!saveBtn) {
+      saveBtn = Array.from(document.querySelectorAll('aside.catalog__sidebar button, button')).find(
+        (b) => {
+          const cls = b.getAttribute?.('class') || b.className || '';
+          if (cls.includes('button-paste-draft') || cls.includes('catalog__draft')) return false;
+          return Boolean(b.querySelector?.('i.icon--save, .icon--save'));
+        }
       );
-
-    if (draftBtn) {
-      simulateClick(draftBtn);
-      logger.info('Freepik: Waiting for draft save spinner to complete');
-
-      try {
-        await waitForElementToDisappear(
-          'button.button-paste-draft span.spinner, button.button-paste-draft i.icon--loading, span.spinner',
-          typeof document !== 'undefined' ? document : null,
-          4000
-        );
-      } catch {
-        // Continue if spinner wait times out
-      }
-
-      if (!draftBtn.disabled) {
-        await sleep(400);
-      }
-
-      logger.success('Freepik: Item draft saved successfully');
-      return true;
     }
 
-    return false;
+    if (!saveBtn) {
+      logger.warn('Freepik: Save button not found');
+      return false;
+    }
+
+    // Wait briefly if save button is still disabled while Vue processes input changes
+    const isSaveDisabled = (btn) => Boolean(
+      btn.disabled ||
+      btn.classList?.contains('disabled') ||
+      (btn.getAttribute?.('class') || '').includes('disabled')
+    );
+
+    if (isSaveDisabled(saveBtn)) {
+      // Poll up to 1000ms for button to become enabled after input
+      const startTime = Date.now();
+      while (Date.now() - startTime < 1000) {
+        await sleep(100);
+        if (!isSaveDisabled(saveBtn)) break;
+      }
+    }
+
+    simulateClick(saveBtn);
+    logger.info('Freepik: Clicked Save button, waiting for save completion');
+
+    // Wait for save spinner to complete if present
+    try {
+      await waitForElementToDisappear(
+        'button[data-cy="savePreitems"] span.spinner, button[data-cy="savePreitems"] i.icon--loading, span.spinner',
+        typeof document !== 'undefined' ? document : null,
+        3000
+      );
+    } catch {
+      // Continue if spinner wait times out
+    }
+
+    await sleep(350);
+    logger.success('Freepik: Item metadata saved successfully');
+    return true;
   }
 
   /**

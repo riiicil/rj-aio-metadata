@@ -8,15 +8,21 @@
 
 - **Current Milestone**: Phase 4: Platform Adapters (Freepik / Magnific Rebranding & Live Bugfixes Complete; Shutterstock & Adobe Stock Live Fixes Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(freepik): eliminate card double-click, deduplicate simulateClick, and verify active asset selection`
+- **Latest Commit**: `fix(freepik): target icon--save for draft commit, clamp ai keywords to 49, and refine delete selectors`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (672/672 assertions passed across all test suites, zero emoji clean)
+- **Build / Test State**: Verified healthy (674/674 assertions passed across all test suites, zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
 Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1 platforms, and extended Freepik support to the Magnific rebranding:
+1. **Freepik (Magnific) Workflow Alignment & Save Button Fix (`contributor.magnific.com`)**:
+   - Replaced `button.button-paste-draft` ("Create draft" template preset feature) in `FreepikAdapter.saveDraft()` with the actual asset save button `button[data-cy="savePreitems"]` (`<i class="icon--save"></i>`) in the sidebar header, eliminating the unexpected "Create a draft" modal dialog.
+   - Added `dismissDraftModal()` helper to automatically close any stray draft modal.
+   - Refined `clearMetadata()` to strictly use `button[data-cy="deleteTitle"]` and `button[data-cy="deleteTags"]`, verifying existing chips before clicking and skipping empty keyword fields completely.
+   - Directed AI switch clicks to `span.switch__indicator` / `label.switch.aiSelector--check` to resolve Vue `TypeError: Cannot read properties of null (reading 'id')`.
+   - Clamped Freepik AI keyword injection to **49 tags** (accounting for Freepik's 1 platform-injected tag to prevent 51/50 overflow) across `FreepikAdapter.js`, `src/popup/popup.js`, and `src/overlay/overlay.js`.
 1. **Freepik (Magnific) Card Selection & simulateClick Deduplication (`contributor.magnific.com`)**:
    - Resolved `"Select 0/2"` and blocked metadata form by removing redundant second click on `cardElement` in `FreepikAdapter.js:selectCard()`.
    - Fixed `simulateClick()` in `src/adapters/utils/dom_helpers.js` which previously fired both synthetic `click` MouseEvent and native `element.click()`, causing double clicks in browser environments.
@@ -77,6 +83,8 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 37 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Target button[data-cy="savePreitems"] (icon--save) for saving item, clamp AI keywords to 49, skip keyword clear when no chips exist | Live browser verification on Magnific / Freepik |
+| 36 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Eliminate card double-click, deduplicate simulateClick in browser, poll active asset selection in waitForEditorReady | Live browser verification on Magnific / Freepik |
 | 35 | 2026-09-10 | `task/platform-adapters` | `feat(freepik)` | Add support for contributor.magnific.com rebranding in manifest, overlay, background worker, popup UI, and integrate LoggerService | Live browser verification on Magnific / Freepik |
 | 34 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Auto-clear editorial prefix on toggle off, tighten Shutterstock chip detection on empty assets, prioritize local storage to fix model saving quota | Live browser verification on Shutterstock |
 | 33 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Async spelling auto-correct polling, save button spinner resolution wait, post-save deselect page, responsive cooldown stop | Live browser testing on Shutterstock |

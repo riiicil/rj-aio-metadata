@@ -690,6 +690,13 @@ export class OverlayHUD {
     const aiToggle = this.shadow.querySelector('#rjToggleAiDeclaration');
     if (aiToggle) {
       aiToggle.addEventListener('change', () => {
+        if (this.platformId === 'freepik') {
+          if (aiToggle.checked && inputCount && Number(inputCount.value) >= 50) {
+            inputCount.value = 49;
+          } else if (!aiToggle.checked && inputCount && Number(inputCount.value) === 49) {
+            inputCount.value = 50;
+          }
+        }
         this.saveFormStateToStorage();
       });
     }
@@ -978,12 +985,15 @@ export class OverlayHUD {
           // Step 4: AI Metadata Generation
           if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving card)...' : 'Generating AI...';
 
-          const keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 50;
+          let keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 50;
           const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
           const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
           const isAiGenerated = (this.platformId !== 'shutterstock' && this.platformId !== 'depositphotos')
             ? Boolean(this.shadow?.querySelector('#rjToggleAiDeclaration')?.checked)
             : false;
+          if (this.platformId === 'freepik' && isAiGenerated) {
+            keywordCount = Math.min(keywordCount, 49);
+          }
           const isShutterstockEditorial = this.platformId === 'shutterstock' && Boolean(this.currentConfig?.platformSettings?.shutterstock?.isEditorial);
           const editorialPrefix = isShutterstockEditorial ? (this.currentConfig?.platformSettings?.shutterstock?.editorialPrefix || '') : '';
           const language = this.currentConfig?.platformSettings?.[this.platformId]?.language || 'en';
@@ -1258,6 +1268,14 @@ export class OverlayHUD {
     if (aiToggle && platSettings.isAiGenerated !== undefined) {
       aiToggle.checked = Boolean(platSettings.isAiGenerated);
     }
+
+    if (inputCount && inputCount !== this.shadow.activeElement) {
+      let val = typeof platSettings.keywordCount === 'number' ? platSettings.keywordCount : limits.max;
+      if (this.platformId === 'freepik' && aiToggle?.checked && val > 49) {
+        val = 49;
+      }
+      inputCount.value = Math.max(limits.min, Math.min(limits.max, val));
+    }
   }
 
   /**
@@ -1273,9 +1291,12 @@ export class OverlayHUD {
       const specificInput = this.shadow?.querySelector('#rjInputSpecificKeywords');
       const aiToggle = this.shadow?.querySelector('#rjToggleAiDeclaration');
 
-      const keywordCount = countInput ? Math.max(limits.min, Math.min(limits.max, Number(countInput.value) || limits.max)) : limits.max;
+      let keywordCount = countInput ? Math.max(limits.min, Math.min(limits.max, Number(countInput.value) || limits.max)) : limits.max;
       const specificKeywords = specificInput ? specificInput.value.trim() : '';
       const isAiGenerated = aiToggle ? aiToggle.checked : false;
+      if (this.platformId === 'freepik' && isAiGenerated && keywordCount > 49) {
+        keywordCount = 49;
+      }
 
       const localStore = chrome.storage.local;
       const syncStore = chrome.storage.sync;
