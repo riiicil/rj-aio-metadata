@@ -66,6 +66,26 @@ export async function imageToBase64(imageSource) {
 
   // 2. HTTP / HTTPS / Blob URL
   if (/^(https?:\/\/|blob:)/i.test(str)) {
+    // If running in browser extension and it's an HTTP/HTTPS URL, proxy via background worker to bypass CORS
+    if (/^https?:\/\//i.test(str) && typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
+      try {
+        const bgRes = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({ action: 'FETCH_IMAGE_AS_BASE64', url: str }, response => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve(response);
+            }
+          });
+        });
+        if (bgRes && bgRes.success && bgRes.dataUrl) {
+          return bgRes.dataUrl;
+        }
+      } catch {
+        // Fall back to direct fetch if background communication fails
+      }
+    }
+
     const res = await fetch(str);
     if (!res.ok) {
       const err = new Error(`Failed to fetch image from URL: ${str} (Status: ${res.status})`);

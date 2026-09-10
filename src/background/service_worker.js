@@ -448,9 +448,48 @@ export async function handleGenerateVisionMetadata(request, { fetchFn, sleepFn, 
   };
 }
 
+/**
+ * Fetches a cross-origin image using background worker host_permissions and returns it as a base64 Data URL.
+ * Bypasses content script CORS restrictions for CDN-hosted thumbnails.
+ *
+ * @param {string} imageUrl - Cross-origin image URL.
+ * @returns {Promise<string>} base64 Data URL.
+ */
+export async function fetchImageAsBase64(imageUrl) {
+  if (!imageUrl) {
+    throw new Error('Image URL is required.');
+  }
+
+  const response = await fetch(imageUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image from URL: ${imageUrl} (Status: ${response.status})`);
+  }
+
+  const blob = await response.blob();
+  const arrayBuffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+
+  const base64 = btoa(binary);
+  const contentType = blob.type || response.headers.get('content-type') || 'image/jpeg';
+  return `data:${contentType};base64,${base64}`;
+}
+
 // Runtime message dispatcher
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'FETCH_IMAGE_AS_BASE64') {
+      fetchImageAsBase64(message.url)
+        .then(dataUrl => sendResponse({ success: true, dataUrl }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true; // Keep message channel open for async response
+    }
+
     if (message.action === 'GENERATE_VISION_METADATA') {
       handleGenerateVisionMetadata(message)
         .then(result => sendResponse(result))

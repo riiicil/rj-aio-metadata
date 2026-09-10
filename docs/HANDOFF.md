@@ -6,34 +6,43 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 4: Platform Adapters (LoggerService Implemented, Adobe Stock Live Bugfixes Round 5 & Overlay Deferred Clearing Verified)
+- **Current Milestone**: Phase 4: Platform Adapters (Shutterstock CORS Background Proxy & Deep MUI Selectors Complete; Adobe Stock Live Verified)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `feat(logging): implement LoggerService, wire into AdobeStockAdapter, and disable global clearMetadata in overlay`
+- **Latest Commit**: `fix(shutterstock): bypass CORS via background image proxy, refactor deep MUI selectors, and wire LoggerService`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (336/336 assertions passed across test_subphase_4_6.mjs [57/57], test_tier1_adapters.mjs [78/78], test_tier2_adapters.mjs [94/94], test_tier3_adapters.mjs [107/107], zero emoji clean)
+- **Build / Test State**: Verified healthy (666/666 assertions passed across all 9 test suites, zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 4 has completed live in-page bugfixing Rounds 1-5 on Adobe Stock Contributor (`contributor.stock.adobe.com`):
-1. **Deferred Metadata Clearing (`src/overlay/overlay.js` & `src/adapters/AdobeStockAdapter.js`)**:
-   - Step 5 in `overlay.js` is skipped for Adobe Stock (`this.platformId !== 'adobestock'`), ensuring existing title and keywords are not cleared prematurely before Category, Releases, and Language are configured.
-   - Title and keywords are cleared surgically inside `fillMetadata()` right before new values are typed.
-2. **Strict Save Work Button Targeting (`src/adapters/AdobeStockAdapter.js`)**:
-   - Avoided accidental click of the green moderation submit button (`Submit N files`).
-   - Implemented `_findSaveWorkButton()` to query `button[data-t="save-work"]` and filter button text matching "Save work" / "Save" while strictly rejecting any button containing "submit", "kirim", or "review".
-3. **Non-AI Release Switch Handling (`src/adapters/AdobeStockAdapter.js`)**:
-   - When `isAiGenerated === false`, unchecks AI declaration and automatically selects the "No" radio button for *"Recognizable people or property?"* (`input[data-t="has-release-no"]`, `input[name="hasReleases"][value="no"]`), with switch label container fallbacks.
-   - Applied in both per-card `fillMetadata()` and post-automation `bulkSave()`.
+Phase 4 has resolved the cross-origin thumbnail fetch barrier and completed live in-page bugfixing across Tier 1 platforms:
+1. **Shutterstock CORS Image Proxy (`src/background/service_worker.js` & `src/services/AiService.js`)**:
+   - Resolved `Access to fetch at ... has been blocked by CORS policy` when downloading thumbnails from `cdn.shutterstock.com`.
+   - Delegated HTTP/HTTPS image fetching to `service_worker.js` (`FETCH_IMAGE_AS_BASE64`) leveraging extension `host_permissions` without CORS restrictions.
+   - Retained local `blob:` URLs and unit test direct fetch fallbacks in `imageToBase64()`.
+2. **Deep Material-UI Selectors & Workflow in `ShutterstockAdapter.js` (`src/adapters/ShutterstockAdapter.js`)**:
+   - Targeted innermost elements: `textarea.MuiInputBase-input`, `div[role="button"]` / `[role="combobox"]` for Category 1 & 2 with text normalization ("The Arts" <-> "Arts"), `keyword-input-text input.MuiInputBase-input` with Enter simulation, and spelling warning approval ("Mark all as correct" / "Mark all keywords as correct").
+   - Usage toggle: Material-UI toggle buttons `button[data-testid="button-editorial"]` vs `button[data-testid="button-commercial"]` inside `div[data-testid="usage-toggle"]`.
+   - Integrated sequential keyword clearing via 3-dots menu (`button[data-testid="more-keyword-actions-button"]` -> `[data-testid="clear-action"]`).
+   - Bulk save: Target first card checkbox, toolbar `button[data-testid="select-page-button"]`, sidebar `button[data-testid="edit-dialog-save-button"]`, and close drawer.
+   - Video (19 categories) vs Image (26 categories) shared workflow supported.
+   - Tightened interaction delays (~200ms-400ms).
+3. **Centralized LoggerService Integration**:
+   - `ShutterstockAdapter.js` now uses `(this.logger || logger).step()`, `.info()`, and `.success()` across every single interaction step.
+4. **Adobe Stock Live Fixes Round 1-5 Verified**:
+   - Strict element sequence, non-AI releases switch to "No", and strict Save work button selector.
 
 ---
 
 ## 3. Actionable Next Steps for Incoming Agent (Phase 5)
 
-1. **Step 1 (Branch Review & Integration)**:
-   - User reviews Phase 4 changes on `task/platform-adapters` and merges into `dev` using `git merge --no-ff`.
-   - Switch or branch off `dev` for `task/phase5-e2e-testing`.
+1. **Step 1 (Live Browser Verification on Shutterstock)**:
+   - Contributor reloads unpacked extension (`chrome://extensions`).
+   - Runs automation on `submit.shutterstock.com/portfolio/not_submitted/photo` or `/video`.
+   - Confirms zero CORS errors, accurate field filling, and console log output.
+2. **Step 2 (Branch Review & Integration)**:
+   - Contributor reviews Phase 4 changes on `task/platform-adapters` and merges into `dev` using `git merge --no-ff`.
 
 ---
 
@@ -41,7 +50,8 @@ Phase 4 has completed live in-page bugfixing Rounds 1-5 on Adobe Stock Contribut
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| 31 | 2026-09-10 | `task/platform-adapters` | `fix(adobestock)` | Non-AI release switch to No, strict Save work button selector (avoid submit), deferred in-form clearing for Adobe Stock, verified 336/336 tests | Phase 5: End-to-End Live Browser Testing & Polish |
+| 32 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Background CORS image proxy, deepest MUI selectors, sequential clearing, tightened delays, LoggerService wired, 666/666 tests pass | Live browser testing on Shutterstock |
+| 31 | 2026-09-10 | `task/platform-adapters` | `feat(logging)` | Implemented LoggerService.js, wired into AdobeStockAdapter, disabled global clearMetadata in overlay, verified 336/336 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 2. **Step 2 (Phase 5: End-to-End Live Browser Testing & Polish)**:
    - Load unpacked extension into Chromium browser (`chrome://extensions`).
    - Live browser testing across available contributor dashboards (Adobe Stock, Shutterstock, Freepik, Vecteezy, Dreamstime, Depositphotos, MiriCanvas).
