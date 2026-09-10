@@ -453,61 +453,101 @@ export class VecteezyAdapter extends BaseAdapter {
 
         this.logger.step('AI Software', software);
 
-        // Open MUI Select dropdown trigger inside ai-generated-section
-        const dropdownTrigger = editorForm.querySelector(
-          'div[data-testid="ai-software-dropdown"] div[role="button"], div[data-testid="ai-software-dropdown"], div[data-testid="ai-generated-section"] div[role="button"], div[data-testid="ai-generated-section"] div.MuiSelect-select'
-        );
+        // 1. Wait for dropdown container to be mounted by React
+        let dropdown = null;
+        for (let i = 0; i < 20; i++) {
+          dropdown = editorForm.querySelector('div[data-testid="ai-software-dropdown"]') ||
+            document.querySelector('div[data-testid="ai-software-dropdown"]') ||
+            aiSection?.querySelector('div[data-testid="ai-software-dropdown"]') ||
+            aiSection;
+          if (dropdown && (dropdown.getAttribute?.('data-testid') === 'ai-software-dropdown' || dropdown.querySelector?.('div.MuiSelect-select, div[role="button"]'))) {
+            break;
+          }
+          await sleep(100);
+        }
+
+        const dropdownTrigger = dropdown?.querySelector?.('div.MuiSelect-select, div[role="button"]') ||
+          editorForm.querySelector('div[data-testid="ai-software-dropdown"] div[role="button"], div[data-testid="ai-software-dropdown"]') ||
+          dropdown;
+
         if (dropdownTrigger) {
-          simulateClick(dropdownTrigger);
-          await sleep(200);
+          this.logger.info('Vecteezy: Opening AI software dropdown');
+          try {
+            dropdownTrigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+          } catch {}
+          if (typeof dropdownTrigger.click === 'function') {
+            dropdownTrigger.click();
+          }
+          await sleep(250);
+        } else {
+          this.logger.warn('Vecteezy: AI software dropdown trigger not found');
         }
 
         const isOther = normSoftware === 'other' || Boolean(customTool) ||
           (!normSoftware.includes('midjourney') && !normSoftware.includes('stable') && !normSoftware.includes('dall'));
 
-        if (!isOther) {
-          // Standard generator selection: midjourney, stable_diffusion, dall_e
-          let targetDataVal = 'midjourney';
-          if (normSoftware.includes('stable')) {
-            targetDataVal = 'stable_diffusion';
-          } else if (normSoftware.includes('dall')) {
-            targetDataVal = 'dall_e';
-          }
+        let targetDataVal = 'midjourney';
+        if (normSoftware.includes('stable')) {
+          targetDataVal = 'stable_diffusion';
+        } else if (normSoftware.includes('dall')) {
+          targetDataVal = 'dall_e';
+        } else if (isOther) {
+          targetDataVal = 'other';
+        }
 
-          const optionEl = document.querySelector(`li[data-value="${targetDataVal}"]`) ||
+        // 2. Poll for the listbox options popover to appear in document
+        let optionEl = null;
+        for (let i = 0; i < 20; i++) {
+          optionEl = document.querySelector(`li[data-value="${targetDataVal}"]`) ||
             Array.from(document.querySelectorAll('li.MuiMenuItem-root, ul[role="listbox"] li, li')).find(
-              (li) => li.textContent && li.textContent.trim().toLowerCase().includes(normSoftware)
+              (li) => {
+                const val = li.getAttribute?.('data-value') || '';
+                const txt = (li.textContent || '').trim().toLowerCase();
+                if (targetDataVal === 'dall_e') return val === 'dall_e' || txt.includes('dall');
+                if (targetDataVal === 'stable_diffusion') return val === 'stable_diffusion' || txt.includes('stable');
+                if (targetDataVal === 'midjourney') return val === 'midjourney' || txt.includes('midjourney');
+                if (targetDataVal === 'other') return val === 'other' || txt.includes('other');
+                return txt.includes(normSoftware);
+              }
             );
+          if (optionEl) break;
+          await sleep(100);
+        }
 
-          if (optionEl) {
-            simulateClick(optionEl);
-            await sleep(200);
-          }
-        } else {
-          // "Other" workflow: select "other" option then inject custom software name
-          const otherOption = document.querySelector('li[data-value="other"]') ||
-            Array.from(document.querySelectorAll('li.MuiMenuItem-root, ul[role="listbox"] li, li')).find(
-              (li) => li.textContent && li.textContent.trim().toLowerCase().includes('other')
-            );
+        if (optionEl) {
+          this.logger.info(`Vecteezy: Selecting software option "${targetDataVal}"`);
+          try {
+            optionEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+          } catch {}
+          simulateClick(optionEl);
+          await sleep(250);
 
-          if (otherOption) {
-            simulateClick(otherOption);
-            await sleep(200);
-          }
+          if (isOther) {
+            // "Other" workflow: select "other" option then inject custom software name
+            const customSoftwareName = customTool || (normSoftware === 'other' ? '' : software) || 'Custom AI';
+            if (customSoftwareName) {
+              this.logger.step('Custom Software', customSoftwareName);
+              let customInput = null;
+              for (let j = 0; j < 15; j++) {
+                customInput = document.querySelector(
+                  'div[data-testid="other-text-input"] input, div.MuiPopover-paper input#undefined-input, div.MuiPopover-paper input[type="text"]'
+                ) || editorForm.querySelector(
+                  'div[data-testid="ai-generated-section"] input#undefined-input, div[data-testid="ai-generated-section"] input[type="text"], div[data-testid="ai-generated-section"] input[required]'
+                );
+                if (customInput) break;
+                await sleep(100);
+              }
 
-          const customSoftwareName = customTool || (normSoftware === 'other' ? '' : software) || 'Custom AI';
-          if (customSoftwareName) {
-            this.logger.step('Custom Software', customSoftwareName);
-            const customInput = document.querySelector(
-              'div[data-testid="other-text-input"] input, div.MuiPopover-paper input#undefined-input, div.MuiPopover-paper input[type="text"]'
-            ) || editorForm.querySelector(
-              'div[data-testid="ai-generated-section"] input#undefined-input, div[data-testid="ai-generated-section"] input[type="text"], div[data-testid="ai-generated-section"] input[required]'
-            );
-            if (customInput) {
-              setNativeValue(customInput, customSoftwareName);
-              await sleep(100);
+              if (customInput) {
+                setNativeValue(customInput, customSoftwareName);
+                await sleep(100);
+              } else {
+                this.logger.warn('Vecteezy: Custom software text input not found in popover');
+              }
             }
           }
+        } else {
+          this.logger.warn(`Vecteezy: Option for "${software}" (${targetDataVal}) not found in dropdown list`);
         }
       }
     }

@@ -7,7 +7,7 @@
 ## 1. Immediate Operational State
 - **Current Milestone**: Phase 4: Platform Adapters (Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Live Fixes Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(vecteezy): direct click and prototype setter for ai checkbox toggle`
+- **Latest Commit**: `fix(vecteezy): poll dropdown mount, dispatch mousedown to open mui select, and resolve options reliably`
 - **Working Tree**: Clean local branch
 - **Build / Test State**: Verified healthy (678/678 assertions passed across all test suites, zero emoji clean)
 
@@ -26,6 +26,7 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
    - Full `LoggerService` integration across all steps (`(this.logger || logger).step()`, `.info()`, `.success()`).
    - Verified clean graceful stop flow triggering `bulkSave()` without unhandled exceptions.
    - **Direct Input Checkbox Click & Prototype Setter**: Updated `fillMetadata()` to click the native `<input>` element directly (rather than the wrapper `<span>`), eliminating manual property assignment that corrupted React 18's internal `_valueTracker`. Added `setNativeCheckbox()` fallback invoking `HTMLInputElement.prototype.checked` setter and dispatching synthetic events.
+   - **AI Software Dropdown Polling & Mousedown Open**: Waits for React to mount `div[data-testid="ai-software-dropdown"]` (up to 2000ms), dispatches `mousedown` + `click` to trigger Material-UI Select open handler, polls for options popover (`ul[role="listbox"] li`), dispatches `mousedown` + click on target option (`dall_e`, `midjourney`, `stable_diffusion`, `other`), and injects custom software name if "Other" is selected.
    - **Sequential Per-Tag Keywords**: Loops through keywords one by one, setting individual tag text and simulating `Enter` + `Comma` key events to prevent Vecteezy from merging the whole string into a single invalid red chip (`No Special Characters`).
 2. **Freepik (Magnific) Card Selection & simulateClick Deduplication (`contributor.magnific.com`)**:
    - Resolved `"Select 0/2"` and blocked metadata form by removing redundant second click on `cardElement` in `FreepikAdapter.js:selectCard()`.
