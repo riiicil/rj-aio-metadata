@@ -71,9 +71,17 @@ export class BaseAdapter {
     throw new Error('fillMetadata() must be implemented by subclass');
   }
 
-  // =========================================================================
-  // Virtual Lifecycle Methods (Standard default behaviors, overridable)
-  // =========================================================================
+  /**
+   * Pre-automation preparation hook executed once immediately after startAutomation()
+   * and before beginning the sequential card processing loop.
+   * Useful for resetting platform-level states (e.g. global select-all checkboxes).
+   * Default implementation is a safe no-op.
+   *
+   * @returns {Promise<boolean>} True if preparation succeeded.
+   */
+  async prepareAutomation() {
+    return true;
+  }
 
   /**
    * Waits for the asset editor form / sidebar to become interactive after card selection.

@@ -17,7 +17,12 @@
 ## 2. Active In-Flight Context
 
 Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1 platforms, and extended Freepik support to the Magnific rebranding:
-1. **Freepik (Magnific) Workflow Alignment & Save Button Fix (`contributor.magnific.com`)**:
+1. **Freepik (Magnific) AI Model Dropdown, Pacing, and Pre-Automation Deselect Hook (`contributor.magnific.com`)**:
+   - Prioritized custom Vue dropdown UI (`div.selector_base_model div.dropdown__button`, `div.dropdown__select li[data-value]`) over native hidden `<select>`, resolving the root cause where AI model selection was ignored by Vue.
+   - Added 500ms delays before/after clicking the AI declaration toggle, and before/after selecting the AI base model.
+   - Verified non-AI mode flow: when `!isAi && isCurrentlyChecked`, explicitly toggles OFF the AI declaration switch with 500ms pacing.
+   - Added pre-automation header select-all deselection hook (`BaseAdapter.prepareAutomation()`, `overlay.js`, and `FreepikAdapter.prepareAutomation()`): checks `<input data-v-f08075b8="" type="checkbox">` / `.checkbox-dropdown__content.full` once at start; if active ("Select 2/2"), deselects all assets before processing card 1.
+2. **Freepik (Magnific) Workflow Alignment & Save Button Fix (`contributor.magnific.com`)**:
    - Replaced `button.button-paste-draft` ("Create draft" template preset feature) in `FreepikAdapter.saveDraft()` with the actual asset save button `button[data-cy="savePreitems"]` (`<i class="icon--save"></i>`) in the sidebar header, eliminating the unexpected "Create a draft" modal dialog.
    - Added `dismissDraftModal()` helper to automatically close any stray draft modal.
    - Refined `clearMetadata()` to strictly use `button[data-cy="deleteTitle"]` and `button[data-cy="deleteTags"]`, verifying existing chips before clicking and skipping empty keyword fields completely.
@@ -83,6 +88,7 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 38 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Prioritize custom dropdown for AI model, add 500ms interaction pacing, check & toggle off AI in non-AI mode, and add pre-start deselect hook | Live browser verification on Magnific / Freepik |
 | 37 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Target button[data-cy="savePreitems"] (icon--save) for saving item, clamp AI keywords to 49, skip keyword clear when no chips exist | Live browser verification on Magnific / Freepik |
 | 36 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Eliminate card double-click, deduplicate simulateClick in browser, poll active asset selection in waitForEditorReady | Live browser verification on Magnific / Freepik |
 | 35 | 2026-09-10 | `task/platform-adapters` | `feat(freepik)` | Add support for contributor.magnific.com rebranding in manifest, overlay, background worker, popup UI, and integrate LoggerService | Live browser verification on Magnific / Freepik |

@@ -169,6 +169,66 @@ export class FreepikAdapter extends BaseAdapter {
   }
 
   /**
+   * Pre-automation preparation hook executed once immediately after starting automation
+   * and before beginning the sequential card processing loop.
+   * Checks if the header select-all checkbox (<input data-v-f08075b8="" type="checkbox">)
+   * is currently active (e.g. batch-selected state "Select 2/2").
+   * If active, clicks it to deselect all assets before processing the first card.
+   * If already inactive (e.g. "Select 0/2"), skips cleanly.
+   *
+   * @returns {Promise<boolean>} True if check completed.
+   */
+  async prepareAutomation() {
+    if (typeof document === 'undefined') return true;
+
+    try {
+      const selectAllInput = document.querySelector(
+        'div[data-cy="filterSelect"] input[type="checkbox"], input[data-v-f08075b8][type="checkbox"], div.checkbox-dropdown input[type="checkbox"]'
+      );
+      const dropdownContent = document.querySelector(
+        'div[data-cy="filterSelect"] .checkbox-dropdown__content, .checkbox-dropdown__content'
+      );
+      const isFullOrPartial = Boolean(
+        dropdownContent && (
+          dropdownContent.classList.contains('full') ||
+          dropdownContent.classList.contains('partial') ||
+          (dropdownContent.getAttribute('class') || '').includes('full') ||
+          (dropdownContent.getAttribute('class') || '').includes('partial')
+        )
+      );
+      const isCatalogActive = Boolean(document.querySelector('.catalog__actions.active'));
+      const isInputChecked = Boolean(
+        selectAllInput && (
+          typeof selectAllInput.checked === 'boolean'
+            ? selectAllInput.checked
+            : (selectAllInput.getAttribute?.('checked') === 'true' || selectAllInput.getAttribute?.('checked') === true)
+        )
+      );
+
+      const isSelectAllActive = Boolean(isFullOrPartial || isCatalogActive || isInputChecked);
+
+      if (isSelectAllActive) {
+        logger.info('Freepik: Header select-all checkbox is active, clicking to deselect all assets');
+        const clickTarget = selectAllInput?.closest?.('label') ||
+          document.querySelector('div[data-cy="filterSelect"] label, label[data-v-f08075b8]') ||
+          selectAllInput;
+
+        if (clickTarget) {
+          simulateClick(clickTarget);
+          if (selectAllInput) selectAllInput.checked = false;
+          await sleep(500);
+        }
+      } else {
+        logger.info('Freepik: Header select-all checkbox is already inactive, proceeding directly');
+      }
+    } catch (err) {
+      logger.warn('Freepik: Pre-automation select-all check warning:', err.message);
+    }
+
+    return true;
+  }
+
+  /**
    * Clears old metadata fields (title, keywords) prior to new injection.
    * Strictly avoids clicking template draft buttons.
    * Only clears keywords if keyword chips exist and deleteTags button is active.
@@ -316,20 +376,22 @@ export class FreepikAdapter extends BaseAdapter {
 
     try {
       if (isAi && !isCurrentlyChecked) {
+        await sleep(500);
         logger.step('Generative AI', 'Enabled');
         const clickTarget = aiSwitchIndicator || aiInput;
         if (clickTarget) {
           simulateClick(clickTarget);
           if (aiInput) aiInput.checked = true;
-          await sleep(200);
+          await sleep(500);
         }
       } else if (!isAi && isCurrentlyChecked) {
+        await sleep(500);
         logger.step('Generative AI', 'Disabled');
         const clickTarget = aiSwitchIndicator || aiInput;
         if (clickTarget) {
           simulateClick(clickTarget);
           if (aiInput) aiInput.checked = false;
-          await sleep(200);
+          await sleep(500);
         }
       }
     } catch (err) {
@@ -341,35 +403,53 @@ export class FreepikAdapter extends BaseAdapter {
       const targetModel = options.aiModel || metadata.aiModel || 'Midjourney 6';
       logger.step('AI Model', targetModel);
 
+      // Delay before selecting AI model
+      await sleep(500);
+
+      // Prioritize Custom Dropdown FIRST (Freepik/Magnific uses Vue custom dropdown, not native select)
+      const dropdownBtn = document.querySelector(
+        'div.selector_base_model div.dropdown__button, div.dropdown__container div.dropdown__button, div.selector_base_model p.line-height-xs'
+      );
+      if (dropdownBtn) {
+        const currentBtnText = dropdownBtn.textContent?.trim().toLowerCase() || '';
+        if (!currentBtnText.includes(targetModel.toLowerCase())) {
+          simulateClick(dropdownBtn);
+          await sleep(300);
+
+          const optionsList = Array.from(document.querySelectorAll(
+            'div.selector_base_model li, ul.dropdown__list li, div.dropdown__select li'
+          ));
+          const matchingOption = optionsList.find(
+            (li) => (li.getAttribute?.('data-value') || '').trim().toLowerCase() === targetModel.trim().toLowerCase() ||
+              li.textContent?.trim().toLowerCase() === targetModel.trim().toLowerCase()
+          ) || optionsList.find(
+            (li) => (li.getAttribute?.('data-value') || '').trim().toLowerCase().includes(targetModel.trim().toLowerCase()) ||
+              li.textContent?.trim().toLowerCase().includes(targetModel.trim().toLowerCase())
+          );
+
+          if (matchingOption) {
+            simulateClick(matchingOption);
+            await sleep(500);
+          }
+
+          // If dropdown menu button still has active class, click it again to close
+          const activeBtn = document.querySelector(
+            'div.selector_base_model div.dropdown__button.active, div.dropdown__button.active'
+          );
+          if (activeBtn) {
+            simulateClick(activeBtn);
+            await sleep(200);
+          }
+        } else {
+          await sleep(500);
+        }
+      }
+
+      // Secondary sync to hidden native select if present
       const modelSelect = document.querySelector('div.selector_base_model select');
-      if (modelSelect) {
+      if (modelSelect && modelSelect.value !== targetModel) {
         modelSelect.value = targetModel;
         modelSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      } else {
-        // Custom dropdown: div.selector_base_model div.dropdown__button
-        const dropdownBtn = document.querySelector(
-          'div.selector_base_model div.dropdown__button, div.dropdown__container div.dropdown__button'
-        );
-        if (dropdownBtn) {
-          const currentBtnText = dropdownBtn.textContent?.trim().toLowerCase() || '';
-          if (!currentBtnText.includes(targetModel.toLowerCase())) {
-            simulateClick(dropdownBtn);
-            await sleep(150);
-
-            const optionsList = Array.from(document.querySelectorAll(
-              'div.selector_base_model li, ul.dropdown__list li, div.dropdown__select li'
-            ));
-            const matchingOption = optionsList.find(
-              (li) => (li.getAttribute?.('data-value') || '').toLowerCase() === targetModel.toLowerCase() ||
-                li.textContent?.trim().toLowerCase() === targetModel.toLowerCase()
-            );
-
-            if (matchingOption) {
-              simulateClick(matchingOption);
-              await sleep(100);
-            }
-          }
-        }
       }
 
       // AI Prompt injection

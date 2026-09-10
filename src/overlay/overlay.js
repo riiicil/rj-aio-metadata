@@ -948,6 +948,13 @@ export class OverlayHUD {
 
       logger.banner(`Automation started on ${this.platformId} with ${total} assets`);
 
+      // Pre-automation initialization (e.g. deselecting header select-all checkboxes)
+      if (typeof adapter.prepareAutomation === 'function') {
+        await adapter.prepareAutomation();
+        if (signal.aborted || this.isStopping) return;
+        await sleep(300);
+      }
+
       this.isStopping = false;
       this.isCardProcessing = false;
       let processedCount = 0;
