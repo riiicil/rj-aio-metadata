@@ -270,7 +270,7 @@ export class VecteezyAdapter extends BaseAdapter {
 
   /**
    * Clears active keyword chips.
-   * Targets data-testid="ClearIcon" on keywords section or individual tag remove icons.
+   * Targets data-testid="ClearIcon" on keywords section and any remaining tag remove icons.
    * @returns {Promise<boolean>} True if cleared.
    */
   async clearKeywords() {
@@ -278,7 +278,7 @@ export class VecteezyAdapter extends BaseAdapter {
 
     const editorForm = this.getEditorForm() || document;
 
-    // First try the bulk ClearIcon in the keywords section
+    // 1. Try the bulk ClearIcon in the keywords section
     const keywordClearIcon = editorForm.querySelector(
       'div[data-testid="tagger-input"] ~ div svg[data-testid="ClearIcon"], div.sc-irCEUn svg[data-testid="ClearIcon"], svg[data-testid="ClearIcon"]'
     );
@@ -286,22 +286,22 @@ export class VecteezyAdapter extends BaseAdapter {
     if (keywordClearIcon) {
       this.logger.info('Vecteezy: Clicking keywords ClearIcon to clear all tags');
       simulateClick(keywordClearIcon);
-      await sleep(150);
-    } else {
-      // Fallback: click individual tag remove icons
-      const removeIcons = Array.from(editorForm.querySelectorAll(
-        'svg[data-testid="tag-remove"], div[data-testid="tag"] svg, div[data-testid="tag"] polygon'
-      ));
-      if (removeIcons.length > 0) {
-        this.logger.info(`Vecteezy: Removing ${removeIcons.length} individual keyword tags`);
-        for (const icon of removeIcons) {
-          simulateClick(icon);
-        }
-        await sleep(150);
-      }
+      await sleep(200);
     }
 
-    // Clear any residual text in tagger input
+    // 2. Secondary sweep: remove any individual tag chips or error tags that remain
+    const removeIcons = Array.from(editorForm.querySelectorAll(
+      'svg[data-testid="tag-remove"], div[data-testid="tag"] svg, div[data-testid="tag"] polygon'
+    ));
+    if (removeIcons.length > 0) {
+      this.logger.info(`Vecteezy: Removing ${removeIcons.length} remaining keyword tags`);
+      for (const icon of removeIcons) {
+        simulateClick(icon);
+      }
+      await sleep(150);
+    }
+
+    // 3. Clear any residual text in tagger input
     const taggerInput = editorForm.querySelector(
       'div[data-testid="tagger-input"] input, input[placeholder*="keyword"]'
     );
@@ -345,7 +345,7 @@ export class VecteezyAdapter extends BaseAdapter {
    * - AI declaration & software selection (Midjourney, Stable Diffusion, DALL·E) or "Other" with custom text input.
    * - Non-AI mode: explicitly unchecks ai_generated checkbox if active.
    * - Title single-string injection (max 200 characters) after clearing old title with X button.
-   * - Keyword comma-separated injection + Enter key simulation (max 50 tags) after clearing old keywords.
+   * - Keyword sequential injection (one tag at a time with Enter/comma) to avoid single-string comma errors.
    * - Prohibited terms modal dismiss guard.
    *
    * @param {Object} metadata - Sanitized metadata payload.
@@ -394,25 +394,57 @@ export class VecteezyAdapter extends BaseAdapter {
 
     // 4. Generative AI Declaration
     const isAi = Boolean(options.isAiGenerated ?? metadata.isAiGenerated);
-    const aiCheckbox = editorForm.querySelector(
-      'div[data-testid="ai-generated-section"] input[type="checkbox"], div[data-testid="ai-generated-section"] input[value="ai_generated"]'
+    const aiSection = editorForm.querySelector('div[data-testid="ai-generated-section"]');
+    const aiCheckbox = aiSection?.querySelector(
+      'input[type="checkbox"], input[value="ai_generated"]'
     );
 
-    if (aiCheckbox) {
-      const isCurrentlyChecked = Boolean(aiCheckbox.checked);
+    if (aiCheckbox || aiSection) {
+      // Check MUI wrapper classes and software dropdown presence for robust state detection
+      const isCurrentlyChecked = Boolean(
+        aiCheckbox?.checked ||
+        aiSection?.querySelector('.Mui-checked') ||
+        aiSection?.querySelector('.checkbox-checked') ||
+        aiSection?.querySelector('div[data-testid="ai-software-dropdown"]')
+      );
+
+      const clickTarget = aiCheckbox?.closest?.('span[data-testid="checkbox-no-label"], label') ||
+        aiSection?.querySelector('span[data-testid="checkbox-no-label"]') ||
+        aiCheckbox;
 
       if (isAi && !isCurrentlyChecked) {
         this.logger.step('Generative AI', 'Checked');
-        const clickTarget = aiCheckbox.closest?.('span') || aiCheckbox;
-        simulateClick(clickTarget);
-        aiCheckbox.checked = true;
+        if (clickTarget) simulateClick(clickTarget);
+        if (aiCheckbox) aiCheckbox.checked = true;
         await sleep(300);
+
+        // Double check if still unchecked
+        const stillUnchecked = Boolean(
+          aiSection?.querySelector('.checkbox-unchecked') &&
+          !aiSection?.querySelector('div[data-testid="ai-software-dropdown"]')
+        );
+        if (stillUnchecked && clickTarget) {
+          this.logger.info('Vecteezy: Retrying click to check AI checkbox');
+          simulateClick(clickTarget);
+          await sleep(300);
+        }
       } else if (!isAi && isCurrentlyChecked) {
         this.logger.step('Generative AI', 'Unchecked');
-        const clickTarget = aiCheckbox.closest?.('span') || aiCheckbox;
-        simulateClick(clickTarget);
-        aiCheckbox.checked = false;
+        if (clickTarget) simulateClick(clickTarget);
+        if (aiCheckbox) aiCheckbox.checked = false;
         await sleep(300);
+
+        // Double check if still checked (e.g. dropdown still present)
+        const stillChecked = Boolean(
+          aiSection?.querySelector('.Mui-checked') ||
+          aiSection?.querySelector('.checkbox-checked') ||
+          aiSection?.querySelector('div[data-testid="ai-software-dropdown"]')
+        );
+        if (stillChecked && clickTarget) {
+          this.logger.info('Vecteezy: Retrying click to uncheck AI checkbox');
+          simulateClick(clickTarget);
+          await sleep(300);
+        }
       }
 
       if (isAi) {
@@ -496,34 +528,43 @@ export class VecteezyAdapter extends BaseAdapter {
       }
     }
 
-    // 7. Keywords (Comma-separated chip injection clamped to max 50 tags + Enter key)
+    // 7. Keywords (Sequential chip injection clamped to max 50 tags + Enter/Comma key per tag)
     if (metadata.keywords && Array.isArray(metadata.keywords) && metadata.keywords.length > 0) {
       const taggerInput = editorForm.querySelector(
         'div[data-testid="tagger-input"] input, input[placeholder*="keyword"]'
       );
       if (taggerInput) {
         const tags = metadata.keywords.slice(0, 50);
-        const tagsString = tags.join(', ') + ',';
+        this.logger.step('Keywords', `Injecting ${tags.length} tags sequentially`);
+
+        for (let i = 0; i < tags.length; i++) {
+          const rawTag = String(tags[i]).trim().replace(/,/g, '');
+          if (!rawTag) continue;
+
+          setNativeValue(taggerInput, rawTag);
+          await sleep(15);
+          simulateEnterKey(taggerInput);
+
+          // Also dispatch comma key event for robust tagger chip triggering
+          const commaInit = { key: ',', code: 'Comma', keyCode: 188, which: 188, bubbles: true, cancelable: true };
+          const createEv = (type) => {
+            if (typeof KeyboardEvent !== 'undefined') {
+              try { return new KeyboardEvent(type, commaInit); } catch {}
+            }
+            if (typeof Event !== 'undefined') {
+              const ev = new Event(type, { bubbles: true, cancelable: true });
+              Object.assign(ev, commaInit);
+              return ev;
+            }
+            return { type, ...commaInit };
+          };
+          taggerInput.dispatchEvent(createEv('keydown'));
+          taggerInput.dispatchEvent(createEv('keyup'));
+
+          await sleep(25);
+        }
+
         this.logger.step('Keywords', `${tags.length} tags injected`);
-        setNativeValue(taggerInput, tagsString);
-        await sleep(100);
-        simulateEnterKey(taggerInput);
-        // Also dispatch comma key event for robust tagger chip triggering
-        const commaInit = { key: ',', code: 'Comma', keyCode: 188, which: 188, bubbles: true, cancelable: true };
-        const createEv = (type) => {
-          if (typeof KeyboardEvent !== 'undefined') {
-            try { return new KeyboardEvent(type, commaInit); } catch {}
-          }
-          if (typeof Event !== 'undefined') {
-            const ev = new Event(type, { bubbles: true, cancelable: true });
-            Object.assign(ev, commaInit);
-            return ev;
-          }
-          return { type, ...commaInit };
-        };
-        taggerInput.dispatchEvent(createEv('keydown'));
-        taggerInput.dispatchEvent(createEv('keyup'));
-        await sleep(150);
       } else {
         this.logger.warn('Vecteezy: Keywords tagger input not found in editor form');
       }

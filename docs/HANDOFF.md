@@ -43,6 +43,8 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
    - **Direct Card `<img>` Click**: `selectCard()` now targets `cardElement.querySelector('img')` directly rather than the parent preview wrapper div, triggering Vecteezy's React selection handler reliably. Added `is-selected` guard to prevent toggling off.
    - **Editor Ready Guard**: `waitForEditorReady()` requires header text to show `(N) Files selected` (not `No Files selected`) or `is-selected` class, with 800ms card re-click retry.
    - **bulkSave Disambiguation**: Fixed collision where `"Deselect all"` was matched by `textContent.includes('select all')`, explicitly requiring `!textContent.includes('deselect')`.
+   - **AI Checkbox Uncheck Guard**: In non-AI mode, detects active AI declarations via `.Mui-checked`, `.checkbox-checked`, or `div[data-testid="ai-software-dropdown"]` (bypassing React's missing native `checked` attribute) and clicks to turn off with retry verification.
+   - **Sequential Per-Tag Keywords**: Loops through keywords one by one, setting individual tag text and simulating `Enter` + `Comma` key events to prevent Vecteezy from merging the whole string into a single invalid red chip (`No Special Characters`).
 2. **Freepik (Magnific) Card Selection & simulateClick Deduplication (`contributor.magnific.com`)**:
    - Resolved `"Select 0/2"` and blocked metadata form by removing redundant second click on `cardElement` in `FreepikAdapter.js:selectCard()`.
    - Fixed `simulateClick()` in `src/adapters/utils/dom_helpers.js` which previously fired both synthetic `click` MouseEvent and native `element.click()`, causing double clicks in browser environments.
