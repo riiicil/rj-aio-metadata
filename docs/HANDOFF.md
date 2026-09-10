@@ -6,9 +6,9 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 4: Platform Adapters (Adobe Stock Live Bugfixes Round 5: Non-AI Release Switch, Strict Save Work Button Selector, and Deferred In-Form Clearing Verified)
+- **Current Milestone**: Phase 4: Platform Adapters (LoggerService Implemented, Adobe Stock Live Bugfixes Round 5 & Overlay Deferred Clearing Verified)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(adobestock): non-ai release switch, strict save work button selector, and skip premature metadata clearing`
+- **Latest Commit**: `feat(logging): implement LoggerService, wire into AdobeStockAdapter, and disable global clearMetadata in overlay`
 - **Working Tree**: Clean local branch
 - **Build / Test State**: Verified healthy (336/336 assertions passed across test_subphase_4_6.mjs [57/57], test_tier1_adapters.mjs [78/78], test_tier2_adapters.mjs [94/94], test_tier3_adapters.mjs [107/107], zero emoji clean)
 
@@ -95,6 +95,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 31 | 2026-09-10 | `task/platform-adapters` | `feat(logging)` | Implemented LoggerService.js, wired into AdobeStockAdapter, disabled global clearMetadata in overlay, verified 336/336 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 30 | 2026-09-07 | `task/platform-adapters` | `feat(overlay)` | Implemented adapters/index.js registry, overlay.js automation orchestrator, dom_helpers abort delays, test_subphase_4_6.mjs with 57/57 assertions (Phase 4 100% complete) | Phase 5: End-to-End Live Browser Testing & Polish |
 | 29 | 2026-09-07 | `task/platform-adapters` | `feat(adapter)` | Implemented DreamstimeAdapter.js, DepositphotosAdapter.js, and MiriCanvasAdapter.js Tier 3 adapters with 107/107 assertions | Sub-phase 4.6: Adapter Registry, In-Page HUD Wiring & Verification Suite |
 | 28 | 2026-09-07 | `task/platform-adapters` | `feat(adapter)` | Implemented FreepikAdapter.js (mandatory per-item save draft, 47 base models) and VecteezyAdapter.js (bulk save, software Other flow) Tier 2 adapters | Sub-phase 4.5: Tier 3 Adapters (Dreamstime, Depositphotos, MiriCanvas) & Registry |

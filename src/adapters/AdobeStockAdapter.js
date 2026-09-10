@@ -12,6 +12,7 @@
  */
 
 import { BaseAdapter } from './BaseAdapter.js';
+import { logger } from '../services/LoggerService.js';
 import {
   setNativeValue,
   waitForElement,
@@ -217,10 +218,8 @@ export class AdobeStockAdapter extends BaseAdapter {
       active = currentTile?.getAttribute?.('aria-selected') === 'true';
     }
 
-    console.log(
-      '%c[RJ AIO Metadata] Card selection confirmed: %s',
-      'color: #079183;',
-      active ? 'OK' : 'Unconfirmed (Proceeding)'
+    (this.logger || logger).info(
+      `Card selection confirmed: ${active ? 'OK' : 'Unconfirmed (Proceeding)'}`
     );
 
     await sleep(300);
@@ -369,7 +368,7 @@ export class AdobeStockAdapter extends BaseAdapter {
     const resolvedCat = resolveAdobeCategory(categoryVal);
 
     if (resolvedCat) {
-      console.log('%c[RJ AIO Metadata] Setting category: %s (%s)', 'color: #079183;', resolvedCat.name, resolvedCat.id);
+      (this.logger || logger).step('category', `${resolvedCat.name} (${resolvedCat.id})`);
       await this._setSpectrumOrNativeDropdown({
         buttonSelector: 'button[data-t="content-tagger-category-select"], div[data-t="content-tagger-category-wrapper"] button',
         selectSelector: 'select[name="category"], select[data-t="content-tagger-category-select"]',
@@ -403,7 +402,7 @@ export class AdobeStockAdapter extends BaseAdapter {
           await sleep(300);
         }
       }
-      console.log('%c[RJ AIO Metadata] Setting Generative AI: %s', 'color: #079183;', isAi ? 'Checked' : 'Unchecked');
+      (this.logger || logger).step('Generative AI', isAi ? 'Checked' : 'Unchecked');
       await sleep(300);
     }
 
@@ -423,7 +422,7 @@ export class AdobeStockAdapter extends BaseAdapter {
           } catch {
             // Ignore dispatch errors
           }
-          console.log('%c[RJ AIO Metadata] Setting Recognizable people or property: No', 'color: #079183;');
+          (this.logger || logger).step('Recognizable people or property', 'No');
           await sleep(300);
         }
       } else {
@@ -438,7 +437,7 @@ export class AdobeStockAdapter extends BaseAdapter {
           );
           if (noBtn) {
             simulateClick(noBtn);
-            console.log('%c[RJ AIO Metadata] Setting Recognizable people or property: No (container match)', 'color: #079183;');
+            (this.logger || logger).step('Recognizable people or property', 'No (container match)');
             await sleep(300);
             break;
           }
@@ -465,7 +464,7 @@ export class AdobeStockAdapter extends BaseAdapter {
       const targetText = isKorean ? '한국' : (mappedLangId === '1' ? 'English' : null);
       const altKeys = isKorean ? ['14', '10'] : [];
 
-      console.log('%c[RJ AIO Metadata] Setting language dropdown: %s', 'color: #079183;', targetText || mappedLangId);
+      (this.logger || logger).step('language dropdown', targetText || mappedLangId);
       await this._setSpectrumOrNativeDropdown({
         buttonSelector: 'button[data-t="content-tagger-keywords-language-select"], div[data-t="content-tagger-keywords-language-wrapper"] button',
         selectSelector: 'select[name="language"], select[data-t="content-tagger-keywords-language-select"]',
@@ -487,7 +486,7 @@ export class AdobeStockAdapter extends BaseAdapter {
           await sleep(200);
         }
         const cleanTitle = String(metadata.title).slice(0, 200);
-        console.log('%c[RJ AIO Metadata] Setting title: %s', 'color: #079183;', cleanTitle);
+        (this.logger || logger).step('title', cleanTitle);
         setNativeValue(titleEl, cleanTitle);
         await sleep(500);
       }
@@ -507,7 +506,7 @@ export class AdobeStockAdapter extends BaseAdapter {
           ? metadata.keywords
           : String(metadata.keywords).split(',').map((t) => t.trim()).filter(Boolean);
         const kwString = tagList.slice(0, 49).join(', ');
-        console.log('%c[RJ AIO Metadata] Setting %d keywords: %s', 'color: #079183;', tagList.length, kwString.slice(0, 60) + '...');
+        (this.logger || logger).step(`${tagList.length} keywords`, kwString.slice(0, 60) + '...');
         setNativeValue(kwEl, kwString);
         await sleep(500);
       }
@@ -614,7 +613,7 @@ export class AdobeStockAdapter extends BaseAdapter {
 
     if (saveBtn) {
       simulateClick(saveBtn);
-      console.log('%c[RJ AIO Metadata] Bulk save executed successfully', 'color: #59d499; font-weight: bold;');
+      (this.logger || logger).success('Bulk save executed successfully');
       await sleep(1000);
       return true;
     }

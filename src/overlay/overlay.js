@@ -7,6 +7,7 @@
 import { getAdapterForUrl, getAdapterForPlatform } from '../adapters/index.js';
 import { generateMetadata } from '../services/AiService.js';
 import { randomDelay, sleep } from '../adapters/utils/dom_helpers.js';
+import { logger } from '../services/LoggerService.js';
 
 // Platform Keyword Count Constraints & Hints
 const PLATFORM_LIMITS = {
@@ -874,7 +875,7 @@ export class OverlayHUD {
     }
 
     if (!adapter) {
-      console.warn('[RJ AIO Metadata] No platform adapter matched for URL:', currentUrl);
+      logger.warn('No platform adapter matched for URL:', currentUrl);
       const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
       if (statusText) statusText.textContent = 'Unsupported Page';
       return;
@@ -885,7 +886,7 @@ export class OverlayHUD {
       await this.syncFromStorage();
     }
     if (!this.isProviderReady(this.currentConfig)) {
-      console.warn('[RJ AIO Metadata] AI Provider is not ready. Configure in popup first.');
+      logger.warn('AI Provider is not ready. Configure in popup first.');
       const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
       if (statusText) statusText.textContent = 'Setup Model';
       return;
@@ -935,12 +936,7 @@ export class OverlayHUD {
         return;
       }
 
-      console.log(
-        '%c[RJ AIO Metadata] Automation started on %s with %d assets',
-        'color: #079183; font-weight: bold;',
-        this.platformId,
-        total
-      );
+      logger.banner(`Automation started on ${this.platformId} with ${total} assets`);
 
       this.isStopping = false;
       this.isCardProcessing = false;
@@ -959,12 +955,7 @@ export class OverlayHUD {
         if (statusText) statusText.textContent = this.isStopping ? 'Stopping...' : 'Processing...';
         if (pillStatus) pillStatus.textContent = `${i + 1}/${total} (${pct}%)`;
 
-        console.log(
-          '%c[RJ AIO Metadata] --- Processing asset %d of %d ---',
-          'color: #57c1ff; font-weight: bold;',
-          i + 1,
-          total
-        );
+        logger.asset(i + 1, total);
 
         this.isCardProcessing = true;
         try {
@@ -1009,12 +1000,14 @@ export class OverlayHUD {
           if (signal.aborted) break;
           await sleep(500);
 
-          // Step 5: Clear existing metadata (Adobe Stock handles title/keyword clearing sequentially inside fillMetadata)
+          // Step 5: Clear existing metadata (Temporarily disabled/commented out; clearing delegated sequentially inside platform adapters)
+          /*
           if (this.platformId !== 'adobestock') {
             await adapter.clearMetadata();
             if (signal.aborted) break;
             await sleep(300);
           }
+          */
 
           // Step 6: Inject sanitized metadata
           if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving card)...' : 'Injecting metadata...';
@@ -1034,12 +1027,7 @@ export class OverlayHUD {
             await adapter.saveDraft();
           }
 
-          console.log(
-            '%c[RJ AIO Metadata] Completed asset %d of %d',
-            'color: #59d499; font-weight: bold;',
-            i + 1,
-            total
-          );
+          logger.success(`Completed asset ${i + 1} of ${total}`);
         } catch (assetErr) {
           if (signal.aborted || assetErr?.message === 'ABORTED') {
             break;
@@ -1047,7 +1035,7 @@ export class OverlayHUD {
           if (total === 1) {
             throw assetErr;
           }
-          console.warn(`[RJ AIO Metadata] Error processing asset ${i + 1}/${total}:`, assetErr);
+          logger.warn(`Error processing asset ${i + 1}/${total}:`, assetErr);
           if (statusText) statusText.textContent = `Asset ${i + 1} skipped`;
           await randomDelay(1000, 2000, signal);
           continue;
@@ -1079,12 +1067,8 @@ export class OverlayHUD {
       const bulkSavePlatforms = ['adobestock', 'shutterstock', 'vecteezy', 'depositphotos', 'miricanvas'];
       if (bulkSavePlatforms.includes(this.platformId) && processedCount > 0 && !signal.aborted) {
         const saveLabel = this.isStopping ? 'Saving work...' : 'Saving all...';
-        console.log(
-          '%c[RJ AIO Metadata] %s for %s (%d processed assets)...',
-          'color: #079183; font-weight: bold;',
-          this.isStopping ? 'Stop requested. Triggering bulk save' : 'All assets processed. Triggering bulk save',
-          this.platformId,
-          processedCount
+        logger.banner(
+          `${this.isStopping ? 'Stop requested. Triggering bulk save' : 'All assets processed. Triggering bulk save'} for ${this.platformId} (${processedCount} processed assets)...`
         );
         if (statusText) statusText.textContent = saveLabel;
         await sleep(1000);
@@ -1093,13 +1077,13 @@ export class OverlayHUD {
       }
 
       if (this.isStopping || signal.aborted) {
-        console.log('%c[RJ AIO Metadata] Automation gracefully saved and stopped.', 'color: #57c1ff; font-weight: bold;');
+        logger.banner('Automation gracefully saved and stopped.');
         this.isStopping = false;
         this.isAutomationRunning = false;
         this.updateAutomationUI(false);
         if (statusText) statusText.textContent = 'Stopped';
       } else {
-        console.log('%c[RJ AIO Metadata] Automation completed successfully!', 'color: #59d499; font-weight: bold;');
+        logger.success('Automation completed successfully!');
 
         // Completion status
         if (progressFill) progressFill.style.width = '100%';
@@ -1115,13 +1099,13 @@ export class OverlayHUD {
       }
     } catch (err) {
       if (err.message === 'ABORTED' || signal.aborted) {
-        console.log('[RJ AIO Metadata] Automation stopped.');
+        logger.info('Automation stopped.');
         this.isStopping = false;
         this.isAutomationRunning = false;
         this.updateAutomationUI(false);
         if (statusText) statusText.textContent = 'Stopped';
       } else {
-        console.error('[RJ AIO Metadata] Automation error:', err);
+        logger.error('Automation error:', err);
         this.isStopping = false;
         this.isAutomationRunning = false;
         this.updateAutomationUI(false);
@@ -1158,7 +1142,7 @@ export class OverlayHUD {
 
     if (this.isStopping || force) {
       // Second click or forced stop: immediate hard abort
-      console.log('[RJ AIO Metadata] Force stop requested. Aborting immediately...');
+      logger.warn('Force stop requested. Aborting immediately...');
       if (this.abortController) {
         this.abortController.abort();
         this.abortController = null;
@@ -1177,10 +1161,7 @@ export class OverlayHUD {
       if (btn) btn.title = 'Stopping automation (saving work)...';
       if (btnText) btnText.textContent = 'Stopping...';
       if (statusText) statusText.textContent = 'Stopping...';
-      console.log(
-        '%c[RJ AIO Metadata] Stop requested. Waiting for active card to finish then saving work...',
-        'color: #f5a623; font-weight: bold;'
-      );
+      logger.warn('Stop requested. Waiting for active card to finish then saving work...');
     }
 
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
@@ -1549,7 +1530,7 @@ export class OverlayHUD {
 
       chrome.storage.local.get(['rj_hud_pos'], (res) => {
         if (chrome.runtime.lastError) {
-          console.warn('[RJ AIO Metadata] Storage load error:', chrome.runtime.lastError);
+          logger.warn('Storage load error:', chrome.runtime.lastError);
           resolve();
           return;
         }
@@ -1588,7 +1569,7 @@ export class OverlayHUD {
       }
     }, () => {
       if (chrome.runtime.lastError) {
-        console.warn('[RJ AIO Metadata] Failed to persist HUD position:', chrome.runtime.lastError);
+        logger.warn('Failed to persist HUD position:', chrome.runtime.lastError);
       }
     });
   }

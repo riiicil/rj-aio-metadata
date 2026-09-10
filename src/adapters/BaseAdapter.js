@@ -6,6 +6,7 @@
  */
 
 import { sleep, randomDelay } from './utils/dom_helpers.js';
+import { logger } from '../services/LoggerService.js';
 
 export class BaseAdapter {
   /**
@@ -16,6 +17,7 @@ export class BaseAdapter {
   constructor(platformId, platformName) {
     this.platformId = platformId;
     this.platformName = platformName;
+    this.logger = logger;
   }
 
   // =========================================================================
