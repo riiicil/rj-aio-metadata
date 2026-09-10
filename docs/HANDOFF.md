@@ -6,18 +6,27 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 4: Platform Adapters (Freepik / Magnific Rebranding & Live Bugfixes Complete; Shutterstock & Adobe Stock Live Fixes Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Live Fixes Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(freepik): target icon--save for draft commit, clamp ai keywords to 49, and refine delete selectors`
+- **Latest Commit**: `fix(vecteezy): scope editor to right panel, add prepareAutomation, clear buttons, and fix bulkSave selector`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (674/674 assertions passed across all test suites, zero emoji clean)
+- **Build / Test State**: Verified healthy (678/678 assertions passed across all test suites, zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1 platforms, and extended Freepik support to the Magnific rebranding:
-1. **Freepik (Magnific) AI Model Dropdown, Pacing, and Pre-Automation Deselect Hook (`contributor.magnific.com`)**:
+Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1 & Tier 2 platforms, and aligned Vecteezy and Freepik (Magnific):
+1. **Vecteezy Live Alignment & Form Scoping (`contributors.vecteezy.com`)**:
+   - Scoped all metadata editor queries strictly to the right panel (`div.right, div[class*="right"]`), eliminating selector collision with the left filter sidebar (`<aside>`) which had identical `pro`, `free`, `editorial` and radio group attributes.
+   - Added pre-automation preparation hook (`VecteezyAdapter.prepareAutomation()`): automatically closes the left filter sidebar if open, and clicks toolbar `"Deselect all"` button if any cards are currently selected before card 1. Skips cleanly if already `"Select all"`.
+   - Integrated title clear X icon (`div[data-testid="text-input"] svg[position="end"]`, `svg.sc-gsqrwE`, `svg`) and keywords bulk ClearIcon (`svg[data-testid="ClearIcon"]`) adjacent to `div[data-testid="tagger-input"]`.
+   - Handled AI declaration checkbox, MUI select dropdown generator options (`midjourney`, `stable_diffusion`, `dall_e`), and `"other"` option with custom tool name injection into `input#undefined-input`. In non-AI mode, explicitly unchecks the AI checkbox if active.
+   - Fixed `bulkSave()` `SyntaxError` caused by invalid `:has-text(...)` pseudo-selector, replacing it with standard JavaScript array `.find()`.
+   - Disambiguated `"Select all"` button matching in `bulkSave()` by explicitly checking `!includes('deselect') && includes('select all')` to prevent substring collision with `"Deselect all"`.
+   - Full `LoggerService` integration across all steps (`(this.logger || logger).step()`, `.info()`, `.success()`).
+   - Verified clean graceful stop flow triggering `bulkSave()` without unhandled exceptions.
+2. **Freepik (Magnific) AI Model Dropdown, Pacing, and Pre-Automation Deselect Hook (`contributor.magnific.com`)**:
    - Prioritized custom Vue dropdown UI (`div.selector_base_model div.dropdown__button`, `div.dropdown__select li[data-value]`) over native hidden `<select>`, resolving the root cause where AI model selection was ignored by Vue.
    - Added 500ms delays before/after clicking the AI declaration toggle, and before/after selecting the AI base model.
    - Verified non-AI mode flow: when `!isAi && isCurrentlyChecked`, explicitly toggles OFF the AI declaration switch with 500ms pacing.
@@ -88,6 +97,7 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 39 | 2026-09-10 | `task/platform-adapters` | `fix(vecteezy)` | Scope metadata editor to right panel, add prepareAutomation, clear buttons, software dropdown, and fix bulkSave selector | Live browser verification on Vecteezy |
 | 38 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Prioritize custom dropdown for AI model, add 500ms interaction pacing, check & toggle off AI in non-AI mode, and add pre-start deselect hook | Live browser verification on Magnific / Freepik |
 | 37 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Target button[data-cy="savePreitems"] (icon--save) for saving item, clamp AI keywords to 49, skip keyword clear when no chips exist | Live browser verification on Magnific / Freepik |
 | 36 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Eliminate card double-click, deduplicate simulateClick in browser, poll active asset selection in waitForEditorReady | Live browser verification on Magnific / Freepik |
