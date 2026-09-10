@@ -20,6 +20,7 @@
 import { BaseAdapter } from './BaseAdapter.js';
 import {
   setNativeValue,
+  setNativeCheckbox,
   waitForElement,
   simulateClick,
   simulateEnterKey,
@@ -392,57 +393,55 @@ export class VecteezyAdapter extends BaseAdapter {
 
     // 3. Category: Strictly ignored (Vecteezy auto-detects category from uploaded file format)
 
-    // 4. Generative AI Declaration
+    // 4. Generative AI Declaration & Software Selection
     const isAi = Boolean(options.isAiGenerated ?? metadata.isAiGenerated);
-    const aiSection = editorForm.querySelector('div[data-testid="ai-generated-section"]');
+    const aiSection = editorForm.querySelector('div[data-testid="ai-generated-section"]') ||
+      Array.from(editorForm.querySelectorAll('div')).find((el) => el.textContent && el.textContent.includes('AI-Generated'));
+
     const aiCheckbox = aiSection?.querySelector(
-      'input[type="checkbox"], input[value="ai_generated"]'
+      'input[type="checkbox"], input[value="ai_generated"], input.PrivateSwitchBase-input'
     );
 
     if (aiCheckbox || aiSection) {
-      // Check MUI wrapper classes and software dropdown presence for robust state detection
-      const isCurrentlyChecked = Boolean(
-        aiCheckbox?.checked ||
+      // Check MUI wrapper classes, software dropdown, and input.checked for robust state detection
+      const isSectionChecked = () => Boolean(
         aiSection?.querySelector('.Mui-checked') ||
         aiSection?.querySelector('.checkbox-checked') ||
-        aiSection?.querySelector('div[data-testid="ai-software-dropdown"]')
+        aiSection?.querySelector('div[data-testid="ai-software-dropdown"]') ||
+        aiCheckbox?.checked
       );
 
-      const clickTarget = aiCheckbox?.closest?.('span[data-testid="checkbox-no-label"], label') ||
-        aiSection?.querySelector('span[data-testid="checkbox-no-label"]') ||
-        aiCheckbox;
+      const isCurrentlyChecked = isSectionChecked();
+
+      // Target MUST be the native input element directly (not the wrapper span)
+      const toggleTarget = aiCheckbox || aiSection?.querySelector(
+        'input[type="checkbox"], input[value="ai_generated"], input.PrivateSwitchBase-input'
+      ) || aiSection?.querySelector('span[data-testid="checkbox-no-label"]');
 
       if (isAi && !isCurrentlyChecked) {
         this.logger.step('Generative AI', 'Checked');
-        if (clickTarget) simulateClick(clickTarget);
-        if (aiCheckbox) aiCheckbox.checked = true;
+        if (toggleTarget) {
+          simulateClick(toggleTarget);
+        }
         await sleep(300);
 
-        // Double check if still unchecked
-        const stillUnchecked = Boolean(
-          aiSection?.querySelector('.checkbox-unchecked') &&
-          !aiSection?.querySelector('div[data-testid="ai-software-dropdown"]')
-        );
-        if (stillUnchecked && clickTarget) {
-          this.logger.info('Vecteezy: Retrying click to check AI checkbox');
-          simulateClick(clickTarget);
+        // Resilient fallback: If still unchecked, use native checkbox setter directly on the input element
+        if (!isSectionChecked() && aiCheckbox) {
+          this.logger.info('Vecteezy: Using native checkbox setter to check AI declaration');
+          setNativeCheckbox(aiCheckbox, true);
           await sleep(300);
         }
       } else if (!isAi && isCurrentlyChecked) {
         this.logger.step('Generative AI', 'Unchecked');
-        if (clickTarget) simulateClick(clickTarget);
-        if (aiCheckbox) aiCheckbox.checked = false;
+        if (toggleTarget) {
+          simulateClick(toggleTarget);
+        }
         await sleep(300);
 
-        // Double check if still checked (e.g. dropdown still present)
-        const stillChecked = Boolean(
-          aiSection?.querySelector('.Mui-checked') ||
-          aiSection?.querySelector('.checkbox-checked') ||
-          aiSection?.querySelector('div[data-testid="ai-software-dropdown"]')
-        );
-        if (stillChecked && clickTarget) {
-          this.logger.info('Vecteezy: Retrying click to uncheck AI checkbox');
-          simulateClick(clickTarget);
+        // Resilient fallback: If still checked, use native checkbox setter directly on the input element
+        if (isSectionChecked() && aiCheckbox) {
+          this.logger.info('Vecteezy: Using native checkbox setter to uncheck AI declaration');
+          setNativeCheckbox(aiCheckbox, false);
           await sleep(300);
         }
       }
@@ -456,7 +455,7 @@ export class VecteezyAdapter extends BaseAdapter {
 
         // Open MUI Select dropdown trigger inside ai-generated-section
         const dropdownTrigger = editorForm.querySelector(
-          'div[data-testid="ai-generated-section"] div[role="button"], div[data-testid="ai-generated-section"] div.MuiSelect-select'
+          'div[data-testid="ai-software-dropdown"] div[role="button"], div[data-testid="ai-software-dropdown"], div[data-testid="ai-generated-section"] div[role="button"], div[data-testid="ai-generated-section"] div.MuiSelect-select'
         );
         if (dropdownTrigger) {
           simulateClick(dropdownTrigger);
@@ -499,7 +498,9 @@ export class VecteezyAdapter extends BaseAdapter {
           const customSoftwareName = customTool || (normSoftware === 'other' ? '' : software) || 'Custom AI';
           if (customSoftwareName) {
             this.logger.step('Custom Software', customSoftwareName);
-            const customInput = editorForm.querySelector(
+            const customInput = document.querySelector(
+              'div[data-testid="other-text-input"] input, div.MuiPopover-paper input#undefined-input, div.MuiPopover-paper input[type="text"]'
+            ) || editorForm.querySelector(
               'div[data-testid="ai-generated-section"] input#undefined-input, div[data-testid="ai-generated-section"] input[type="text"], div[data-testid="ai-generated-section"] input[required]'
             );
             if (customInput) {

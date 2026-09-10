@@ -109,6 +109,57 @@ export function setNativeValue(element, value) {
 }
 
 /**
+ * Universal instant checkbox state setter for controlled inputs (React, Vue, etc.).
+ * Bypasses virtual DOM overrides by directly invoking the native HTMLInputElement
+ * prototype property setter for 'checked' and dispatching synthetic click, input, and change events.
+ *
+ * @param {HTMLInputElement|Object} element - Target checkbox input element.
+ * @param {boolean} checked - Target checked boolean state.
+ * @returns {boolean} True if successfully set and dispatched, false otherwise.
+ */
+export function setNativeCheckbox(element, checked) {
+  if (!element) return false;
+
+  const targetChecked = Boolean(checked);
+
+  try {
+    const prototype = typeof HTMLInputElement !== 'undefined'
+      ? HTMLInputElement.prototype
+      : Object.getPrototypeOf(element);
+
+    const descriptor = prototype ? Object.getOwnPropertyDescriptor(prototype, 'checked') : null;
+    const nativeSetter = descriptor?.set;
+
+    if (nativeSetter) {
+      nativeSetter.call(element, targetChecked);
+    } else {
+      element.checked = targetChecked;
+    }
+
+    const createEvent = (type) => {
+      if (typeof Event !== 'undefined') {
+        return new Event(type, { bubbles: true });
+      }
+      return { type, bubbles: true };
+    };
+
+    if (typeof element.dispatchEvent === 'function') {
+      element.dispatchEvent(createEvent('click'));
+      element.dispatchEvent(createEvent('input'));
+      element.dispatchEvent(createEvent('change'));
+    }
+
+    return true;
+  } catch {
+    if (typeof element.click === 'function') {
+      element.click();
+      return true;
+    }
+    return false;
+  }
+}
+
+/**
  * Waits for an element matching selector to appear in DOM within timeoutMs.
  * Returns immediately if element is already present.
  *

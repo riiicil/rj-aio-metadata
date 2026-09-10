@@ -5,10 +5,9 @@
 ---
 
 ## 1. Immediate Operational State
-
 - **Current Milestone**: Phase 4: Platform Adapters (Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Live Fixes Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(vecteezy): scope editor to right panel, add prepareAutomation, clear buttons, and fix bulkSave selector`
+- **Latest Commit**: `fix(vecteezy): direct click and prototype setter for ai checkbox toggle`
 - **Working Tree**: Clean local branch
 - **Build / Test State**: Verified healthy (678/678 assertions passed across all test suites, zero emoji clean)
 
@@ -26,24 +25,7 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
    - Disambiguated `"Select all"` button matching in `bulkSave()` by explicitly checking `!includes('deselect') && includes('select all')` to prevent substring collision with `"Deselect all"`.
    - Full `LoggerService` integration across all steps (`(this.logger || logger).step()`, `.info()`, `.success()`).
    - Verified clean graceful stop flow triggering `bulkSave()` without unhandled exceptions.
-2. **Freepik (Magnific) AI Model Dropdown, Pacing, and Pre-Automation Deselect Hook (`contributor.magnific.com`)**:
-   - Prioritized custom Vue dropdown UI (`div.selector_base_model div.dropdown__button`, `div.dropdown__select li[data-value]`) over native hidden `<select>`, resolving the root cause where AI model selection was ignored by Vue.
-   - Added 500ms delays before/after clicking the AI declaration toggle, and before/after selecting the AI base model.
-   - Verified non-AI mode flow: when `!isAi && isCurrentlyChecked`, explicitly toggles OFF the AI declaration switch with 500ms pacing.
-   - Added pre-automation header select-all deselection hook (`BaseAdapter.prepareAutomation()`, `overlay.js`, and `FreepikAdapter.prepareAutomation()`): checks `<input data-v-f08075b8="" type="checkbox">` / `.checkbox-dropdown__content.full` once at start; if active ("Select 2/2"), deselects all assets before processing card 1.
-2. **Freepik (Magnific) Workflow Alignment & Save Button Fix (`contributor.magnific.com`)**:
-   - Replaced `button.button-paste-draft` ("Create draft" template preset feature) in `FreepikAdapter.saveDraft()` with the actual asset save button `button[data-cy="savePreitems"]` (`<i class="icon--save"></i>`) in the sidebar header, eliminating the unexpected "Create a draft" modal dialog.
-   - Added `dismissDraftModal()` helper to automatically close any stray draft modal.
-   - Refined `clearMetadata()` to strictly use `button[data-cy="deleteTitle"]` and `button[data-cy="deleteTags"]`, verifying existing chips before clicking and skipping empty keyword fields completely.
-   - Directed AI switch clicks to `span.switch__indicator` / `label.switch.aiSelector--check` to resolve Vue `TypeError: Cannot read properties of null (reading 'id')`.
-   - Clamped Freepik AI keyword injection to **49 tags** (accounting for Freepik's 1 platform-injected tag to prevent 51/50 overflow) across `FreepikAdapter.js`, `src/popup/popup.js`, and `src/overlay/overlay.js`.
-1. **Vecteezy Right Panel Form Scoping & Card Image Selection (`contributors.vecteezy.com`)**:
-   - **MuiGrid Collision**: Resolved collision where `div.right` matched the 9-column asset grid container (`MuiGrid-grid-xs-9`, `sc-bUrGhc gHifVb right`) instead of the 3-column metadata editor form (`MuiGrid-grid-xs-3`, `sc-jSpnoh iRWKJS right`).
-   - Implemented `getEditorForm()` prioritizing `div.MuiGrid-grid-xs-3.right`, `div.MuiGrid-grid-xs-3`, or the container with header `Files selected`, preventing title injection into the pagination input box.
-   - **Direct Card `<img>` Click**: `selectCard()` now targets `cardElement.querySelector('img')` directly rather than the parent preview wrapper div, triggering Vecteezy's React selection handler reliably. Added `is-selected` guard to prevent toggling off.
-   - **Editor Ready Guard**: `waitForEditorReady()` requires header text to show `(N) Files selected` (not `No Files selected`) or `is-selected` class, with 800ms card re-click retry.
-   - **bulkSave Disambiguation**: Fixed collision where `"Deselect all"` was matched by `textContent.includes('select all')`, explicitly requiring `!textContent.includes('deselect')`.
-   - **AI Checkbox Uncheck Guard**: In non-AI mode, detects active AI declarations via `.Mui-checked`, `.checkbox-checked`, or `div[data-testid="ai-software-dropdown"]` (bypassing React's missing native `checked` attribute) and clicks to turn off with retry verification.
+   - **Direct Input Checkbox Click & Prototype Setter**: Updated `fillMetadata()` to click the native `<input>` element directly (rather than the wrapper `<span>`), eliminating manual property assignment that corrupted React 18's internal `_valueTracker`. Added `setNativeCheckbox()` fallback invoking `HTMLInputElement.prototype.checked` setter and dispatching synthetic events.
    - **Sequential Per-Tag Keywords**: Loops through keywords one by one, setting individual tag text and simulating `Enter` + `Comma` key events to prevent Vecteezy from merging the whole string into a single invalid red chip (`No Special Characters`).
 2. **Freepik (Magnific) Card Selection & simulateClick Deduplication (`contributor.magnific.com`)**:
    - Resolved `"Select 0/2"` and blocked metadata form by removing redundant second click on `cardElement` in `FreepikAdapter.js:selectCard()`.
