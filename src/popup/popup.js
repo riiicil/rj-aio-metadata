@@ -293,8 +293,9 @@ function saveActiveFormStateToMemory(platformId) {
   } else if (platformId === 'shutterstock') {
     const isEd = platformDynamicForm.querySelector('#shutterstock_isEditorial');
     const ep = platformDynamicForm.querySelector('#shutterstock_editorialPrefix');
-    if (isEd) settings.isEditorial = isEd.checked;
-    if (ep) settings.editorialPrefix = ep.value.trim();
+    const isChecked = Boolean(isEd && isEd.checked);
+    settings.isEditorial = isChecked;
+    settings.editorialPrefix = (isChecked && ep) ? ep.value.trim() : '';
   } else if (platformId === 'freepik') {
     const ai = platformDynamicForm.querySelector('#freepik_isAiGenerated');
     const model = platformDynamicForm.querySelector('#freepik_aiModel');
@@ -619,12 +620,17 @@ function renderPlatformDynamicForm(platformId) {
   if (platformId === 'shutterstock') {
     const isEd = platformDynamicForm.querySelector('#shutterstock_isEditorial');
     const group = platformDynamicForm.querySelector('#shutterstock_editorialGroup');
+    const ep = platformDynamicForm.querySelector('#shutterstock_editorialPrefix');
     if (isEd && group) {
       isEd.addEventListener('change', () => {
         if (isEd.checked) {
           group.classList.add('rj-visible');
         } else {
           group.classList.remove('rj-visible');
+          if (ep) ep.value = '';
+          if (currentConfig.platformSettings?.shutterstock) {
+            currentConfig.platformSettings.shutterstock.editorialPrefix = '';
+          }
         }
       });
     }
@@ -1022,7 +1028,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response && response.success && response.models) {
         // Save to current config
         currentConfig.providers[activeProvId].models = response.models;
-        currentConfig.providers[activeProvId].selectedModel = response.models[0];
+        const prevSelected = currentConfig.providers[activeProvId].selectedModel;
+        if (!prevSelected || !response.models.includes(prevSelected)) {
+          currentConfig.providers[activeProvId].selectedModel = response.models[0] || '';
+        }
         // Re-render select
         updateModelDropdownState(currentConfig.providers[activeProvId]);
         showToast(`Fetched ${response.models.length} models successfully`);

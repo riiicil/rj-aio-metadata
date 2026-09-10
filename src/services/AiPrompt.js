@@ -654,10 +654,11 @@ export function buildChatPayload({
   const modelStr = model || '';
 
   // Reasoning models (o1, o3, o4) and GPT-5 family strictly prohibit custom temperature (or only default 1.0)
-  const isStrictTemperatureModel = /^(o1|o3|o4|gpt-5)/i.test(modelStr);
+  // Supports direct model names (gpt-5.4-nano) and vendor-prefixed router models (openai/gpt-5.4-nano)
+  const isStrictTemperatureModel = /(?:^|\/)(o1|o3|o4|gpt-5)/i.test(modelStr);
 
   // Models that require max_completion_tokens (reject max_tokens)
-  const isCompletionTokenModel = /^(o1|o3|o4|gpt-5)/i.test(modelStr);
+  const isCompletionTokenModel = /(?:^|\/)(o1|o3|o4|gpt-5)/i.test(modelStr);
 
   // Allocate sufficient token budget: reasoning models consume completion tokens for thinking
   const effectiveMaxTokens = maxTokens !== null

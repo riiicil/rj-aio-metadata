@@ -978,8 +978,11 @@ export class OverlayHUD {
           const keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 50;
           const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
           const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
-          const isAiGenerated = Boolean(this.shadow?.querySelector('#rjToggleAiDeclaration')?.checked);
-          const editorialPrefix = this.currentConfig?.platformSettings?.shutterstock?.editorialPrefix || '';
+          const isAiGenerated = (this.platformId !== 'shutterstock' && this.platformId !== 'depositphotos')
+            ? Boolean(this.shadow?.querySelector('#rjToggleAiDeclaration')?.checked)
+            : false;
+          const isShutterstockEditorial = this.platformId === 'shutterstock' && Boolean(this.currentConfig?.platformSettings?.shutterstock?.isEditorial);
+          const editorialPrefix = isShutterstockEditorial ? (this.currentConfig?.platformSettings?.shutterstock?.editorialPrefix || '') : '';
           const language = this.currentConfig?.platformSettings?.[this.platformId]?.language || 'en';
           const isVideo = this.platformId === 'shutterstock' && typeof window !== 'undefined' && window.location?.pathname?.includes('/video');
           const assetType = isVideo ? 'video' : 'image';
@@ -1187,25 +1190,41 @@ export class OverlayHUD {
     if (!this.shadow || typeof chrome === 'undefined' || !chrome.storage) return;
 
     return new Promise((resolve) => {
-      const getter = chrome.storage.sync ? chrome.storage.sync : chrome.storage.local;
-      getter.get(null, (res) => {
-        let config = res || {};
-        if (chrome.runtime.lastError || !config.platformSettings) {
-          if (chrome.storage.local) {
-            chrome.storage.local.get(null, (localRes) => {
-              this.currentConfig = localRes || {};
-              this._applyConfigToInputs(this.currentConfig);
-              this.updateStartButtonReadiness();
-              resolve();
-            });
-            return;
-          }
-        }
-        this.currentConfig = config;
-        this._applyConfigToInputs(config);
+      const localStore = chrome.storage.local;
+      const syncStore = chrome.storage.sync;
+
+      const applyAndResolve = (config) => {
+        this.currentConfig = config || {};
+        this._applyConfigToInputs(this.currentConfig);
         this.updateStartButtonReadiness();
         resolve();
-      });
+      };
+
+      if (localStore) {
+        localStore.get(null, (localRes) => {
+          if (!chrome.runtime.lastError && localRes && Object.keys(localRes).length > 0 && localRes.platformSettings) {
+            applyAndResolve(localRes);
+            return;
+          }
+          if (syncStore) {
+            syncStore.get(null, (syncRes) => {
+              applyAndResolve(syncRes || localRes || {});
+            });
+          } else {
+            applyAndResolve(localRes || {});
+          }
+        });
+        return;
+      }
+
+      if (syncStore) {
+        syncStore.get(null, (syncRes) => {
+          applyAndResolve(syncRes || {});
+        });
+        return;
+      }
+
+      resolve();
     });
   }
 
@@ -1255,7 +1274,10 @@ export class OverlayHUD {
       const specificKeywords = specificInput ? specificInput.value.trim() : '';
       const isAiGenerated = aiToggle ? aiToggle.checked : false;
 
-      const getter = chrome.storage.sync ? chrome.storage.sync : chrome.storage.local;
+      const localStore = chrome.storage.local;
+      const syncStore = chrome.storage.sync;
+      const getter = localStore || syncStore;
+
       getter.get(null, (res) => {
         const config = res || {};
         if (!config.platformSettings) config.platformSettings = {};
@@ -1267,16 +1289,24 @@ export class OverlayHUD {
           config.platformSettings[this.platformId].isAiGenerated = isAiGenerated;
         }
 
-        if (chrome.storage.sync) {
-          chrome.storage.sync.set(config, () => {
-            if (chrome.runtime.lastError && chrome.storage.local) {
-              chrome.storage.local.set(config);
-            } else if (chrome.storage.local) {
-              chrome.storage.local.set(config);
+        if (localStore) {
+          localStore.set(config, () => {
+            if (syncStore) {
+              try {
+                const syncConfig = JSON.parse(JSON.stringify(config));
+                if (syncConfig.providers) {
+                  Object.keys(syncConfig.providers).forEach(k => {
+                    if (Array.isArray(syncConfig.providers[k]?.models)) {
+                      syncConfig.providers[k].models = syncConfig.providers[k].models.slice(0, 5);
+                    }
+                  });
+                }
+                syncStore.set(syncConfig, () => {});
+              } catch {}
             }
           });
-        } else if (chrome.storage.local) {
-          chrome.storage.local.set(config);
+        } else if (syncStore) {
+          syncStore.set(config);
         }
       });
     }, 300);

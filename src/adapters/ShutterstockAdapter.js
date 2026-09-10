@@ -129,22 +129,30 @@ export class ShutterstockAdapter extends BaseAdapter {
   _getExistingKeywordChips() {
     if (typeof document === 'undefined') return [];
 
-    // 1. Primary: Selected keyword chips with data-testid
+    // 1. Primary: Selected keyword chips with data-testid (strictly chips)
     const chips = Array.from(document.querySelectorAll(
-      '.MuiChip-root[data-testid^="selected-keyword-"], div[data-testid^="selected-keyword-"], [data-testid^="selected-keyword-"]'
+      '.MuiChip-root[data-testid^="selected-keyword-"]'
     ));
 
     if (chips.length > 0) return chips;
 
-    // 2. Secondary fallback: Chips inside keywords container
-    const kwContainer = document.querySelector(
-      'div[data-testid="keyword-input"], div[data-testid="keywords-block-all"], div[data-testid="keyword-input-text"]'
-    )?.closest('div.MuiGrid-root, form, div.MuiStack-root');
+    // 2. Fallback: Any element with data-testid starting with "selected-keyword-" that is a chip
+    const testIdChips = Array.from(document.querySelectorAll(
+      '[data-testid^="selected-keyword-"]'
+    )).filter((el) => {
+      return el.classList.contains('MuiChip-root') ||
+        el.getAttribute('role') === 'button' ||
+        Boolean(el.querySelector('svg[data-testid="ClearIcon"], svg.MuiChip-deleteIcon'));
+    });
 
-    if (kwContainer) {
-      return Array.from(kwContainer.querySelectorAll(
-        '.MuiChip-root, [class*="MuiChip-root"]'
-      )).filter((el) => {
+    if (testIdChips.length > 0) return testIdChips;
+
+    // 3. Fallback scoped strictly inside the keyword chip stack container (never broad form or page grid)
+    const kwStack = document.querySelector(
+      'div[data-testid="keywords-block-all"] .MuiStack-root, div[data-testid="keyword-input-text"] ~ .MuiStack-root'
+    );
+    if (kwStack) {
+      return Array.from(kwStack.querySelectorAll('.MuiChip-root')).filter((el) => {
         return Boolean(el.querySelector('svg[data-testid="ClearIcon"], svg.MuiChip-deleteIcon'));
       });
     }
@@ -161,6 +169,14 @@ export class ShutterstockAdapter extends BaseAdapter {
    */
   async clearKeywords() {
     if (typeof document === 'undefined') return true;
+
+    // Check for empty keywords state indicators
+    const hasEmptyMessage = Boolean(
+      document.querySelector('div[data-testid="keywords-block-all"] p.MuiTypography-alignCenter, [data-testid="keyword-input"] p.MuiTypography-alignCenter')
+    );
+    if (hasEmptyMessage) {
+      return true;
+    }
 
     const existingChips = this._getExistingKeywordChips();
 

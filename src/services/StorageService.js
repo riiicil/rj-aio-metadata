@@ -174,19 +174,40 @@ export class StorageService {
         resolve(StorageService._deepMerge(DEFAULT_CONFIG, {}));
         return;
       }
-      chrome.storage.sync.get(null, stored => {
-        let rawData = stored;
-        if (chrome.runtime.lastError || !rawData || Object.keys(rawData).length === 0) {
-          chrome.storage.local.get(null, localStored => {
-            rawData = localStored || {};
-            const config = StorageService._processLoadedConfig(rawData);
+      // Prioritize local storage (10MB quota) as primary source of truth
+      const localStore = chrome.storage.local;
+      const syncStore = chrome.storage.sync;
+
+      if (localStore) {
+        localStore.get(null, localData => {
+          if (!chrome.runtime.lastError && localData && Object.keys(localData).length > 0 && localData.platformSettings) {
+            const config = StorageService._processLoadedConfig(localData);
             resolve(config);
-          });
-          return;
-        }
-        const config = StorageService._processLoadedConfig(rawData);
-        resolve(config);
-      });
+            return;
+          }
+          // Fallback to sync store if local store has no valid config
+          if (syncStore) {
+            syncStore.get(null, syncData => {
+              const rawData = syncData || {};
+              const config = StorageService._processLoadedConfig(rawData);
+              resolve(config);
+            });
+          } else {
+            resolve(StorageService._processLoadedConfig(localData || {}));
+          }
+        });
+        return;
+      }
+
+      if (syncStore) {
+        syncStore.get(null, syncData => {
+          const config = StorageService._processLoadedConfig(syncData || {});
+          resolve(config);
+        });
+        return;
+      }
+
+      resolve(StorageService._deepMerge(DEFAULT_CONFIG, {}));
     });
   }
 
@@ -328,15 +349,48 @@ export class StorageService {
         resolve(true);
         return;
       }
-      chrome.storage.sync.set(data, () => {
-        if (chrome.runtime.lastError) {
-          // Fallback to local if sync quota exceeded
-          chrome.storage.local.set(data, () => resolve(true));
-        } else {
-          // Keep local in sync
-          chrome.storage.local.set(data, () => resolve(true));
-        }
-      });
+
+      const payload = (data && typeof data === 'object') ? data : {};
+      payload._schemaVersion = DEFAULT_CONFIG._schemaVersion;
+
+      // 1. Always save complete configuration to local storage (10MB quota)
+      if (chrome.storage.local) {
+        chrome.storage.local.set(payload, () => {
+          // 2. Best-effort mirror to sync storage with pruned models to strictly stay under 8KB QUOTA_BYTES_PER_ITEM
+          if (chrome.storage.sync) {
+            try {
+              const syncPayload = JSON.parse(JSON.stringify(payload));
+              if (syncPayload.providers) {
+                Object.keys(syncPayload.providers).forEach(provKey => {
+                  const prov = syncPayload.providers[provKey];
+                  if (prov && Array.isArray(prov.models)) {
+                    // Retain at most 5 items in sync to eliminate quota overflow while keeping selectedModel intact
+                    prov.models = prov.models.slice(0, 5);
+                  }
+                });
+              }
+              chrome.storage.sync.set(syncPayload, () => {
+                // Ignore sync quota errors gracefully
+                if (chrome.runtime.lastError) {
+                  // Silently ignored
+                }
+              });
+            } catch {
+              // Ignore sync serialization errors
+            }
+          }
+          resolve(true);
+        });
+        return;
+      }
+
+      // Direct fallback if only sync exists
+      if (chrome.storage.sync) {
+        chrome.storage.sync.set(payload, () => resolve(true));
+        return;
+      }
+
+      resolve(true);
     });
   }
 
