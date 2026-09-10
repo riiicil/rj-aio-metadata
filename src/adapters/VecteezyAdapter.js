@@ -108,6 +108,40 @@ export class VecteezyAdapter extends BaseAdapter {
   }
 
   /**
+   * Resolves the right-hand metadata editor sidebar container.
+   * Scopes strictly to MuiGrid-grid-xs-3 (.right) and guards against colliding
+   * with the 9-column asset grid container (which also carries class "right").
+   *
+   * @returns {HTMLElement|Document} Right-hand editor form container or document fallback.
+   */
+  getEditorForm() {
+    if (typeof document === 'undefined') return null;
+
+    // 1. Target the 3-column grid container specifically (right-hand sidebar)
+    const panel = document.querySelector('div.MuiGrid-grid-xs-3.right, div.MuiGrid-grid-xs-3, .MuiGrid-grid-xs-3');
+    if (panel) return panel;
+
+    // 2. Target via the "Files selected" header
+    const header = Array.from(document.querySelectorAll('h6')).find(
+      (h) => h.textContent && h.textContent.toLowerCase().includes('files selected')
+    );
+    if (header) {
+      const container = header.closest('div.right') ||
+        header.closest('div[class*="MuiGrid-grid-xs-3"]') ||
+        header.closest('div.MuiGrid-item');
+      if (container) return container;
+    }
+
+    // 3. Fallback: if multiple div.right exist on page, the editor sidebar is the last one (xs-9 is first, xs-3 is last)
+    const rightDivs = document.querySelectorAll('div.right');
+    if (rightDivs.length > 1) {
+      return rightDivs[rightDivs.length - 1];
+    }
+
+    return rightDivs[0] || document;
+  }
+
+  /**
    * Scans and retrieves all resource cards in the batch list.
    * @returns {HTMLElement[]} Array of resource card elements.
    */
@@ -131,20 +165,35 @@ export class VecteezyAdapter extends BaseAdapter {
 
   /**
    * Selects a resource card in the grid to open its sidebar editor.
+   * If card is already selected (carries 'is-selected' class), skips click to avoid toggling off.
+   * Targets the card's <img> directly, which reliably triggers Vecteezy's selection handler.
+   *
    * @param {HTMLElement} cardElement - Card element to select.
    */
   selectCard(cardElement) {
     if (!cardElement) return;
+
+    // Guard: Do not click if already selected (clicking toggles selection off!)
+    if (cardElement.classList?.contains('is-selected')) {
+      this.logger.info('Vecteezy: Asset card is already selected');
+      return;
+    }
+
     this.logger.step('Vecteezy: Selecting asset card');
-    const clickTarget = cardElement.querySelector?.(
-      'img, div[data-testid="resource-card-preview"]'
-    ) || cardElement;
+
+    // Prioritize direct <img> element as proven in user recordings
+    const clickTarget = cardElement.querySelector?.('img') ||
+      cardElement.querySelector?.('div.sc-dkYedM img') ||
+      cardElement.querySelector?.('div[data-testid="resource-card-preview"]') ||
+      cardElement;
+
     simulateClick(clickTarget);
   }
 
   /**
    * Waits for the editor sidebar to become interactive.
-   * Checks that title input is present and right header does not say "No Files selected".
+   * Requires that an asset is actively selected (header shows "(N) Files selected"
+   * and NOT "No Files selected", or card has "is-selected" class) and title input is ready.
    *
    * @param {HTMLElement} [cardElement=null] - Selected asset card.
    * @param {number} [timeoutMs=4000] - Timeout in milliseconds.
@@ -154,37 +203,36 @@ export class VecteezyAdapter extends BaseAdapter {
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeoutMs) {
-      const titleInput = document.querySelector(
-        'div.right input#title-input, div[class*="right"] input#title-input, input#title-input'
-      );
-      const isTitleReady = Boolean(titleInput && !titleInput.disabled);
+      const editorForm = this.getEditorForm() || document;
+      const header = editorForm.querySelector('h6');
+      const headerText = header?.textContent?.trim().toLowerCase() || '';
 
-      const rightHeader = document.querySelector(
-        'div.right h6, div[class*="right"] h6'
-      );
+      const isCardSelected = Boolean(cardElement?.classList?.contains('is-selected'));
       const hasFilesSelected = Boolean(
-        rightHeader && !rightHeader.textContent?.toLowerCase()?.includes('no files selected')
+        headerText && !headerText.includes('no files') && headerText.includes('files selected')
       );
 
-      if (isTitleReady || hasFilesSelected) {
+      const titleInput = editorForm.querySelector('input#title-input');
+      const isReady = (hasFilesSelected || isCardSelected) && Boolean(titleInput);
+
+      if (isReady) {
         return true;
       }
 
-      // If card was not yet selected and time passed > 1s, retry clicking card
-      if (cardElement && Date.now() - startTime > 1000) {
-        const clickTarget = cardElement.querySelector?.(
-          'img, div[data-testid="resource-card-preview"]'
-        ) || cardElement;
-        if (clickTarget) {
-          simulateClick(clickTarget);
-          await sleep(300);
-        }
+      // If not yet selected and > 800ms elapsed, retry clicking the card's img
+      if (cardElement && Date.now() - startTime > 800 && !isCardSelected && !hasFilesSelected) {
+        this.logger.info('Vecteezy: Retrying card click to activate editor form');
+        const img = cardElement.querySelector?.('img') || cardElement;
+        simulateClick(img);
+        await sleep(300);
       }
 
       await sleep(150);
     }
 
-    return Boolean(document.querySelector('input#title-input'));
+    // Final fallback check
+    const editorForm = this.getEditorForm() || document;
+    return Boolean(editorForm.querySelector('input#title-input'));
   }
 
   /**
@@ -196,12 +244,12 @@ export class VecteezyAdapter extends BaseAdapter {
     if (typeof document === 'undefined') return true;
     this.logger.step('Vecteezy: Checking and clearing existing title and keywords');
 
-    const editorForm = document.querySelector('div.right, div[class*="right"]') || document;
+    const editorForm = this.getEditorForm() || document;
 
     // 1. Clear title using X button on field if present
-    const titleInput = editorForm.querySelector('input#title-input, input[name="title"]');
+    const titleInput = editorForm.querySelector('input#title-input');
     const titleClearIcon = editorForm.querySelector(
-      'div[data-testid="text-input"] svg[position="end"], div[data-testid="text-input"] svg.sc-gsqrwE, div[data-testid="text-input"] svg'
+      'input#title-input ~ svg, input#title-input + svg, div[data-testid="text-input"]:has(input#title-input) svg[position="end"], div[data-testid="text-input"] svg[position="end"]'
     );
 
     if (titleClearIcon && titleInput && titleInput.value) {
@@ -228,7 +276,7 @@ export class VecteezyAdapter extends BaseAdapter {
   async clearKeywords() {
     if (typeof document === 'undefined') return true;
 
-    const editorForm = document.querySelector('div.right, div[class*="right"]') || document;
+    const editorForm = this.getEditorForm() || document;
 
     // First try the bulk ClearIcon in the keywords section
     const keywordClearIcon = editorForm.querySelector(
@@ -291,7 +339,7 @@ export class VecteezyAdapter extends BaseAdapter {
 
   /**
    * Injects sanitized metadata into Vecteezy sidebar editor.
-   * Scopes all queries strictly to the right editor form (div.right).
+   * Scopes all queries strictly to the right editor form (MuiGrid-grid-xs-3).
    * - License radio selection (Pro, Free, Editorial).
    * - Category: 100% ignored (auto-detected from file format by Vecteezy).
    * - AI declaration & software selection (Midjourney, Stable Diffusion, DALL·E) or "Other" with custom text input.
@@ -307,8 +355,8 @@ export class VecteezyAdapter extends BaseAdapter {
   async fillMetadata(metadata, options = {}) {
     if (typeof document === 'undefined' || !metadata) return false;
 
-    // Scope queries strictly to the right metadata editor form, NOT the left filters panel!
-    const editorForm = document.querySelector('div.right, div[class*="right"]') || document;
+    // Scope queries strictly to the right metadata editor form (MuiGrid-grid-xs-3)
+    const editorForm = this.getEditorForm() || document;
 
     // 1. Prohibited terms modal dismiss guard (check upfront)
     this.dismissProhibitedModal();
@@ -323,8 +371,6 @@ export class VecteezyAdapter extends BaseAdapter {
     if (normLicense === 'pro') targetLicenseVal = 'pro';
     else if (normLicense === 'editorial') targetLicenseVal = 'editorial';
 
-    this.logger.step('License', targetLicenseVal.toUpperCase());
-
     // Target radio input strictly inside editorForm's radio group
     const licenseRadio = editorForm.querySelector(
       `div[data-testid="radio-group"] input[value="${targetLicenseVal}"]`
@@ -332,11 +378,16 @@ export class VecteezyAdapter extends BaseAdapter {
       (lbl) => lbl.textContent && lbl.textContent.trim().toLowerCase().includes(normLicense)
     )?.querySelector('input[type="radio"]');
 
-    if (licenseRadio && !licenseRadio.checked) {
-      const clickTarget = licenseRadio.closest?.('label') || licenseRadio;
-      simulateClick(clickTarget);
-      if (licenseRadio) licenseRadio.checked = true;
-      await sleep(200);
+    if (licenseRadio) {
+      this.logger.step('License', targetLicenseVal.toUpperCase());
+      if (!licenseRadio.checked) {
+        const clickTarget = licenseRadio.closest?.('label') || licenseRadio;
+        simulateClick(clickTarget);
+        licenseRadio.checked = true;
+        await sleep(200);
+      }
+    } else {
+      this.logger.warn(`Vecteezy: License radio for "${targetLicenseVal}" not found in editor form`);
     }
 
     // 3. Category: Strictly ignored (Vecteezy auto-detects category from uploaded file format)
@@ -354,13 +405,13 @@ export class VecteezyAdapter extends BaseAdapter {
         this.logger.step('Generative AI', 'Checked');
         const clickTarget = aiCheckbox.closest?.('span') || aiCheckbox;
         simulateClick(clickTarget);
-        if (aiCheckbox) aiCheckbox.checked = true;
+        aiCheckbox.checked = true;
         await sleep(300);
       } else if (!isAi && isCurrentlyChecked) {
         this.logger.step('Generative AI', 'Unchecked');
         const clickTarget = aiCheckbox.closest?.('span') || aiCheckbox;
         simulateClick(clickTarget);
-        if (aiCheckbox) aiCheckbox.checked = false;
+        aiCheckbox.checked = false;
         await sleep(300);
       }
 
@@ -434,21 +485,21 @@ export class VecteezyAdapter extends BaseAdapter {
 
     // 6. Title (Single-string instant injection, clamped to max 200 characters)
     if (metadata.title) {
-      const titleInput = editorForm.querySelector(
-        'input#title-input, div[data-testid="text-input"] input, input[name="title"]'
-      );
+      const titleInput = editorForm.querySelector('input#title-input');
       if (titleInput) {
         const cleanTitle = String(metadata.title).slice(0, 200);
         this.logger.step('Title', cleanTitle);
         setNativeValue(titleInput, cleanTitle);
         await sleep(100);
+      } else {
+        this.logger.warn('Vecteezy: Title input (input#title-input) not found in editor form');
       }
     }
 
     // 7. Keywords (Comma-separated chip injection clamped to max 50 tags + Enter key)
     if (metadata.keywords && Array.isArray(metadata.keywords) && metadata.keywords.length > 0) {
       const taggerInput = editorForm.querySelector(
-        'div[data-testid="tagger-input"] input, div.sc-jdWxax input, input[placeholder*="keyword"]'
+        'div[data-testid="tagger-input"] input, input[placeholder*="keyword"]'
       );
       if (taggerInput) {
         const tags = metadata.keywords.slice(0, 50);
@@ -457,7 +508,24 @@ export class VecteezyAdapter extends BaseAdapter {
         setNativeValue(taggerInput, tagsString);
         await sleep(100);
         simulateEnterKey(taggerInput);
+        // Also dispatch comma key event for robust tagger chip triggering
+        const commaInit = { key: ',', code: 'Comma', keyCode: 188, which: 188, bubbles: true, cancelable: true };
+        const createEv = (type) => {
+          if (typeof KeyboardEvent !== 'undefined') {
+            try { return new KeyboardEvent(type, commaInit); } catch {}
+          }
+          if (typeof Event !== 'undefined') {
+            const ev = new Event(type, { bubbles: true, cancelable: true });
+            Object.assign(ev, commaInit);
+            return ev;
+          }
+          return { type, ...commaInit };
+        };
+        taggerInput.dispatchEvent(createEv('keydown'));
+        taggerInput.dispatchEvent(createEv('keyup'));
         await sleep(150);
+      } else {
+        this.logger.warn('Vecteezy: Keywords tagger input not found in editor form');
       }
     }
 

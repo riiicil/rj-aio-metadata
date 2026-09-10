@@ -37,7 +37,13 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
    - Refined `clearMetadata()` to strictly use `button[data-cy="deleteTitle"]` and `button[data-cy="deleteTags"]`, verifying existing chips before clicking and skipping empty keyword fields completely.
    - Directed AI switch clicks to `span.switch__indicator` / `label.switch.aiSelector--check` to resolve Vue `TypeError: Cannot read properties of null (reading 'id')`.
    - Clamped Freepik AI keyword injection to **49 tags** (accounting for Freepik's 1 platform-injected tag to prevent 51/50 overflow) across `FreepikAdapter.js`, `src/popup/popup.js`, and `src/overlay/overlay.js`.
-1. **Freepik (Magnific) Card Selection & simulateClick Deduplication (`contributor.magnific.com`)**:
+1. **Vecteezy Right Panel Form Scoping & Card Image Selection (`contributors.vecteezy.com`)**:
+   - **MuiGrid Collision**: Resolved collision where `div.right` matched the 9-column asset grid container (`MuiGrid-grid-xs-9`, `sc-bUrGhc gHifVb right`) instead of the 3-column metadata editor form (`MuiGrid-grid-xs-3`, `sc-jSpnoh iRWKJS right`).
+   - Implemented `getEditorForm()` prioritizing `div.MuiGrid-grid-xs-3.right`, `div.MuiGrid-grid-xs-3`, or the container with header `Files selected`, preventing title injection into the pagination input box.
+   - **Direct Card `<img>` Click**: `selectCard()` now targets `cardElement.querySelector('img')` directly rather than the parent preview wrapper div, triggering Vecteezy's React selection handler reliably. Added `is-selected` guard to prevent toggling off.
+   - **Editor Ready Guard**: `waitForEditorReady()` requires header text to show `(N) Files selected` (not `No Files selected`) or `is-selected` class, with 800ms card re-click retry.
+   - **bulkSave Disambiguation**: Fixed collision where `"Deselect all"` was matched by `textContent.includes('select all')`, explicitly requiring `!textContent.includes('deselect')`.
+2. **Freepik (Magnific) Card Selection & simulateClick Deduplication (`contributor.magnific.com`)**:
    - Resolved `"Select 0/2"` and blocked metadata form by removing redundant second click on `cardElement` in `FreepikAdapter.js:selectCard()`.
    - Fixed `simulateClick()` in `src/adapters/utils/dom_helpers.js` which previously fired both synthetic `click` MouseEvent and native `element.click()`, causing double clicks in browser environments.
    - Added active selection verification and polling in `FreepikAdapter.js:waitForEditorReady()` with fallback checkbox click.
