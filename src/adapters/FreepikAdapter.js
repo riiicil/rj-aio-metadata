@@ -13,6 +13,7 @@
  */
 
 import { BaseAdapter } from './BaseAdapter.js';
+import { logger } from '../services/LoggerService.js';
 import {
   setNativeValue,
   waitForElement,
@@ -66,6 +67,7 @@ export class FreepikAdapter extends BaseAdapter {
    */
   selectCard(cardElement) {
     if (!cardElement) return;
+    logger.step('Freepik: Selecting asset card');
     simulateClick(cardElement);
   }
 
@@ -95,6 +97,7 @@ export class FreepikAdapter extends BaseAdapter {
    */
   async clearMetadata() {
     if (typeof document === 'undefined') return true;
+    logger.step('Freepik: Clearing existing title and keywords');
 
     // 1. Clear title: click trash button in title group if present, or clear textarea
     const titleTrash = document.querySelector('div.inputTitle button.icon--trash') ||
@@ -103,12 +106,14 @@ export class FreepikAdapter extends BaseAdapter {
       );
 
     if (titleTrash) {
+      logger.info('Freepik: Clicking title trash button');
       simulateClick(titleTrash);
     } else {
       const titleEl = document.querySelector(
         'div.inputTitle textarea, textarea[placeholder*="title"], textarea[placeholder*="Enter the title"]'
       );
-      if (titleEl) {
+      if (titleEl && titleEl.value) {
+        logger.info('Freepik: Clearing title textarea');
         setNativeValue(titleEl, '');
       }
     }
@@ -120,11 +125,15 @@ export class FreepikAdapter extends BaseAdapter {
       );
 
     if (kwTrash) {
+      logger.info('Freepik: Clicking keyword trash button');
       simulateClick(kwTrash);
     } else {
       const removeButtons = Array.from(document.querySelectorAll('button.inputTag__remove'));
-      for (const btn of removeButtons) {
-        simulateClick(btn);
+      if (removeButtons.length > 0) {
+        logger.info(`Freepik: Removing ${removeButtons.length} individual tag chips`);
+        for (const btn of removeButtons) {
+          simulateClick(btn);
+        }
       }
     }
 
@@ -152,6 +161,7 @@ export class FreepikAdapter extends BaseAdapter {
    */
   async fillMetadata(metadata, options = {}) {
     if (typeof document === 'undefined' || !metadata) return false;
+    logger.step('Freepik: Injecting metadata into sidebar editor');
 
     // 1. Category: Strictly omitted (Freepik indexes assets automatically)
 
@@ -163,9 +173,11 @@ export class FreepikAdapter extends BaseAdapter {
 
     if (aiSwitch) {
       if (isAi && !aiSwitch.checked) {
+        logger.step('Generative AI', 'Enabled');
         simulateClick(aiSwitch);
         await sleep(100);
       } else if (!isAi && aiSwitch.checked) {
+        logger.step('Generative AI', 'Disabled');
         simulateClick(aiSwitch);
         await sleep(100);
       }
@@ -173,6 +185,7 @@ export class FreepikAdapter extends BaseAdapter {
       if (isAi) {
         // AI Base Model Selection
         const targetModel = options.aiModel || metadata.aiModel || 'Midjourney 6';
+        logger.step('AI Model', targetModel);
         const modelSelect = document.querySelector('div.selector_base_model select');
 
         if (modelSelect) {
@@ -201,6 +214,7 @@ export class FreepikAdapter extends BaseAdapter {
         // AI Prompt injection
         const promptText = options.aiPrompt || metadata.aiPrompt || options.prompt || '';
         if (promptText) {
+          logger.step('AI Prompt', promptText.slice(0, 50) + (promptText.length > 50 ? '...' : ''));
           const promptInput = document.querySelector('textarea#aiPrompt, textarea[placeholder*="prompt"]');
           if (promptInput) {
             setNativeValue(promptInput, promptText);
@@ -216,6 +230,7 @@ export class FreepikAdapter extends BaseAdapter {
       );
       if (titleInput) {
         const cleanTitle = String(metadata.title).slice(0, 100);
+        logger.step('Title', cleanTitle);
         setNativeValue(titleInput, cleanTitle);
       }
     }
@@ -229,6 +244,7 @@ export class FreepikAdapter extends BaseAdapter {
           : String(metadata.keywords).split(',').map((t) => t.trim()).filter(Boolean);
         const tagsString = tagList.slice(0, 50).join(', ') + ',';
 
+        logger.step('Keywords', `${tagList.slice(0, 50).length} tags injected`);
         setNativeValue(tagInput, tagsString);
         simulateEnterKey(tagInput);
       }
@@ -247,6 +263,7 @@ export class FreepikAdapter extends BaseAdapter {
    */
   async saveDraft() {
     if (typeof document === 'undefined') return true;
+    logger.step('Freepik: Saving item draft ("Create draft")');
 
     const draftBtn = document.querySelector('button.button-paste-draft') ||
       Array.from(document.querySelectorAll('button')).find(
@@ -255,6 +272,7 @@ export class FreepikAdapter extends BaseAdapter {
 
     if (draftBtn) {
       simulateClick(draftBtn);
+      logger.info('Freepik: Waiting for draft save spinner to complete');
 
       try {
         await waitForElementToDisappear(
@@ -270,6 +288,7 @@ export class FreepikAdapter extends BaseAdapter {
         await sleep(400);
       }
 
+      logger.success('Freepik: Item draft saved successfully');
       return true;
     }
 
@@ -282,6 +301,7 @@ export class FreepikAdapter extends BaseAdapter {
    */
   async submitForReview() {
     if (typeof document === 'undefined') return false;
+    logger.step('Freepik: Submitting selected assets for review');
 
     const submitBtn = document.querySelector('button.button--submit') ||
       Array.from(document.querySelectorAll('button')).find(
@@ -290,6 +310,7 @@ export class FreepikAdapter extends BaseAdapter {
 
     if (submitBtn && !submitBtn.disabled) {
       simulateClick(submitBtn);
+      logger.success('Freepik: Assets submitted for review');
       return true;
     }
 

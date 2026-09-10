@@ -2,7 +2,7 @@
 
 *Last Updated: 2026-09-10*<br>
 *Active Branch: `task/platform-adapters`*<br>
-*Current Milestone: Phase 4: Platform Adapters (Shutterstock Editorial Prefix Reset, Strict Keyword Chip Check & Model Storage Quota Fix Complete; Adobe Stock Live Fixes Verified)*
+*Current Milestone: Phase 4: Platform Adapters (Freepik / Magnific Rebranding & Logger Integration Complete; Shutterstock & Adobe Stock Live Fixes Complete)*
 
 ---
 
@@ -12,7 +12,7 @@
 - **Phase 1 — Storage & Popup UI**: [COMPLETE] (Storage engine, background worker, modular platform-dynamic popup UI merged to dev)
 - **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, multi-platform media detection, popup toggle, bidirectional sync merged to dev)
 - **Phase 3 — Universal Vision Service**: [COMPLETE] (Step 3.1 Prompt Engine, Step 3.2 Sanitizer Engine, Step 3.3 Universal Vision Client & Background Proxy Worker complete, merged to dev)
-- **Phase 4 — Platform Adapters**: [COMPLETE] (Sub-phase 4.1 Complete: Vecteezy & Freepik popup AI model taxonomies aligned, Schema v4 migrated; Sub-phase 4.2 Complete: Core Adapter Foundation implemented with dom_helpers.js and BaseAdapter.js; Sub-phase 4.3 Complete: Tier 1 Adapters AdobeStockAdapter.js & ShutterstockAdapter.js implemented; Sub-phase 4.4 Complete: Tier 2 Adapters FreepikAdapter.js & VecteezyAdapter.js implemented; Sub-phase 4.5 Complete: Tier 3 Adapters DreamstimeAdapter.js, DepositphotosAdapter.js, and MiriCanvasAdapter.js implemented; Sub-phase 4.6 Complete: Adapter Registry index.js, In-Page HUD Wiring & Automation Orchestrator overlay.js; Adobe Stock Live Fixes Round 1-5 Verified; Shutterstock CORS Bypass via Background Image Proxy, Deep MUI Selectors, Sequential Keyword Clearing, Spelling Warning Polling, Save Spinner Wait & Deselect Page Wired, LoggerService Integrated; Editorial Prefix Auto-Clear on Toggle Off & Overlay Guard, Strict Keyword Chip Detection on Empty Assets, OpenRouter/Multi-Vendor Model Selection Storage Quota Resolution)
+- **Phase 4 — Platform Adapters**: [COMPLETE] (Sub-phase 4.1 Complete: Vecteezy & Freepik popup AI model taxonomies aligned, Schema v4 migrated; Sub-phase 4.2 Complete: Core Adapter Foundation implemented with dom_helpers.js and BaseAdapter.js; Sub-phase 4.3 Complete: Tier 1 Adapters AdobeStockAdapter.js & ShutterstockAdapter.js implemented; Sub-phase 4.4 Complete: Tier 2 Adapters FreepikAdapter.js & VecteezyAdapter.js implemented; Sub-phase 4.5 Complete: Tier 3 Adapters DreamstimeAdapter.js, DepositphotosAdapter.js, and MiriCanvasAdapter.js implemented; Sub-phase 4.6 Complete: Adapter Registry index.js, In-Page HUD Wiring & Automation Orchestrator overlay.js; Adobe Stock Live Fixes Round 1-5 Verified; Shutterstock CORS Bypass via Background Image Proxy, Deep MUI Selectors, Sequential Keyword Clearing, Spelling Warning Polling, Save Spinner Wait & Deselect Page Wired, LoggerService Integrated; Editorial Prefix Auto-Clear on Toggle Off & Overlay Guard, Strict Keyword Chip Detection on Empty Assets, OpenRouter/Multi-Vendor Model Selection Storage Quota Resolution; Freepik/Magnific Rebranding Multi-Domain Detection, Overlay Routing, Manifest Permissions, and Logger Integration Complete)
 - **Phase 5 — End-to-End Testing & Polish**: [PLANNED] (E2E live verification & packaging)
 
 ---
@@ -23,7 +23,7 @@
 | :--- | :--- | :--- |
 | `main` | Clean (1 empty commit) | Stable production releases only |
 | `dev` | Integration (Phase 0, 1, 2, 3 merged) | Active development integration branch |
-| `task/platform-adapters` | Active (Adobe Stock & Shutterstock Refactored) | Phase 4: Platform Adapters & Automation Engine |
+| `task/platform-adapters` | Active (Adobe Stock, Shutterstock & Freepik Updated) | Phase 4: Platform Adapters & Automation Engine |
 
 ---
 
@@ -35,7 +35,7 @@
 | **Shutterstock** | READY | READY | READY | READY | [LIVE_FIXES_APPLIED] |
 | **Dreamstime** | READY | READY | READY | READY | [TESTED_AND_WIRED] |
 | **Vecteezy** | READY | READY | READY | READY | [TESTED_AND_WIRED] |
-| **Freepik** | READY | READY | READY | READY | [TESTED_AND_WIRED] |
+| **Freepik (Magnific)** | READY | READY | READY | READY | [TESTED_AND_WIRED] |
 | **Depositphotos** | READY | READY | READY | READY | [TESTED_AND_WIRED] |
 | **MiriCanvas** | READY | READY | READY | READY | [TESTED_AND_WIRED] |
 

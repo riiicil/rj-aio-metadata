@@ -6,9 +6,9 @@
 
 ## 1. Immediate Operational State
 
-- **Current Milestone**: Phase 4: Platform Adapters (Shutterstock Editorial Prefix Reset, Strict Keyword Chip Check & Model Storage Quota Fix Complete; Adobe Stock Live Verified)
+- **Current Milestone**: Phase 4: Platform Adapters (Freepik / Magnific Rebranding & Logger Integration Complete; Shutterstock & Adobe Stock Live Fixes Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(shutterstock): auto-clear editorial prefix, tighten keyword chip check, and resolve model storage quota`
+- **Latest Commit**: `feat(freepik): add support for contributor.magnific.com rebranding and integrate logger`
 - **Working Tree**: Clean local branch
 - **Build / Test State**: Verified healthy (672/672 assertions passed across all test suites, zero emoji clean)
 
@@ -16,22 +16,28 @@
 
 ## 2. Active In-Flight Context
 
-Phase 4 has resolved the cross-origin thumbnail fetch barrier and completed live in-page bugfixing across Tier 1 platforms:
-1. **Editorial Prefix Reset & Guard (`src/popup/popup.js`, `src/overlay/overlay.js`)**:
+Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1 platforms, and extended Freepik support to the Magnific rebranding:
+1. **Freepik Rebranding to Magnific (`contributor.magnific.com`)**:
+   - Updated `src/manifest.json` `host_permissions` with `*://*.magnific.com/*`.
+   - Updated `src/overlay/overlay.js` `detectPlatformId()`, `detectPlatform()`, and `detectAssetCount()` to match `host.includes('magnific.com')`, displaying `"Freepik (Magnific)"` and detecting asset cards accurately.
+   - Updated `src/background/service_worker.js` with `hostPatterns: ['contributor.freepik.com', 'contributor.magnific.com']` and new catalog URL `https://contributor.magnific.com/catalog/pending-files/1`.
+   - Updated `src/popup/popup.js` and `popup.html` with `"Freepik (Magnific)"` option and multi-domain tab matching (`Ready on Tab`).
+   - Integrated `logger` into `src/adapters/FreepikAdapter.js` across card selection, clearing, injection, and per-item draft save (`button.button-paste-draft`).
+2. **Editorial Prefix Reset & Guard (`src/popup/popup.js`, `src/overlay/overlay.js`)**:
    - Toggling off editorial switch now clears the prefix input and resets in-memory `editorialPrefix`.
    - `overlay.js` explicitly guards prefix passing so commercial descriptions remain 100% clean.
-2. **Strict Keyword Chip Check on Shutterstock (`src/adapters/ShutterstockAdapter.js`)**:
+3. **Strict Keyword Chip Check on Shutterstock (`src/adapters/ShutterstockAdapter.js`)**:
    - Refactored `_getExistingKeywordChips()` to avoid false positive matching of other MUI form elements on empty assets.
    - `clearKeywords()` skips execution entirely when 0 chips are present or empty text indicator is displayed.
-3. **OpenRouter & Multi-Vendor Model Selection Storage Fix (`src/services/StorageService.js`, `src/overlay/overlay.js`, `src/services/AiPrompt.js`, `src/background/service_worker.js`)**:
+4. **OpenRouter & Multi-Vendor Model Selection Storage Fix (`src/services/StorageService.js`, `src/overlay/overlay.js`, `src/services/AiPrompt.js`, `src/background/service_worker.js`)**:
    - `chrome.storage.local` is now the primary source of truth, avoiding sync quota overflow (8KB limit) on large model catalogs (OpenRouter 435 models, 15KB).
    - Sync mirrors are safely pruned to <=5 models.
    - Gemini models normalized without `models/` prefix for Google's OpenAI endpoint while preserving OpenRouter vendor prefixes.
-4. **Shutterstock CORS Image Proxy (`src/background/service_worker.js` & `src/services/AiService.js`)**:
+5. **Shutterstock CORS Image Proxy (`src/background/service_worker.js` & `src/services/AiService.js`)**:
    - Resolved `Access to fetch at ... has been blocked by CORS policy` when downloading thumbnails from `cdn.shutterstock.com`.
    - Delegated HTTP/HTTPS image fetching to `service_worker.js` (`FETCH_IMAGE_AS_BASE64`) leveraging extension `host_permissions` without CORS restrictions.
    - Retained local `blob:` URLs and unit test direct fetch fallbacks in `imageToBase64()`.
-5. **Deep Material-UI Selectors & Workflow in `ShutterstockAdapter.js` (`src/adapters/ShutterstockAdapter.js`)**:
+6. **Deep Material-UI Selectors & Workflow in `ShutterstockAdapter.js` (`src/adapters/ShutterstockAdapter.js`)**:
    - Targeted innermost elements: `textarea.MuiInputBase-input`, `div[role="button"]` / `[role="combobox"]` for Category 1 & 2 with text normalization ("The Arts" <-> "Arts"), `keyword-input-text input.MuiInputBase-input` with Enter simulation, and spelling warning approval ("Mark all as correct" / "Mark all keywords as correct").
    - Added active asynchronous polling to `approveSpellingWarnings()` (up to 3.5s) to allow asynchronous chip error rendering and spellcheck latency before clicking mark all correct.
    - Usage toggle: Material-UI toggle buttons `button[data-testid="button-editorial"]` vs `button[data-testid="button-commercial"]` inside `div[data-testid="usage-toggle"]`.
@@ -39,19 +45,19 @@ Phase 4 has resolved the cross-origin thumbnail fetch barrier and completed live
    - Bulk save: Target first card checkbox, toolbar `button[data-testid="select-page-button"]`, sidebar `button[data-testid="edit-dialog-save-button"]`, waits for save spinner to resolve and button to normalize, clicks toolbar "Deselect page", and closes drawer.
    - Verified auto-saving on graceful stop mid-batch, with 100ms responsive stop checking during cooldown in `overlay.js`.
    - Video (19 categories) vs Image (26 categories) shared workflow supported.
-6. **Centralized LoggerService Integration**:
-   - `ShutterstockAdapter.js` now uses `(this.logger || logger).step()`, `.info()`, and `.success()` across every single interaction step.
-7. **Adobe Stock Live Fixes Round 1-5 Verified**:
+7. **Centralized LoggerService Integration**:
+   - `ShutterstockAdapter.js` and `FreepikAdapter.js` now use `logger.step()`, `.info()`, and `.success()` across every single interaction step.
+8. **Adobe Stock Live Fixes Round 1-5 Verified**:
    - Strict element sequence, non-AI releases switch to "No", and strict Save work button selector.
 
 ---
 
 ## 3. Actionable Next Steps for Incoming Agent (Phase 5)
 
-1. **Step 1 (Live Browser Verification on Shutterstock)**:
+1. **Step 1 (Live Browser Verification on Magnific / Freepik)**:
    - Contributor reloads unpacked extension (`chrome://extensions`).
-   - Runs automation on `submit.shutterstock.com/portfolio/not_submitted/photo` or `/video`.
-   - Confirms zero CORS errors, clean commercial descriptions when editorial is toggled off, zero unnecessary keyword clearing on empty cards, and smooth OpenRouter/Gemini model saving.
+   - Opens `https://contributor.magnific.com/catalog/pending-files/1`.
+   - Confirms Overlay HUD detects `"Freepik (Magnific)"` with correct asset count, popup shows `"Ready on Tab"`, and runs automation with per-item draft save verification.
 2. **Step 2 (Branch Review & Integration)**:
    - Contributor reviews Phase 4 changes on `task/platform-adapters` and merges into `dev` using `git merge --no-ff`.
 
@@ -61,6 +67,7 @@ Phase 4 has resolved the cross-origin thumbnail fetch barrier and completed live
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 35 | 2026-09-10 | `task/platform-adapters` | `feat(freepik)` | Add support for contributor.magnific.com rebranding in manifest, overlay, background worker, popup UI, and integrate LoggerService | Live browser verification on Magnific / Freepik |
 | 34 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Auto-clear editorial prefix on toggle off, tighten Shutterstock chip detection on empty assets, prioritize local storage to fix model saving quota | Live browser verification on Shutterstock |
 | 33 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Async spelling auto-correct polling, save button spinner resolution wait, post-save deselect page, responsive cooldown stop | Live browser testing on Shutterstock |
 | 32 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Background CORS image proxy, deepest MUI selectors, sequential clearing, tightened delays, LoggerService wired, 666/666 tests pass | Live browser testing on Shutterstock |

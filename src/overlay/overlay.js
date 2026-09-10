@@ -79,7 +79,7 @@ export class OverlayHUD {
     if (host.includes('shutterstock.com')) return 'shutterstock';
     if (host.includes('dreamstime.com')) return 'dreamstime';
     if (host.includes('vecteezy.com')) return 'vecteezy';
-    if (host.includes('freepik.com')) return 'freepik';
+    if (host.includes('freepik.com') || host.includes('magnific.com')) return 'freepik';
     if (host.includes('depositphotos.com')) return 'depositphotos';
     if (host.includes('miricanvas.com')) return 'miricanvas';
     return 'unknown';
@@ -95,7 +95,7 @@ export class OverlayHUD {
     if (host.includes('shutterstock.com')) return 'Shutterstock';
     if (host.includes('dreamstime.com')) return 'Dreamstime';
     if (host.includes('vecteezy.com')) return 'Vecteezy';
-    if (host.includes('freepik.com')) return 'Freepik';
+    if (host.includes('freepik.com') || host.includes('magnific.com')) return 'Freepik (Magnific)';
     if (host.includes('depositphotos.com')) return 'Depositphotos';
     if (host.includes('miricanvas.com')) return 'MiriCanvas';
     return 'Unknown Page';
@@ -166,9 +166,9 @@ export class OverlayHUD {
       };
     }
 
-    // 3. Freepik
-    if (host.includes('freepik.com')) {
-      const elements = document.querySelectorAll('div.catalog__item');
+    // 3. Freepik / Magnific
+    if (host.includes('freepik.com') || host.includes('magnific.com')) {
+      const elements = document.querySelectorAll('div.catalog__item, div[data-testid*="catalog-item"]');
       const count = elements.length;
       return {
         count,

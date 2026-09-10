@@ -169,7 +169,11 @@ function updateTabMatchStatus() {
 
   const targetPlatform = activeTabInfo.destinations[selectedPlatform];
   const currentUrl = activeTabInfo.url || '';
-  const isMatch = targetPlatform && currentUrl.includes(targetPlatform.hostPattern);
+  const isMatch = targetPlatform && (
+    targetPlatform.hostPatterns
+      ? targetPlatform.hostPatterns.some((p) => currentUrl.includes(p))
+      : currentUrl.includes(targetPlatform.hostPattern)
+  );
 
   if (isMatch) {
     platformStatusBadge.className = 'rj-status-badge rj-status-matched';

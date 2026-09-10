@@ -28,9 +28,10 @@ const PLATFORM_DESTINATIONS = {
     url: 'https://contributors.vecteezy.com/content'
   },
   freepik: {
-    name: 'Freepik',
-    hostPattern: 'contributor.freepik.com',
-    url: 'https://contributor.freepik.com/files'
+    name: 'Freepik (Magnific)',
+    hostPattern: 'contributor.magnific.com',
+    hostPatterns: ['contributor.freepik.com', 'contributor.magnific.com'],
+    url: 'https://contributor.magnific.com/catalog/pending-files/1'
   },
   depositphotos: {
     name: 'Depositphotos',
@@ -124,7 +125,10 @@ export function evaluateTabPlatform(url = '') {
   try {
     const urlObj = new URL(url);
     for (const [platformId, def] of Object.entries(PLATFORM_DESTINATIONS)) {
-      if (urlObj.hostname.includes(def.hostPattern)) {
+      const isMatch = def.hostPatterns
+        ? def.hostPatterns.some((pattern) => urlObj.hostname.includes(pattern))
+        : urlObj.hostname.includes(def.hostPattern);
+      if (isMatch) {
         return { detectedPlatform: platformId, platformDef: def, isMatched: true };
       }
     }
