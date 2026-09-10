@@ -40,35 +40,48 @@ export class FreepikAdapter extends BaseAdapter {
   }
 
   /**
-   * Scans and retrieves all catalog item cards in the grid.
+   * Scans and retrieves all real catalog item cards in the grid (excluding fake placeholders).
    * @returns {HTMLElement[]} Array of catalog item card elements.
    */
   getAssetCards() {
     if (typeof document === 'undefined') return [];
-    return Array.from(document.querySelectorAll('div.catalog__item, div.row.mg-none > div.catalog__item'));
+    return Array.from(document.querySelectorAll('div.catalog__item, div.row.mg-none > div.catalog__item')).filter(
+      (el) => !el.classList?.contains('catalog__item--fake') && !(el.getAttribute?.('class') || '').includes('catalog__item--fake')
+    );
   }
 
   /**
    * Extracts the thumbnail image URL from an asset card.
+   * Targets artwork thumbnail preview and strictly avoids AI badge icons (aiGenerated.svg).
+   *
    * @param {HTMLElement} cardElement - Asset card element.
    * @returns {string|null} Image URL or null.
    */
   getThumbnailUrl(cardElement) {
     if (!cardElement) return null;
     const img = cardElement.querySelector?.(
-      'div.catalog__item .thumbnail img, div.thumbnail > img, img'
-    );
+      '.thumbnail img[data-cy*="preitemImg"], div.thumbnail img, .thumbnail img, img[data-cy*="preitemImg"]'
+    ) || cardElement.querySelector?.('img:not([src*="aiGenerated"]):not([src*=".svg"])')
+      || cardElement.querySelector?.('img');
     return extractThumbnailUrl(img || cardElement);
   }
 
   /**
    * Selects an asset card in the catalog grid to open its sidebar editor.
+   * Targets the innermost thumbnail element to reliably trigger Vue item selection.
+   *
    * @param {HTMLElement} cardElement - Card element to select.
    */
   selectCard(cardElement) {
     if (!cardElement) return;
     logger.step('Freepik: Selecting asset card');
-    simulateClick(cardElement);
+    const clickTarget = cardElement.querySelector?.(
+      '.thumbnail img[data-cy*="preitemImg"], div.thumbnail img, .thumbnail img, div.thumbnail, .content'
+    ) || cardElement;
+    simulateClick(clickTarget);
+    if (clickTarget !== cardElement) {
+      simulateClick(cardElement);
+    }
   }
 
   /**
@@ -80,10 +93,11 @@ export class FreepikAdapter extends BaseAdapter {
   async waitForEditorReady(cardElement = null, timeoutMs = 4000) {
     try {
       await waitForElement(
-        'aside.catalog__sidebar, div.inputTitle textarea',
+        'aside.catalog__sidebar, div.inputTitle textarea, aside.catalog__sidebar textarea',
         typeof document !== 'undefined' ? document : null,
         timeoutMs
       );
+      await sleep(300);
       return true;
     } catch {
       return false;
@@ -99,15 +113,26 @@ export class FreepikAdapter extends BaseAdapter {
     if (typeof document === 'undefined') return true;
     logger.step('Freepik: Clearing existing title and keywords');
 
+    // Helper to locate trash button in title or keyword section
+    const findTrashButton = (sectionSelector) => {
+      const section = document.querySelector(sectionSelector);
+      if (!section) return null;
+      const buttons = Array.from(section.querySelectorAll('button'));
+      return buttons.find((b) => {
+        if (b.disabled || b.classList?.contains('disabled') || (b.getAttribute?.('class') || '').includes('disabled')) return false;
+        const cls = b.getAttribute?.('class') || b.className || '';
+        if (cls.includes('icon--trash')) return true;
+        return Boolean(b.querySelector?.('i.icon--trash, .icon--trash'));
+      }) || null;
+    };
+
     // 1. Clear title: click trash button in title group if present, or clear textarea
-    const titleTrash = document.querySelector('div.inputTitle button.icon--trash') ||
-      Array.from(document.querySelectorAll('div.inputTitle button')).find(
-        (b) => b.querySelector?.('i.icon--trash') || (b.getAttribute?.('class') || b.className || '').includes('icon--trash')
-      );
+    const titleTrash = findTrashButton('div.inputTitle');
 
     if (titleTrash) {
       logger.info('Freepik: Clicking title trash button');
       simulateClick(titleTrash);
+      await sleep(150);
     } else {
       const titleEl = document.querySelector(
         'div.inputTitle textarea, textarea[placeholder*="title"], textarea[placeholder*="Enter the title"]'
@@ -115,18 +140,17 @@ export class FreepikAdapter extends BaseAdapter {
       if (titleEl && titleEl.value) {
         logger.info('Freepik: Clearing title textarea');
         setNativeValue(titleEl, '');
+        await sleep(100);
       }
     }
 
     // 2. Clear keywords: click trash button in tag group if present, or click individual remove buttons
-    const kwTrash = document.querySelector('div.inputTag button.icon--trash') ||
-      Array.from(document.querySelectorAll('div.inputTag button')).find(
-        (b) => b.querySelector?.('i.icon--trash') || (b.getAttribute?.('class') || b.className || '').includes('icon--trash')
-      );
+    const kwTrash = findTrashButton('div.inputTag');
 
     if (kwTrash) {
       logger.info('Freepik: Clicking keyword trash button');
       simulateClick(kwTrash);
+      await sleep(150);
     } else {
       const removeButtons = Array.from(document.querySelectorAll('button.inputTag__remove'));
       if (removeButtons.length > 0) {
@@ -134,6 +158,7 @@ export class FreepikAdapter extends BaseAdapter {
         for (const btn of removeButtons) {
           simulateClick(btn);
         }
+        await sleep(150);
       }
     }
 
@@ -161,6 +186,11 @@ export class FreepikAdapter extends BaseAdapter {
    */
   async fillMetadata(metadata, options = {}) {
     if (typeof document === 'undefined' || !metadata) return false;
+
+    // 0. Explicitly clear previous title & keywords before injecting new metadata
+    await this.clearMetadata();
+    await sleep(200);
+
     logger.step('Freepik: Injecting metadata into sidebar editor');
 
     // 1. Category: Strictly omitted (Freepik indexes assets automatically)

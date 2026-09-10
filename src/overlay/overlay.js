@@ -168,12 +168,15 @@ export class OverlayHUD {
 
     // 3. Freepik / Magnific
     if (host.includes('freepik.com') || host.includes('magnific.com')) {
-      const elements = document.querySelectorAll('div.catalog__item, div[data-testid*="catalog-item"]');
+      const allElements = Array.from(document.querySelectorAll('div.catalog__item, div[data-testid*="catalog-item"]'));
+      const elements = allElements.filter(
+        (el) => !el.classList?.contains('catalog__item--fake') && !(el.getAttribute?.('class') || '').includes('catalog__item--fake')
+      );
       const count = elements.length;
       return {
         count,
         label: count > 0 ? `${count} Asset${count === 1 ? '' : 's'} Found` : '0 Assets Detected',
-        selector: 'div.catalog__item'
+        selector: 'div.catalog__item:not(.catalog__item--fake)'
       };
     }
 
