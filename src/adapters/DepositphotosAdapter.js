@@ -411,63 +411,82 @@ export class DepositphotosAdapter extends BaseAdapter {
       );
       if (tagsEditor) {
         simulateClick(tagsEditor);
-        await sleep(120);
+        await sleep(100);
       }
 
-      // B. Primary: Attempt native full-string paste event on paste target within THIS card
-      let pasteSucceeded = false;
-      const pasteTarget = this._queryScoped(
-        root,
-        'span.paste_editor__tag, span.tagseditor__item_new span.tagseditor__tag, div.tagseditor'
-      );
+      // Helper to query the active typing input (strictly ignoring existing committed chips)
+      const getActiveInput = () => {
+        return this._queryScoped(
+          root,
+          'span.tagseditor__item_new span.tagseditor__tag, span.tagseditor__item[data-type="input"] span.tagseditor__tag, .tagseditor__item_new .tagseditor__tag'
+        );
+      };
 
-      if (pasteTarget && typeof ClipboardEvent !== 'undefined' && typeof DataTransfer !== 'undefined') {
-        try {
-          const dt = new DataTransfer();
-          dt.setData('text/plain', cleanTagsString);
-          dt.setData('text', cleanTagsString);
-          const pasteEvent = new ClipboardEvent('paste', {
-            bubbles: true,
-            cancelable: true,
-            composed: true,
-            clipboardData: dt
-          });
-          pasteTarget.dispatchEvent(pasteEvent);
-          await sleep(200);
+      let activeInput = getActiveInput();
+      if (!activeInput && tagsEditor) {
+        simulateClick(tagsEditor);
+        await sleep(80);
+        activeInput = getActiveInput();
+      }
 
-          const createdChips = root.querySelectorAll('span.tagseditor__item:not(.tagseditor__item_new)');
-          if (createdChips.length > 0) {
-            pasteSucceeded = true;
-          }
-        } catch {
-          pasteSucceeded = false;
+      // B. Primary: Single-string comma injection + Enter
+      // Depositphotos Collection.Tags natively splits strings by /[,;]/g into individual chips!
+      if (activeInput) {
+        if (typeof activeInput.focus === 'function') activeInput.focus();
+        activeInput.textContent = cleanTagsString;
+        if (activeInput.innerText !== undefined) activeInput.innerText = cleanTagsString;
+        activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await sleep(60);
+
+        simulateEnterKey(activeInput);
+        const itemParent = activeInput.closest?.('._tagseditor__item, span.tagseditor__item');
+        if (itemParent && itemParent !== activeInput) {
+          simulateEnterKey(itemParent);
         }
+        await sleep(250);
       }
 
-      // C. Fallback: Fast sequential tag injection + Enter (100% native Depositphotos tag creation)
-      if (!pasteSucceeded) {
+      // C. Verification & Fallback: Ensure all chips are created without overwriting
+      let createdChips = Array.from(root.querySelectorAll?.('span.tagseditor__item:not(.tagseditor__item_new)') || []);
+      const minExpected = Math.min(cleanTagsList.length, 5);
+
+      if (createdChips.length < minExpected) {
+        // If a single unsplit chip with commas was created, remove it before fallback
+        if (createdChips.length === 1) {
+          const singleChipText = createdChips[0].textContent || '';
+          if (singleChipText.includes(',')) {
+            const removeBtn = createdChips[0].querySelector?.('i.tagseditor__remove');
+            if (removeBtn) {
+              simulateClick(removeBtn);
+              await sleep(60);
+            }
+          }
+        }
+
+        if (tagsEditor) {
+          simulateClick(tagsEditor);
+          await sleep(60);
+        }
+
         for (const tag of cleanTagsList) {
-          let activeInput = this._queryScoped(
-            root,
-            'span.tagseditor__item_new span.tagseditor__tag, div.tagseditor span[contenteditable="true"]'
-          );
-          if (!activeInput) {
-            const editorContainer = this._queryScoped(root, 'div.tagseditor');
-            if (editorContainer) simulateClick(editorContainer);
-            await sleep(40);
-            activeInput = this._queryScoped(
-              root,
-              'span.tagseditor__item_new span.tagseditor__tag, div.tagseditor span[contenteditable="true"]'
-            );
+          let inputEl = getActiveInput();
+          if (!inputEl && tagsEditor) {
+            simulateClick(tagsEditor);
+            await sleep(50);
+            inputEl = getActiveInput();
           }
 
-          if (activeInput) {
-            if (typeof activeInput.focus === 'function') activeInput.focus();
-            activeInput.textContent = tag;
-            if (activeInput.innerText !== undefined) activeInput.innerText = tag;
-            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
-            simulateEnterKey(activeInput);
-            await sleep(35);
+          if (inputEl) {
+            if (typeof inputEl.focus === 'function') inputEl.focus();
+            inputEl.textContent = tag;
+            if (inputEl.innerText !== undefined) inputEl.innerText = tag;
+            inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+            simulateEnterKey(inputEl);
+            const parent = inputEl.closest?.('._tagseditor__item, span.tagseditor__item');
+            if (parent && parent !== inputEl) {
+              simulateEnterKey(parent);
+            }
+            await sleep(60);
           }
         }
       }

@@ -5,9 +5,9 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 4: Platform Adapters (Depositphotos Strict Scoping & Dual-Strategy Keyword Chips, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Live Fixes Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (Depositphotos Full-String Native Comma Splitting & Chip Overwrite Elimination, Strict Scoping, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Live Fixes Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(depositphotos): resolve cross-card leakage, dual-strategy keyword chip creation, and bulk save deselect`
+- **Latest Commit**: `fix(depositphotos): inject full comma string for native multi-chip splitting and prevent chip overwrite`
 - **Working Tree**: Clean local branch
 - **Build / Test State**: Verified healthy (748/748 assertions passed across all test suites, zero emoji clean)
 
@@ -18,7 +18,8 @@
 Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned Depositphotos, Dreamstime, Vecteezy, and Freepik (Magnific):
 1. **Depositphotos Live Alignment & Form Scoping (`depositphotos.com/files/unfinished.html`)**:
    - **Strict Card Scoping & Zero Cross-Card Leakage**: Removed dangerous `document.querySelector` fallback from `_queryScoped(root, selector)`. When querying within a card container (`root`), searches are 100% strictly scoped to `root` and return `null` if not found, eliminating the bug where Card 1's tag search leaked to Card 2's existing chips.
-   - **Dual-Strategy Keyword Chip Creation (Paste + Sequential Enter Loop)**: Reverse-engineered Depositphotos' Backbone View (`unfinished.js`, `className: 'tagseditor'`). Depositphotos only creates tag chips on `paste` (reading `e.originalEvent.clipboardData.getData('text')`) or `keydown Enter/Comma`. Implemented primary full-string paste via synthetic `ClipboardEvent('paste')` with `DataTransfer`, with an automated fallback to a rapid per-tag entry loop + `simulateEnterKey` on `span.tagseditor__item_new > span.tagseditor__tag`, perfectly matching the user's manual interaction recording (`rekaman-platform-20260912_034231-v2.json`).
+   - **Full-String Direct Comma Injection & Native Multi-Chip Splitting**: Depositphotos' native Backbone collection (`DP.Collection.Tags` in `unfinished.js`) defines `splitModelByKeywordNameRegex: /[,;]/g`. When `keydown Enter` is fired on `span.tagseditor__item_new > span.tagseditor__tag` with a full comma-separated string (`cleanTagsString`), Depositphotos natively parses the string, splits it by commas, and creates all 50 tag chips at once.
+   - **Chip Overwrite Elimination**: Completely removed `div.tagseditor span[contenteditable="true"]` from active input selectors. Since every committed tag chip has `contenteditable="true"` on its inner span, querying it caused subsequent loop iterations to repeatedly overwrite the first created chip, leaving only the 50th keyword. Fallback queries now strictly isolate `span.tagseditor__item_new > span.tagseditor__tag, span.tagseditor__item[data-type="input"] > span.tagseditor__tag`.
    - **Pre-Start Header Select-All Deselection (`prepareAutomation()`)**: Depositphotos loads unfinished assets with `i._checkbox.checkbox-bicon.select-all` checked by default, causing multi-item selection where edits on any card are broadcast to all selected cards. `prepareAutomation()` inspects this checkbox on automation start and clicks to uncheck it if selected, cleanly isolating cards.
    - **Safe Single-Card Selection (`selectCard()`)**: `selectCard(cardElement)` tracks `this.activeCard` without clicking individual card checkboxes (`i.itemeditor__selectaction`), preventing cards from being grouped during sequential processing.
    - **Modern Itemeditor List Card Extraction**: Unfinished files page renders assets in a vertical list container `.itemslist > div.itemeditor` (with virtualized `.itemeditor_stub` state), replacing legacy table rows (`tr.unfinished__item`). Updated `getAssetCards()` with modern selector and legacy fallback, resolving "0 Assets Detected" bug on automation start.
