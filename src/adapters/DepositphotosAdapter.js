@@ -96,26 +96,49 @@ export class DepositphotosAdapter extends BaseAdapter {
   }
 
   /**
-   * Selects an item card and stores it as activeCard.
+   * Pre-automation preparation:
+   * Checks if the table header "Select all" checkbox is checked.
+   * If checked (or items are selected), unchecks it before card processing begins.
+   * This prevents multi-edit broadcasting across cards.
+   * @returns {Promise<boolean>}
+   */
+  async prepareAutomation() {
+    if (typeof document === 'undefined') return true;
+
+    const selectAllBtn = document.querySelector(
+      'i._checkbox.checkbox-bicon.select-all, i.checkbox-bicon.select-all, th.unfinished__action i.select-all, .select-all'
+    );
+    const qtySelectedEl = document.querySelector('span._cp__qty_selected, ._cp__qty_selected');
+    const selectedQty = qtySelectedEl ? parseInt(qtySelectedEl.textContent.trim() || '0', 10) : 0;
+
+    const isChecked = Boolean(
+      (selectAllBtn && (selectAllBtn.classList?.contains('selected') || selectAllBtn.classList?.contains('active'))) ||
+      selectedQty > 0 ||
+      document.querySelector('.itemeditor__container_selected')
+    );
+
+    if (isChecked && selectAllBtn) {
+      (this.logger || logger).step('Depositphotos: Unchecking initial Select All to isolate card edits...');
+      simulateClick(selectAllBtn);
+      await sleep(300);
+    } else {
+      (this.logger || logger).info('Depositphotos: Select All is already unchecked, proceeding...');
+    }
+
+    return true;
+  }
+
+  /**
+   * Tracks target item card as activeCard without toggling card checkboxes.
+   * On Depositphotos, checking card checkboxes triggers multi-item selection mode,
+   * causing single-card edits to overwrite all checked cards.
    * @param {HTMLElement} cardElement - Item element.
    */
   selectCard(cardElement) {
     if (!cardElement) return;
     this.activeCard = cardElement;
-
-    const checkbox = cardElement.querySelector?.(
-      'div.itemeditor__checkboxcell, i.itemeditor__selectaction, td.unfinished__action label.checkbox-wrapper i, td.unfinished__action i, i.checkbox-bicon'
-    );
-    if (checkbox) {
-      const isSelected =
-        cardElement.classList?.contains('itemeditor__container_selected') ||
-        cardElement.querySelector?.('.itemeditor__container_selected');
-      if (!isSelected) {
-        simulateClick(checkbox);
-      }
-    } else {
-      simulateClick(cardElement);
-    }
+    // Scoped editing on Depositphotos happens directly within each card container.
+    // Do NOT click the card checkbox here to prevent multi-edit grouping.
   }
 
   /**
@@ -280,25 +303,98 @@ export class DepositphotosAdapter extends BaseAdapter {
    * @param {HTMLElement} [cardElement=null] - Target card element.
    * @returns {Promise<boolean>} True if injection succeeded.
    */
+  /**
+   * Injects sanitized metadata into Depositphotos item editor.
+   * Scoped strictly to target cardElement to prevent cross-card contamination.
+   * Sequential workflow:
+   * 1. Clear old description if exists via x button (a._itemeditor__reset_description).
+   * 2. Inject description into textarea._itemeditor__value_description.
+   * 3. Defocus description: click .itemeditor__row.itemeditor__namerow (or label) to blur.
+   * 4. Clear old keywords if exists via x button (a._itemeditor__reset_keywords).
+   * 5. Inject keywords via span.paste_editor__tag + Enter key.
+   * 6. Defocus keywords: click .itemeditor__row.itemeditor__namerow (or label) to blur.
+   * 7. Editorial & Country Location (if enabled in preferences; skipped otherwise).
+   * 8. Nudity / Mature (if enabled in preferences).
+   *
+   * @param {Object} metadata - Sanitized metadata payload.
+   * @param {Object} [options={}] - Options (isEditorial, editorialCountry, isNudity).
+   * @param {HTMLElement} [cardElement=null] - Target card element.
+   * @returns {Promise<boolean>} True if injection succeeded.
+   */
   async fillMetadata(metadata, options = {}, cardElement = null) {
     const root = cardElement || this.activeCard || (typeof document !== 'undefined' ? document : null);
     if (!root || !metadata) return false;
 
-    if (options.clearExisting !== false) {
-      await this.clearMetadata(root);
-    }
+    // Helper for defocusing active field by clicking namerow
+    const defocusField = async (sourceElement = null) => {
+      if (sourceElement && typeof sourceElement.blur === 'function') {
+        sourceElement.blur();
+      }
+      if (typeof document !== 'undefined' && document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
+      const nameRow = this._queryScoped(
+        root,
+        'div.itemeditor__row.itemeditor__namerow, .itemeditor__row.itemeditor__namerow, div.itemeditor__namerow, .itemeditor__namerow .itemeditor__label, .itemeditor__namerow'
+      );
+      if (nameRow) {
+        simulateClick(nameRow);
+        await sleep(120);
+      }
+    };
 
-    // 1. Description: Single-string instant injection into textarea
+    // 1. Clear old description if exists with x button
+    const resetDesc = this._queryScoped(
+      root,
+      'a._itemeditor__reset_description, .itemeditor__row_description a.itemeditor__reset, div.itemeditor__fock a.itemeditor__reset'
+    );
     const descTextarea = this._queryScoped(
       root,
       'textarea.itemeditor__input_description, textarea._itemeditor__value_description'
     );
+    const hasOldDesc = Boolean(
+      (resetDesc && (resetDesc.classList?.contains('itemeditor__reset_active') ||
+        (!resetDesc.classList?.contains('itemeditor__reset_hidden') && resetDesc.offsetParent !== null) ||
+        (!resetDesc.classList?.contains('itemeditor__reset_hidden') && typeof resetDesc.offsetParent === 'undefined'))) ||
+      (descTextarea && descTextarea.value && descTextarea.value.trim().length > 0)
+    );
+    if (resetDesc && hasOldDesc) {
+      (this.logger || logger).step('Clearing description...');
+      simulateClick(resetDesc);
+      await sleep(80);
+    }
+    if (descTextarea && descTextarea.value) {
+      setNativeValue(descTextarea, '');
+    }
+
+    // 2. Fill description
     if (descTextarea && metadata.description) {
       (this.logger || logger).step('Injecting description', metadata.description.slice(0, 45) + '...');
       setNativeValue(descTextarea, metadata.description.trim());
+      await sleep(100);
     }
 
-    // 2. Keywords: Fast Tag Injection via paste trigger
+    // 3. Defocus description: click itemeditor__namerow
+    await defocusField(descTextarea);
+
+    // 4. Clear old keywords if exists with x button
+    const resetKeywords = this._queryScoped(
+      root,
+      'a._itemeditor__reset_keywords, .itemeditor__row_tags a.itemeditor__reset'
+    );
+    const hasExistingTags = Boolean(
+      (resetKeywords && (resetKeywords.classList?.contains('itemeditor__reset_active') ||
+        (!resetKeywords.classList?.contains('itemeditor__reset_hidden') && resetKeywords.offsetParent !== null) ||
+        (!resetKeywords.classList?.contains('itemeditor__reset_hidden') && typeof resetKeywords.offsetParent === 'undefined'))) ||
+      (root.querySelectorAll?.('span.tagseditor__item:not(.tagseditor__item_new)')?.length > 0)
+    );
+    if (resetKeywords && hasExistingTags) {
+      (this.logger || logger).step('Clearing keywords...');
+      simulateClick(resetKeywords);
+      await sleep(80);
+    }
+
+    // 5. Fill keywords
     if (metadata.keywords && metadata.keywords.length > 0) {
       const rawKeywords = Array.isArray(metadata.keywords)
         ? metadata.keywords
@@ -318,43 +414,65 @@ export class DepositphotosAdapter extends BaseAdapter {
       );
       if (pasteTrigger) {
         simulateClick(pasteTrigger);
-        await sleep(80);
+        await sleep(120);
       }
 
-      const activeTagInput = this._queryScoped(
+      // Locate active tag editable container (contenteditable span or input)
+      const activeTagSpan = this._queryScoped(
         root,
-        'div.itemeditor__field_focused span.tagseditor__tag, div.tagseditor input, div.tagseditor textarea, input.tagseditor__input, span.tagseditor__item_new span.tagseditor__tag, span.tagseditor__tag'
+        'span.tagseditor__item_new span.tagseditor__tag, div.itemeditor__field_focused span.tagseditor__tag, div.tagseditor span[contenteditable="true"], span.tagseditor__tag[contenteditable="true"]'
+      );
+      const activeInput = this._queryScoped(
+        root,
+        'div.tagseditor input, div.tagseditor textarea, input.tagseditor__input'
       );
 
-      if (activeTagInput) {
-        setNativeValue(activeTagInput, cleanTags);
-        simulateEnterKey(activeTagInput);
+      if (activeInput) {
+        setNativeValue(activeInput, cleanTags);
+        simulateEnterKey(activeInput);
+      } else if (activeTagSpan) {
+        if (typeof activeTagSpan.focus === 'function') activeTagSpan.focus();
+        activeTagSpan.textContent = cleanTags;
+        if (activeTagSpan.innerText !== undefined) activeTagSpan.innerText = cleanTags;
+        if (typeof InputEvent !== 'undefined') {
+          activeTagSpan.dispatchEvent(
+            new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertFromPaste', data: cleanTags })
+          );
+        } else {
+          activeTagSpan.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        activeTagSpan.dispatchEvent(new Event('change', { bubbles: true }));
+        simulateEnterKey(activeTagSpan);
       } else if (pasteTrigger) {
-        setNativeValue(pasteTrigger, cleanTags);
+        pasteTrigger.textContent = cleanTags;
+        if (pasteTrigger.innerText !== undefined) pasteTrigger.innerText = cleanTags;
+        pasteTrigger.dispatchEvent(new Event('input', { bubbles: true }));
         simulateEnterKey(pasteTrigger);
       }
+      await sleep(120);
     }
 
-    // 3. Editorial & Country Location
-    const editorialSelect = this._queryScoped(
-      root,
-      'select._itemeditor__value_is_editorial, div._itemeditor__field_is_editorial select, select[class*="_value_is_editorial"]'
-    );
-    if (editorialSelect) {
-      const isEditorial = Boolean(options.isEditorial || options.licenseType === 'editorial');
-      // Depositphotos values are "yes" and "no" (also support "1"/"0" in mock)
-      const targetVal = isEditorial ? 'yes' : 'no';
-      const fallbackVal = isEditorial ? '1' : '0';
+    // 6. Defocus keywords: click itemeditor__namerow
+    await defocusField();
 
-      const hasOption = Array.from(editorialSelect.options || []).some(o => o.value === targetVal);
-      const valToSet = hasOption ? targetVal : fallbackVal;
+    // 7. Editorial & Country Location (Only if enabled in preferences)
+    const isEditorial = Boolean(options.isEditorial || options.licenseType === 'editorial');
+    if (isEditorial) {
+      const editorialSelect = this._queryScoped(
+        root,
+        'select._itemeditor__value_is_editorial, div._itemeditor__field_is_editorial select, select[class*="_value_is_editorial"]'
+      );
+      if (editorialSelect) {
+        const targetVal = 'yes';
+        const fallbackVal = '1';
+        const hasOption = Array.from(editorialSelect.options || []).some((o) => o.value === targetVal);
+        const valToSet = hasOption ? targetVal : fallbackVal;
 
-      (this.logger || logger).step('Setting Editorial', isEditorial ? 'Yes' : 'No');
-      editorialSelect.value = valToSet;
-      editorialSelect.dispatchEvent(new Event('change', { bubbles: true }));
-
-      if (isEditorial) {
+        (this.logger || logger).step('Setting Editorial', 'Yes');
+        editorialSelect.value = valToSet;
+        editorialSelect.dispatchEvent(new Event('change', { bubbles: true }));
         await sleep(150);
+
         const countryCode = options.editorialCountry || options.countryCode || 'US';
         const countrySelect = this._queryScoped(
           root,
@@ -364,22 +482,25 @@ export class DepositphotosAdapter extends BaseAdapter {
           (this.logger || logger).step('Setting Country', countryCode);
           countrySelect.value = countryCode;
           countrySelect.dispatchEvent(new Event('change', { bubbles: true }));
+          await sleep(100);
         }
       }
     }
 
-    // 4. Nudity / Mature Content
-    const nuditySelect = this._queryScoped(
-      root,
-      'select._itemeditor__value_is_nudity, div._itemeditor__field_is_nudity select, select[class*="_value_is_nudity"]'
-    );
-    if (nuditySelect) {
-      const isNudity = Boolean(options.isNudity);
-      const targetVal = isNudity ? 'yes' : 'no';
-      const fallbackVal = isNudity ? '1' : '0';
-      const hasOption = Array.from(nuditySelect.options || []).some(o => o.value === targetVal);
-      nuditySelect.value = hasOption ? targetVal : fallbackVal;
-      nuditySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    // 8. Nudity / Mature Content (Only if explicitly specified)
+    if (options.isNudity !== undefined) {
+      const nuditySelect = this._queryScoped(
+        root,
+        'select._itemeditor__value_is_nudity, div._itemeditor__field_is_nudity select, select[class*="_value_is_nudity"]'
+      );
+      if (nuditySelect) {
+        const isNudity = Boolean(options.isNudity);
+        const targetVal = isNudity ? 'yes' : 'no';
+        const fallbackVal = isNudity ? '1' : '0';
+        const hasOption = Array.from(nuditySelect.options || []).some((o) => o.value === targetVal);
+        nuditySelect.value = hasOption ? targetVal : fallbackVal;
+        nuditySelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
     }
 
     (this.logger || logger).success('Item metadata injected successfully');
@@ -407,7 +528,7 @@ export class DepositphotosAdapter extends BaseAdapter {
    * Bulk Save Strategy:
    * 1. Scrolls back to top via i.to-top-bicon.
    * 2. Clicks table header "Select all" checkbox if not already selected.
-   * 3. Clicks control panel Save button and waits for sync completion.
+   * 3. Clicks control panel Save button and waits for sync completion / button disabled.
    * @returns {Promise<boolean>} True if bulk save executed.
    */
   async bulkSave() {
@@ -419,14 +540,15 @@ export class DepositphotosAdapter extends BaseAdapter {
     if (toTopBtn) {
       (this.logger || logger).step('Scrolling back to top...');
       simulateClick(toTopBtn);
-    } else if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+    }
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    await sleep(500);
+    await sleep(600);
 
     // 2. Click "Select all" checkbox if not already selected
     const selectAllBtn = document.querySelector(
-      'i.checkbox-bicon.select-all, th.unfinished__action label.checkbox-wrapper > i, th.unfinished__action i.select-all, .select-all'
+      'i._checkbox.checkbox-bicon.select-all, i.checkbox-bicon.select-all, th.unfinished__action label.checkbox-wrapper > i, th.unfinished__action i.select-all, .select-all'
     );
     if (selectAllBtn) {
       const isSelected =
@@ -434,7 +556,7 @@ export class DepositphotosAdapter extends BaseAdapter {
       if (!isSelected) {
         (this.logger || logger).step('Clicking Select All checkbox...');
         simulateClick(selectAllBtn);
-        await sleep(300);
+        await sleep(400);
       }
     }
 
@@ -446,14 +568,25 @@ export class DepositphotosAdapter extends BaseAdapter {
       (this.logger || logger).step('Clicking Save button...');
       simulateClick(saveBtn);
 
-      // 4. Wait for sync completion
-      await sleep(500);
+      // 4. Wait until save button becomes disabled or sync finishes
+      await sleep(600);
       let waited = 0;
-      while (waited < 5000) {
+      const maxTimeout = 10000;
+      while (waited < maxTimeout) {
         const syncIndicator = document.querySelector('._cp__indicator_sync:not(.unfinished__indicator_hidden)');
-        if (!syncIndicator && !saveBtn.disabled) break;
-        await sleep(250);
-        waited += 250;
+        const isButtonDisabled = saveBtn.disabled || saveBtn.classList?.contains('disabled');
+        const isButtonSaving = saveBtn.classList?.contains('active');
+
+        if (isButtonDisabled) {
+          (this.logger || logger).step('Save button disabled, changes committed.');
+          break;
+        }
+
+        if (!syncIndicator && !isButtonSaving && waited > 1500) {
+          break;
+        }
+        await sleep(300);
+        waited += 300;
       }
       (this.logger || logger).success('Bulk save completed successfully');
       return true;

@@ -7,9 +7,9 @@
 ## 1. Immediate Operational State
 - **Current Milestone**: Phase 4: Platform Adapters (Depositphotos, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Live Fixes Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(depositphotos): align card selectors, progressive scroll, card-scoped form filling, and to-top bulkSave`
+- **Latest Commit**: `fix(depositphotos): add pre-start deselect, namerow defocus, contenteditable tags, and save lifecycle`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (732/732 assertions passed across all test suites, zero emoji clean)
+- **Build / Test State**: Verified healthy (739/739 assertions passed across all test suites, zero emoji clean)
 
 ---
 
@@ -17,12 +17,19 @@
 
 Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned Depositphotos, Dreamstime, Vecteezy, and Freepik (Magnific):
 1. **Depositphotos Live Alignment & Form Scoping (`depositphotos.com/files/unfinished.html`)**:
-   - **Modern Itemeditor List Card Extraction**: Depositphotos unfinished files page renders assets in a vertical list container `.itemslist > div.itemeditor` (with virtualized `.itemeditor_stub` state), replacing legacy table rows (`tr.unfinished__item`). Updated `getAssetCards()` with modern selector and legacy fallback, resolving "0 Assets Detected" bug on automation start.
+   - **Pre-Start Header Select-All Deselection (`prepareAutomation()`)**: Depositphotos loads unfinished assets with `i._checkbox.checkbox-bicon.select-all` checked by default, causing multi-item selection where edits on any card are broadcast to all selected cards. `prepareAutomation()` inspects this checkbox on automation start and clicks to uncheck it if selected, cleanly isolating cards.
+   - **Safe Single-Card Selection (`selectCard()`)**: `selectCard(cardElement)` tracks `this.activeCard` without clicking individual card checkboxes (`i.itemeditor__selectaction`), preventing cards from being grouped during sequential processing.
+   - **Modern Itemeditor List Card Extraction**: Unfinished files page renders assets in a vertical list container `.itemslist > div.itemeditor` (with virtualized `.itemeditor_stub` state), replacing legacy table rows (`tr.unfinished__item`). Updated `getAssetCards()` with modern selector and legacy fallback, resolving "0 Assets Detected" bug on automation start.
    - **Progressive In-View Scroll & Virtualization Readiness**: `waitForEditorReady(cardElement)` brings virtualized items into the viewport using `cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' })` and actively polls until Depositphotos removes `.itemeditor_stub`.
-   - **Card-Scoped Form Isolation**: Every card in `.itemslist` contains its own embedded form container (`div._itemeditor__container.itemeditor__container`). Implemented `_queryScoped(root, selector)` helper querying inside `root` first with document fallback, and updated `src/overlay/overlay.js` to pass `card` explicitly to `fillMetadata()`, preventing form fields from repeatedly overwriting card 1.
-   - **Condition-Checked Granular Clearing**: Targets `a._itemeditor__reset_description` and `a._itemeditor__reset_keywords`, verifying active state class `itemeditor__reset_active` before clicking, skipping clicks when already empty or hidden (`itemeditor__reset_hidden`).
-   - **Metadata Injection Alignment**: Instant single-string description injection into `textarea._itemeditor__value_description`, fast keyword tag paste via `span.paste_editor__tag` and Enter key simulation (clamped to 50 tags), editorial dropdown selection (`"yes"` vs `"no"`), 2-letter ISO country code selection on `select._itemeditor__value_location_country_code`, and nudity/mature selection.
-   - **To-Top Bulk Save Strategy**: Scrolls back to top via `i.to-top-bicon` (or `window.scrollTo({ top: 0 })`), clicks table header `i.checkbox-bicon.select-all` (idempotently checking `.selected` class to avoid accidental deselection), and clicks control panel Save button (`button.button.white, button._cp__action_save`) waiting for sync indicator resolution.
+   - **Sequential In-Card Workflow with Namerow Defocus**: Each card contains its own embedded form container (`div._itemeditor__container.itemeditor__container`). Implemented the strict sequential order:
+     1. Clear old description via `a._itemeditor__reset_description.itemeditor__reset_active`.
+     2. Inject description into `textarea._itemeditor__value_description`.
+     3. Defocus description by clicking `.itemeditor__row.itemeditor__namerow` (or label) and triggering blur to commit value.
+     4. Clear old keywords via `a._itemeditor__reset_keywords.itemeditor__reset_active`.
+     5. Inject keywords: click `span.paste_editor__tag`, inject text into contenteditable `span._tagseditor__tag` (dispatching `InputEvent`, `change`, and `simulateEnterKey`), properly parsing tags into chips.
+     6. Defocus keywords by clicking `.itemeditor__row.itemeditor__namerow` (or label) and triggering blur.
+     7. Editorial & Country: conditionally set only when enabled in preferences (`isEditorial: true`), left untouched otherwise.
+   - **To-Top Bulk Save Strategy & Disabled Wait**: Scrolls back to top via `i.to-top-bicon` (or `window.scrollTo({ top: 0 })`), clicks table header `i._checkbox.checkbox-bicon.select-all` (idempotently checking `.selected` class), and clicks control panel Save button (`button._cp__action_save`), polling until the button becomes disabled or sync indicator resolves.
    - **Full LoggerService Integration**: All Depositphotos steps emit structured console logs with `.step()`, `.asset()`, `.info()`, and `.success()`.
 2. **Dreamstime Live Alignment & Carousel Orchestration (`dreamstime.com/upload/edit*`)**:
    - **Subcategory AJAX Latency Resolution**: Dreamstime populates `<select id="M_Subcategory_X">` asynchronously via an internal AJAX call triggered upon main category selection. Added async option polling (`subcatSelect.options.length > 1` with a 3000ms timeout) before selecting the subcategory, preventing the selection from being overwritten when the AJAX response renders.
