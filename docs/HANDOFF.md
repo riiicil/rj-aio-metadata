@@ -5,18 +5,26 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 4: Platform Adapters (Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Live Fixes Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (Depositphotos, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Live Fixes Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(dreamstime): add subcategory polling, single-word keywords, toast waiting, and carousel loop`
+- **Latest Commit**: `fix(depositphotos): align card selectors, progressive scroll, card-scoped form filling, and to-top bulkSave`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (680/680 assertions passed across all test suites, zero emoji clean)
+- **Build / Test State**: Verified healthy (732/732 assertions passed across all test suites, zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned Dreamstime, Vecteezy, and Freepik (Magnific):
-1. **Dreamstime Live Alignment & Carousel Orchestration (`dreamstime.com/upload/edit*`)**:
+Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned Depositphotos, Dreamstime, Vecteezy, and Freepik (Magnific):
+1. **Depositphotos Live Alignment & Form Scoping (`depositphotos.com/files/unfinished.html`)**:
+   - **Modern Itemeditor List Card Extraction**: Depositphotos unfinished files page renders assets in a vertical list container `.itemslist > div.itemeditor` (with virtualized `.itemeditor_stub` state), replacing legacy table rows (`tr.unfinished__item`). Updated `getAssetCards()` with modern selector and legacy fallback, resolving "0 Assets Detected" bug on automation start.
+   - **Progressive In-View Scroll & Virtualization Readiness**: `waitForEditorReady(cardElement)` brings virtualized items into the viewport using `cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' })` and actively polls until Depositphotos removes `.itemeditor_stub`.
+   - **Card-Scoped Form Isolation**: Every card in `.itemslist` contains its own embedded form container (`div._itemeditor__container.itemeditor__container`). Implemented `_queryScoped(root, selector)` helper querying inside `root` first with document fallback, and updated `src/overlay/overlay.js` to pass `card` explicitly to `fillMetadata()`, preventing form fields from repeatedly overwriting card 1.
+   - **Condition-Checked Granular Clearing**: Targets `a._itemeditor__reset_description` and `a._itemeditor__reset_keywords`, verifying active state class `itemeditor__reset_active` before clicking, skipping clicks when already empty or hidden (`itemeditor__reset_hidden`).
+   - **Metadata Injection Alignment**: Instant single-string description injection into `textarea._itemeditor__value_description`, fast keyword tag paste via `span.paste_editor__tag` and Enter key simulation (clamped to 50 tags), editorial dropdown selection (`"yes"` vs `"no"`), 2-letter ISO country code selection on `select._itemeditor__value_location_country_code`, and nudity/mature selection.
+   - **To-Top Bulk Save Strategy**: Scrolls back to top via `i.to-top-bicon` (or `window.scrollTo({ top: 0 })`), clicks table header `i.checkbox-bicon.select-all` (idempotently checking `.selected` class to avoid accidental deselection), and clicks control panel Save button (`button.button.white, button._cp__action_save`) waiting for sync indicator resolution.
+   - **Full LoggerService Integration**: All Depositphotos steps emit structured console logs with `.step()`, `.asset()`, `.info()`, and `.success()`.
+2. **Dreamstime Live Alignment & Carousel Orchestration (`dreamstime.com/upload/edit*`)**:
    - **Subcategory AJAX Latency Resolution**: Dreamstime populates `<select id="M_Subcategory_X">` asynchronously via an internal AJAX call triggered upon main category selection. Added async option polling (`subcatSelect.options.length > 1` with a 3000ms timeout) before selecting the subcategory, preventing the selection from being overwritten when the AJAX response renders.
    - **Granular Condition-Checked Clear Buttons**: Dreamstime provides clear buttons `#js-remove-title`, `#js-remove-all-description`, `#js-remove-cat1..3`, and `#js-remove-all-key`. Each button carries `data-state="hidden"` when empty and `data-state="visible"` when populated. Replaced unconditional clicking with granular checking (`clearTitleIfNotEmpty`, `clearDescriptionIfNotEmpty`, `clearCategoriesIfNotEmpty`, `clearKeywordsIfNotEmpty`), avoiding unnecessary DOM mutations.
    - **Strict Single-Word Keyword Splitting**: Dreamstime strictly prohibits multi-word keywords (e.g., "bus station" splits into "bus" and "station"). Updated `SanitizerService.js` to split strings by whitespace `/\s+/`, filter, deduplicate, and clamp to the 70 tag quota. Added duplicate protection in `DreamstimeAdapter.js:fillMetadata()`.
@@ -97,6 +105,8 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 41 | 2026-09-12 | `task/platform-adapters` | `fix(depositphotos)` | Align .itemslist > div.itemeditor card selectors, progressive scroll & stub waiting, card-scoped form filling, condition-checked clearing, to-top bulkSave | Live browser verification on Depositphotos |
+| 40 | 2026-09-11 | `task/platform-adapters` | `fix(dreamstime)` | Subcategory polling, condition-checked clear buttons, single-word keywords, toast lifecycle waiting, and in-page carousel loop | Live browser verification on Dreamstime |
 | 39 | 2026-09-10 | `task/platform-adapters` | `fix(vecteezy)` | Scope metadata editor to right panel, add prepareAutomation, clear buttons, software dropdown, and fix bulkSave selector | Live browser verification on Vecteezy |
 | 38 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Prioritize custom dropdown for AI model, add 500ms interaction pacing, check & toggle off AI in non-AI mode, and add pre-start deselect hook | Live browser verification on Magnific / Freepik |
 | 37 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Target button[data-cy="savePreitems"] (icon--save) for saving item, clamp AI keywords to 49, skip keyword clear when no chips exist | Live browser verification on Magnific / Freepik |

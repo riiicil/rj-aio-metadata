@@ -265,16 +265,16 @@ export class OverlayHUD {
         }
       }
 
-      // C. Fallback: table rows on page
+      // C. Fallback: modern item cards or table rows on page
       const rows = document.querySelectorAll(
-        'div._unfinished__section_items table tbody tr, table.unfinished-files tbody tr, tr.unfinished__item'
+        '.itemslist > div.itemeditor, div._unfinished__section_items table tbody tr, table.unfinished-files tbody tr, tr.unfinished__item'
       );
       if (rows.length > 0) {
         return {
           count: rows.length,
           mediaType: 'Assets',
           label: `${rows.length} Asset${rows.length === 1 ? '' : 's'} Detected`,
-          selector: 'div._unfinished__section_items table tbody tr'
+          selector: '.itemslist > div.itemeditor'
         };
       }
 
@@ -1173,7 +1173,7 @@ export class OverlayHUD {
             language
           };
 
-          await adapter.fillMetadata(sanitizedData, platformOptions);
+          await adapter.fillMetadata(sanitizedData, platformOptions, card);
           processedCount++;
 
           // Step 7: Per-item save (for Freepik and Dreamstime)
