@@ -142,8 +142,8 @@ export class DepositphotosAdapter extends BaseAdapter {
   }
 
   /**
-   * Scoped query selector helper. Queries target container first,
-   * falling back to document if not found (supports both modern card scoping and legacy table/external panel).
+   * Scoped query selector helper. Queries target container strictly.
+   * If root is null or element is not found within root, returns null (never leaks to document).
    * @private
    * @param {HTMLElement|Document} root - Container to query within.
    * @param {string} selector - CSS selector.
@@ -151,12 +151,7 @@ export class DepositphotosAdapter extends BaseAdapter {
    */
   _queryScoped(root, selector) {
     if (!selector) return null;
-    const fromRoot = root?.querySelector?.(selector);
-    if (fromRoot) return fromRoot;
-    if (root && root !== document && typeof document !== 'undefined') {
-      return document.querySelector(selector);
-    }
-    return null;
+    return root?.querySelector?.(selector) || null;
   }
 
   /**
@@ -322,7 +317,7 @@ export class DepositphotosAdapter extends BaseAdapter {
    * @returns {Promise<boolean>} True if injection succeeded.
    */
   async fillMetadata(metadata, options = {}, cardElement = null) {
-    const root = cardElement || this.activeCard || (typeof document !== 'undefined' ? document : null);
+    const root = cardElement || this.activeCard;
     if (!root || !metadata) return false;
 
     // Helper for defocusing active field by clicking namerow
@@ -335,18 +330,18 @@ export class DepositphotosAdapter extends BaseAdapter {
       }
       const nameRow = this._queryScoped(
         root,
-        'div.itemeditor__row.itemeditor__namerow, .itemeditor__row.itemeditor__namerow, div.itemeditor__namerow, .itemeditor__namerow .itemeditor__label, .itemeditor__namerow'
+        'div.itemeditor__row.itemeditor__namerow span.itemeditor__name, div.itemeditor__row.itemeditor__namerow, .itemeditor__row.itemeditor__namerow, div.itemeditor__namerow, .itemeditor__namerow .itemeditor__label, .itemeditor__namerow'
       );
       if (nameRow) {
         simulateClick(nameRow);
-        await sleep(120);
+        await sleep(100);
       }
     };
 
     // 1. Clear old description if exists with x button
     const resetDesc = this._queryScoped(
       root,
-      'a._itemeditor__reset_description, .itemeditor__row_description a.itemeditor__reset, div.itemeditor__fock a.itemeditor__reset'
+      'a._itemeditor__reset_description, .itemeditor__row_description a.itemeditor__reset, div.itemeditor__row:nth-of-type(3) a.itemeditor__reset'
     );
     const descTextarea = this._queryScoped(
       root,
@@ -380,7 +375,7 @@ export class DepositphotosAdapter extends BaseAdapter {
     // 4. Clear old keywords if exists with x button
     const resetKeywords = this._queryScoped(
       root,
-      'a._itemeditor__reset_keywords, .itemeditor__row_tags a.itemeditor__reset'
+      'a._itemeditor__reset_keywords, .itemeditor__row_tags a.itemeditor__reset, div.itemeditor__row.itemeditor__row_tags a.itemeditor__reset'
     );
     const hasExistingTags = Boolean(
       (resetKeywords && (resetKeywords.classList?.contains('itemeditor__reset_active') ||
@@ -400,56 +395,83 @@ export class DepositphotosAdapter extends BaseAdapter {
         ? metadata.keywords
         : String(metadata.keywords).split(',');
 
-      const cleanTags = rawKeywords
+      const cleanTagsList = rawKeywords
         .map((k) => (typeof k === 'string' ? k.trim() : ''))
         .filter((k) => k.length > 0)
-        .slice(0, 50)
-        .join(', ');
+        .slice(0, 50);
 
-      (this.logger || logger).step('Injecting keywords', `${cleanTags.split(',').length} tags`);
+      const cleanTagsString = cleanTagsList.join(', ');
 
-      const pasteTrigger = this._queryScoped(
+      (this.logger || logger).step('Injecting keywords', `${cleanTagsList.length} tags`);
+
+      // A. Activate tags editor container on THIS card
+      const tagsEditor = this._queryScoped(
         root,
-        'span.paste_editor__tag, div.tagseditor span.paste_editor__tag'
+        'div.tagseditor, span.paste_editor__tag'
       );
-      if (pasteTrigger) {
-        simulateClick(pasteTrigger);
+      if (tagsEditor) {
+        simulateClick(tagsEditor);
         await sleep(120);
       }
 
-      // Locate active tag editable container (contenteditable span or input)
-      const activeTagSpan = this._queryScoped(
+      // B. Primary: Attempt native full-string paste event on paste target within THIS card
+      let pasteSucceeded = false;
+      const pasteTarget = this._queryScoped(
         root,
-        'span.tagseditor__item_new span.tagseditor__tag, div.itemeditor__field_focused span.tagseditor__tag, div.tagseditor span[contenteditable="true"], span.tagseditor__tag[contenteditable="true"]'
-      );
-      const activeInput = this._queryScoped(
-        root,
-        'div.tagseditor input, div.tagseditor textarea, input.tagseditor__input'
+        'span.paste_editor__tag, span.tagseditor__item_new span.tagseditor__tag, div.tagseditor'
       );
 
-      if (activeInput) {
-        setNativeValue(activeInput, cleanTags);
-        simulateEnterKey(activeInput);
-      } else if (activeTagSpan) {
-        if (typeof activeTagSpan.focus === 'function') activeTagSpan.focus();
-        activeTagSpan.textContent = cleanTags;
-        if (activeTagSpan.innerText !== undefined) activeTagSpan.innerText = cleanTags;
-        if (typeof InputEvent !== 'undefined') {
-          activeTagSpan.dispatchEvent(
-            new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertFromPaste', data: cleanTags })
-          );
-        } else {
-          activeTagSpan.dispatchEvent(new Event('input', { bubbles: true }));
+      if (pasteTarget && typeof ClipboardEvent !== 'undefined' && typeof DataTransfer !== 'undefined') {
+        try {
+          const dt = new DataTransfer();
+          dt.setData('text/plain', cleanTagsString);
+          dt.setData('text', cleanTagsString);
+          const pasteEvent = new ClipboardEvent('paste', {
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            clipboardData: dt
+          });
+          pasteTarget.dispatchEvent(pasteEvent);
+          await sleep(200);
+
+          const createdChips = root.querySelectorAll('span.tagseditor__item:not(.tagseditor__item_new)');
+          if (createdChips.length > 0) {
+            pasteSucceeded = true;
+          }
+        } catch {
+          pasteSucceeded = false;
         }
-        activeTagSpan.dispatchEvent(new Event('change', { bubbles: true }));
-        simulateEnterKey(activeTagSpan);
-      } else if (pasteTrigger) {
-        pasteTrigger.textContent = cleanTags;
-        if (pasteTrigger.innerText !== undefined) pasteTrigger.innerText = cleanTags;
-        pasteTrigger.dispatchEvent(new Event('input', { bubbles: true }));
-        simulateEnterKey(pasteTrigger);
       }
-      await sleep(120);
+
+      // C. Fallback: Fast sequential tag injection + Enter (100% native Depositphotos tag creation)
+      if (!pasteSucceeded) {
+        for (const tag of cleanTagsList) {
+          let activeInput = this._queryScoped(
+            root,
+            'span.tagseditor__item_new span.tagseditor__tag, div.tagseditor span[contenteditable="true"]'
+          );
+          if (!activeInput) {
+            const editorContainer = this._queryScoped(root, 'div.tagseditor');
+            if (editorContainer) simulateClick(editorContainer);
+            await sleep(40);
+            activeInput = this._queryScoped(
+              root,
+              'span.tagseditor__item_new span.tagseditor__tag, div.tagseditor span[contenteditable="true"]'
+            );
+          }
+
+          if (activeInput) {
+            if (typeof activeInput.focus === 'function') activeInput.focus();
+            activeInput.textContent = tag;
+            if (activeInput.innerText !== undefined) activeInput.innerText = tag;
+            activeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            simulateEnterKey(activeInput);
+            await sleep(35);
+          }
+        }
+      }
+      await sleep(100);
     }
 
     // 6. Defocus keywords: click itemeditor__namerow
@@ -589,6 +611,17 @@ export class DepositphotosAdapter extends BaseAdapter {
         waited += 300;
       }
       (this.logger || logger).success('Bulk save completed successfully');
+
+      // Uncheck select-all after save completes to avoid leaving all cards selected
+      if (selectAllBtn) {
+        await sleep(300);
+        const isStillChecked =
+          selectAllBtn.classList?.contains('selected') || selectAllBtn.classList?.contains('active');
+        if (isStillChecked) {
+          simulateClick(selectAllBtn);
+        }
+      }
+
       return true;
     }
 
