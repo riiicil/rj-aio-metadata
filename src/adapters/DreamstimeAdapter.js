@@ -4,16 +4,16 @@
  * Implements BaseAdapter interface for Dreamstime (dreamstime.com):
  * - URL matching for dreamstime.com (especially /uploadfile and /upload/edit*).
  * - Modal detection and asset card extraction (div.upload-item[id], modal container div.popup-upload).
- * - Thumbnail extraction (div.upload-item__thumb img, .popup-upload img).
- * - Title clearing (#js-remove-title) and single-string instant injection into input#title.
- * - Description clearing (.js-editcleandescription) and single-string instant injection into textarea#description.
- * - Category pairs interaction with 300ms AJAX delay (select#M_Category_1/2/3 -> select#M_Subcategory_1/2/3).
+ * - Thumbnail extraction (div.upload-item__thumb img, .popup-upload img, background-image).
+ * - Granular condition-checked metadata clearing (#js-remove-title, #js-remove-all-description, #js-remove-cat*, #js-remove-all-key).
+ * - Category pairs interaction with asynchronous subcategory option polling (select#M_Category_1/2/3 -> select#M_Subcategory_1/2/3).
  *   AI Mode Special Rule: Category 3 is hardcoded to "Illustration & Clipart" and "Generative AI".
- * - Keywords clearing (.js-editcleankeywords) and comma-separated chip injection into input#keywords_tag + Enter.
- * - License type selection: Commercial (RF) vs Editorial (ED).
- * - Save Draft with Toast Confirmation: clicks #js-savededits, awaits .noty_type__dt-success or #js-submit-message.
+ * - Keywords single-word per tag splitting, deduplication, and chip injection (clamped <= 70 tags).
+ * - License type selection: Commercial (RF) vs Editorial (ED) in #licensesubmissiontype.
+ * - Save Draft with Toast Confirmation: clicks #js-savededits, awaits toast appearance AND disappearance.
+ * - Submit for Review: clicks #submitbutton, awaits toast appearance AND disappearance.
  * - Next item navigation with Infinite Carousel Loop Guard: tracks processed asset IDs and stops when cycling.
- * - Submit for review: clicks a#js-next-submit.
+ * - Comprehensive LoggerService integration across all steps.
  */
 
 import { BaseAdapter } from './BaseAdapter.js';
@@ -25,6 +25,7 @@ import {
   extractThumbnailUrl,
   sleep
 } from './utils/dom_helpers.js';
+import { logger } from '../services/LoggerService.js';
 
 export class DreamstimeAdapter extends BaseAdapter {
   constructor() {
@@ -64,12 +65,21 @@ export class DreamstimeAdapter extends BaseAdapter {
   getCurrentAssetId() {
     if (typeof document === 'undefined') return null;
 
+    // 1. Direct filename link
+    const filenameLink = document.querySelector('#js-originalfilename');
+    if (filenameLink) {
+      const match = (filenameLink.textContent || '').match(/(\d{7,12})/);
+      if (match) return match[1];
+    }
+
+    // 2. Breadcrumbs container
     const header = document.querySelector('.popup-nav__breadcrumbs, .popup-nav');
     if (header) {
       const match = (header.textContent || '').match(/(\d{7,12})/);
       if (match) return match[1];
     }
 
+    // 3. Modal container attributes
     const modal = document.querySelector('div.popup-upload, div.popup-upload--submit');
     if (modal) {
       const dataId = modal.getAttribute('data-id') || modal.id;
@@ -78,6 +88,12 @@ export class DreamstimeAdapter extends BaseAdapter {
         if (match) return match[1];
       }
       const match = (modal.textContent || '').match(/(\d{7,12})/);
+      if (match) return match[1];
+    }
+
+    // 4. URL path fallback (e.g. /upload/edit473814624)
+    if (typeof window !== 'undefined' && window.location?.pathname) {
+      const match = window.location.pathname.match(/\/upload\/edit(\d{7,12})/i);
       if (match) return match[1];
     }
 
@@ -91,10 +107,26 @@ export class DreamstimeAdapter extends BaseAdapter {
    */
   getThumbnailUrl(cardElement) {
     if (!cardElement) return null;
+
+    // 1. Check img tags
     const img = cardElement.querySelector?.(
       'div.upload-item__thumb img, .popup-upload img, .popup-upload__img img, img'
     );
-    return extractThumbnailUrl(img || cardElement);
+    if (img) {
+      const url = extractThumbnailUrl(img);
+      if (url) return url;
+    }
+
+    // 2. Check CSS background-image on preview containers
+    const bgContainer = cardElement.querySelector?.(
+      '.popup-upload__img, div.upload-item__thumb, [style*="background-image"]'
+    );
+    if (bgContainer && bgContainer.style && bgContainer.style.backgroundImage) {
+      const match = bgContainer.style.backgroundImage.match(/url\(['"]?(.*?)['"]?\)/i);
+      if (match && match[1]) return match[1];
+    }
+
+    return extractThumbnailUrl(cardElement);
   }
 
   /**
@@ -122,7 +154,7 @@ export class DreamstimeAdapter extends BaseAdapter {
   async waitForEditorReady(cardElement = null, timeoutMs = 4000) {
     try {
       await waitForElement(
-        'input#title, textarea#description',
+        'input#title, textarea#description, select#M_Category_1',
         typeof document !== 'undefined' ? document : null,
         timeoutMs
       );
@@ -133,45 +165,137 @@ export class DreamstimeAdapter extends BaseAdapter {
   }
 
   /**
+   * Clears pre-existing title if populated using button x (#js-remove-title).
+   */
+  async clearTitleIfNotEmpty() {
+    if (typeof document === 'undefined') return;
+    const titleInput = document.querySelector('input#title, input[name="M_title"]');
+    const clearBtn = document.querySelector('#js-remove-title, a#js-remove-title');
+    const hasValue = Boolean(titleInput && titleInput.value && titleInput.value.trim().length > 0);
+    const isBtnVisible = Boolean(clearBtn && clearBtn.getAttribute('data-state') !== 'hidden');
+
+    if (hasValue || isBtnVisible) {
+      logger.step('Clearing pre-existing title...');
+      if (clearBtn) {
+        simulateClick(clearBtn);
+      } else if (titleInput) {
+        setNativeValue(titleInput, '');
+      }
+      await sleep(150);
+      if (titleInput && titleInput.value.trim().length > 0) {
+        setNativeValue(titleInput, '');
+      }
+    } else {
+      logger.info('Title is already empty. Skipping clear.');
+    }
+  }
+
+  /**
+   * Clears pre-existing description if populated using button x (#js-remove-all-description).
+   */
+  async clearDescriptionIfNotEmpty() {
+    if (typeof document === 'undefined') return;
+    const descInput = document.querySelector('textarea#description, textarea[name="M_description"]');
+    const clearBtn = document.querySelector(
+      '#js-remove-all-description, a#js-remove-all-description, .js-editcleandescription'
+    );
+    const hasValue = Boolean(descInput && descInput.value && descInput.value.trim().length > 0);
+    const isBtnVisible = Boolean(clearBtn && clearBtn.getAttribute('data-state') !== 'hidden');
+
+    if (hasValue || isBtnVisible) {
+      logger.step('Clearing pre-existing description...');
+      if (clearBtn) {
+        simulateClick(clearBtn);
+      } else if (descInput) {
+        setNativeValue(descInput, '');
+      }
+      await sleep(150);
+      if (descInput && descInput.value.trim().length > 0) {
+        setNativeValue(descInput, '');
+      }
+    } else {
+      logger.info('Description is already empty. Skipping clear.');
+    }
+  }
+
+  /**
+   * Clears pre-existing categories if populated using button x (#js-remove-cat or #js-remove-cat1/2/3).
+   */
+  async clearCategoriesIfNotEmpty() {
+    if (typeof document === 'undefined') return;
+    const c1 = document.querySelector('select#M_Category_1, select[name="M_Category_1"]');
+    const c2 = document.querySelector('select#M_Category_2, select[name="M_Category_2"]');
+    const c3 = document.querySelector('select#M_Category_3, select[name="M_Category_3"]');
+    const clearAllBtn = document.querySelector(
+      '#js-remove-cat, a#js-remove-cat, .popup__row--categories .js-editcleancategories'
+    );
+    const cat1Btn = document.querySelector('#js-remove-cat1, a#js-remove-cat1');
+    const cat2Btn = document.querySelector('#js-remove-cat2, a#js-remove-cat2');
+    const cat3Btn = document.querySelector('#js-remove-cat3, a#js-remove-cat3');
+
+    const isAnySet = (c1 && c1.value && c1.value !== '0') ||
+                     (c2 && c2.value && c2.value !== '0') ||
+                     (c3 && c3.value && c3.value !== '0');
+    const isBtnVisible = Boolean(
+      (clearAllBtn && clearAllBtn.getAttribute('data-state') !== 'hidden') ||
+      (cat1Btn && cat1Btn.getAttribute('data-state') !== 'hidden') ||
+      (cat2Btn && cat2Btn.getAttribute('data-state') !== 'hidden') ||
+      (cat3Btn && cat3Btn.getAttribute('data-state') !== 'hidden')
+    );
+
+    if (isAnySet || isBtnVisible || cat1Btn || clearAllBtn) {
+      logger.step('Clearing pre-existing categories...');
+      if (clearAllBtn) {
+        simulateClick(clearAllBtn);
+        await sleep(150);
+      }
+      if (cat1Btn) simulateClick(cat1Btn);
+      if (cat2Btn) simulateClick(cat2Btn);
+      if (cat3Btn) simulateClick(cat3Btn);
+      await sleep(150);
+    } else {
+      logger.info('Categories already empty. Skipping clear.');
+    }
+  }
+
+  /**
+   * Clears pre-existing keywords if populated using button x (#js-remove-all-key).
+   */
+  async clearKeywordsIfNotEmpty() {
+    if (typeof document === 'undefined') return;
+    const clearBtn = document.querySelector(
+      '#js-remove-all-key, a#js-remove-all-key, .js-editcleankeywords'
+    );
+    const kwInput = document.querySelector('input#keywords_tag, div.popup__row--keywords input');
+    const existingChips = document.querySelectorAll(
+      'div.popup__row--keywords .tag, div.popup__row--keywords .label-tag, div.popup__row--keywords [data-tag]'
+    );
+    const isBtnVisible = Boolean(clearBtn && clearBtn.getAttribute('data-state') !== 'hidden');
+    const hasChips = existingChips.length > 0 || Boolean(kwInput && kwInput.value && kwInput.value.trim().length > 0);
+
+    if (hasChips || isBtnVisible) {
+      logger.step('Clearing pre-existing keywords...');
+      if (clearBtn) {
+        simulateClick(clearBtn);
+      } else if (kwInput) {
+        setNativeValue(kwInput, '');
+      }
+      await sleep(150);
+    } else {
+      logger.info('Keywords already empty. Skipping clear.');
+    }
+  }
+
+  /**
    * Clears old metadata fields (title, description, categories, keywords) prior to injection.
    * @returns {Promise<boolean>} True if cleared.
    */
   async clearMetadata() {
-    if (typeof document === 'undefined') return true;
-
-    // 1. Clear Title
-    const clearTitle = document.querySelector('#js-remove-title, a#js-remove-title');
-    if (clearTitle) {
-      simulateClick(clearTitle);
-    } else {
-      const titleInput = document.querySelector('input#title, input[name="M_title"]');
-      if (titleInput) setNativeValue(titleInput, '');
-    }
-
-    // 2. Clear Description
-    const clearDesc = document.querySelector('.js-editcleandescription, a.js-editcleandescription');
-    if (clearDesc) {
-      simulateClick(clearDesc);
-    } else {
-      const descInput = document.querySelector('textarea#description, textarea[name="M_description"]');
-      if (descInput) setNativeValue(descInput, '');
-    }
-
-    // 3. Clear Categories (1, 2, 3)
-    const clearCat1 = document.querySelector('#js-remove-cat1, a#js-remove-cat1');
-    if (clearCat1) simulateClick(clearCat1);
-
-    const clearCat2 = document.querySelector('#js-remove-cat2, a#js-remove-cat2');
-    if (clearCat2) simulateClick(clearCat2);
-
-    const clearCat3 = document.querySelector('#js-remove-cat3, a#js-remove-cat3');
-    if (clearCat3) simulateClick(clearCat3);
-
-    // 4. Clear Keywords
-    const clearKeywords = document.querySelector('.js-editcleankeywords, a.js-editcleankeywords');
-    if (clearKeywords) simulateClick(clearKeywords);
-
-    await sleep(80);
+    await this.clearTitleIfNotEmpty();
+    await this.clearDescriptionIfNotEmpty();
+    await this.clearCategoriesIfNotEmpty();
+    await this.clearKeywordsIfNotEmpty();
+    await sleep(100);
     return true;
   }
 
@@ -180,15 +304,53 @@ export class DreamstimeAdapter extends BaseAdapter {
    * @returns {Promise<boolean>}
    */
   async clearKeywords() {
-    if (typeof document === 'undefined') return true;
-    const clearKeywords = document.querySelector('.js-editcleankeywords, a.js-editcleankeywords');
-    if (clearKeywords) simulateClick(clearKeywords);
+    await this.clearKeywordsIfNotEmpty();
     return true;
   }
 
   /**
-   * Helper to set a category / subcategory select pair with 300ms AJAX wait.
-   * Matches option by value or text content.
+   * Helper to match and select an option in a native <select> element.
+   * @private
+   * @param {HTMLSelectElement} selectEl - Target select element.
+   * @param {string|number} target - Value or text to match.
+   * @returns {boolean} True if matched.
+   */
+  _matchAndSelectOption(selectEl, target) {
+    if (!selectEl || !target) return false;
+    const str = String(target).trim().toLowerCase();
+
+    if (selectEl.options && selectEl.options.length > 0) {
+      for (const opt of selectEl.options) {
+        const optVal = String(opt.value ?? '').trim().toLowerCase();
+        const optText = String(opt.textContent || opt.text || '').trim().toLowerCase();
+
+        // Direct match on value or text
+        if (optVal === str || optText === str) {
+          selectEl.value = opt.value;
+          return true;
+        }
+
+        // Substring match
+        if (str.length > 3 && (optText.includes(str) || str.includes(optText))) {
+          selectEl.value = opt.value;
+          return true;
+        }
+
+        // Normalized match (ignore trailing 's' for plural variation e.g. illustration vs illustrations)
+        const normStr = str.replace(/\b([a-z]+)s\b/g, '$1');
+        const normOpt = optText.replace(/\b([a-z]+)s\b/g, '$1');
+        if (normOpt.includes(normStr) || normStr.includes(normOpt)) {
+          selectEl.value = opt.value;
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Helper to set a category / subcategory select pair with active option polling.
+   * Dispatches input and change events, then polls for subcategory options to populate.
    * @param {HTMLSelectElement} catSelect - Category select element.
    * @param {HTMLSelectElement} subcatSelect - Dependent subcategory select element.
    * @param {string|number} mainVal - Main category value or name.
@@ -198,69 +360,76 @@ export class DreamstimeAdapter extends BaseAdapter {
   async setCategoryPair(catSelect, subcatSelect, mainVal, subVal) {
     if (!catSelect || !mainVal) return false;
 
-    const selectOption = (selectEl, target) => {
-      if (!selectEl || !target) return false;
-      const str = String(target).trim().toLowerCase();
-      let matched = false;
+    // 1. Select Main Category
+    const matchedMain = this._matchAndSelectOption(catSelect, mainVal);
+    if (!matchedMain) {
+      catSelect.value = String(mainVal);
+    }
+    catSelect.dispatchEvent(new Event('input', { bubbles: true }));
+    catSelect.dispatchEvent(new Event('change', { bubbles: true }));
 
-      if (selectEl.options && selectEl.options.length > 0) {
-        for (const opt of selectEl.options) {
-          const optVal = String(opt.value ?? '').trim().toLowerCase();
-          const optText = String(opt.textContent || opt.text || '').trim().toLowerCase();
-
-          // Direct match on value or text
-          if (optVal === str || optText === str) {
-            selectEl.value = opt.value;
-            matched = true;
-            break;
-          }
-
-          // Substring match
-          if (str.length > 3 && (optText.includes(str) || str.includes(optText))) {
-            selectEl.value = opt.value;
-            matched = true;
-            break;
-          }
-
-          // Normalized match (ignore trailing 's' for plural variation e.g. illustration vs illustrations)
-          const normStr = str.replace(/\b([a-z]+)s\b/g, '$1');
-          const normOpt = optText.replace(/\b([a-z]+)s\b/g, '$1');
-          if (normOpt.includes(normStr) || normStr.includes(normOpt)) {
-            selectEl.value = opt.value;
-            matched = true;
-            break;
-          }
-        }
-      }
-
-      if (!matched) {
-        selectEl.value = String(target);
-      }
-
-      selectEl.dispatchEvent(new Event('change', { bubbles: true }));
-      return true;
-    };
-
-    selectOption(catSelect, mainVal);
-
-    // Allow Dreamstime internal AJAX/jQuery script to populate subcategory options
-    await sleep(300);
-
+    // 2. Poll for Subcategory Options to load (Dreamstime AJAX latency)
     if (subcatSelect && subVal) {
-      selectOption(subcatSelect, subVal);
+      const pollStart = Date.now();
+      while (subcatSelect.options && subcatSelect.options.length <= 1 && (Date.now() - pollStart) < 3000) {
+        await sleep(100);
+      }
+      await sleep(150);
+
+      // 3. Select Subcategory
+      const matchedSub = this._matchAndSelectOption(subcatSelect, subVal);
+      if (!matchedSub) {
+        subcatSelect.value = String(subVal);
+      }
+      subcatSelect.dispatchEvent(new Event('input', { bubbles: true }));
+      subcatSelect.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     return true;
   }
 
   /**
-   * Injects sanitized metadata into Dreamstime edit modal.
-   * - Title single-string instant injection.
-   * - Description single-string instant injection.
-   * - Category 1, 2, and 3 pairs with 300ms AJAX delay.
-   *   AI Mode Special Rule: Category 3 is hardcoded to "Illustration & Clipart" and "Generative AI".
-   * - Keywords chip injection (clamped to 70 tags) + Enter simulation.
-   * - License type selection: Commercial (RF) vs Editorial (ED).
+   * Sets the license type to Commercial (RF) or Editorial (ED) at #licensesubmissiontype.
+   * @param {boolean} [isEditorial=false]
+   */
+  async setLicenseType(isEditorial = false) {
+    if (typeof document === 'undefined') return;
+
+    const allLinks = Array.from(
+      document.querySelectorAll('#licensesubmissiontype a, div.popup__form-element--buttons a, a')
+    );
+    const comBtn = allLinks.find(a => a.textContent && a.textContent.includes('Commercial (RF)')) ||
+      document.querySelector('#licensesubmissiontype > a:nth-of-type(1)');
+    const edBtn = allLinks.find(a => a.textContent && a.textContent.includes('Editorial (ED)')) ||
+      document.querySelector('#licensesubmissiontype > a:nth-of-type(2)');
+
+    const targetBtn = isEditorial ? edBtn : comBtn;
+    const targetLabel = isEditorial ? 'Editorial (ED)' : 'Commercial (RF)';
+
+    if (targetBtn) {
+      const isActive = targetBtn.getAttribute('data-state') === 'active' ||
+                       targetBtn.classList.contains('active');
+      if (!isActive) {
+        logger.step(`Setting License Type to ${targetLabel}...`);
+        simulateClick(targetBtn);
+        await sleep(250);
+      } else {
+        logger.info(`License Type already set to ${targetLabel}.`);
+      }
+    }
+  }
+
+  /**
+   * Injects sanitized metadata into Dreamstime edit modal sequentially.
+   * - Step 1: Clear old title -> Fill title.
+   * - Step 2: Clear old description -> Fill description.
+   * - Step 3: Clear old categories.
+   * - Step 4: Fill Main Cat 1 & Subcat 1 (with option polling).
+   * - Step 5: Fill Main Cat 2 & Subcat 2 (with option polling).
+   * - Step 6: Fill Main Cat 3 & Subcat 3 (AI Mode: "Illustration & Clipart" / "Generative AI").
+   * - Step 7: Clear old keywords.
+   * - Step 8: Fill Keywords (split multi-words into single words, clamped <= 70 tags).
+   * - Step 9: Set License Type (Commercial RF vs Editorial ED).
    *
    * @param {Object} metadata - Sanitized metadata payload.
    * @param {Object} [options={}] - Options (isAiGenerated, isEditorial, licenseType, clearExisting).
@@ -269,72 +438,97 @@ export class DreamstimeAdapter extends BaseAdapter {
   async fillMetadata(metadata, options = {}) {
     if (typeof document === 'undefined' || !metadata) return false;
 
+    logger.banner('Injecting Dreamstime metadata sequentially...');
+
+    // 1. Clear Title if populated
     if (options.clearExisting !== false) {
-      await this.clearMetadata();
+      await this.clearTitleIfNotEmpty();
+      await sleep(150);
     }
 
-    // 1. Title: Single-string instant injection
+    // 2. Fill Title
     const titleInput = document.querySelector('input#title, input[name="M_title"]');
     if (titleInput && metadata.title) {
+      logger.step(`Injecting title: "${metadata.title.slice(0, 40)}..."`);
       setNativeValue(titleInput, metadata.title);
+      titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+      titleInput.dispatchEvent(new Event('change', { bubbles: true }));
+      await sleep(250);
     }
 
-    // 2. Description: Single-string instant injection
+    // 3. Clear Description if populated
+    if (options.clearExisting !== false) {
+      await this.clearDescriptionIfNotEmpty();
+      await sleep(150);
+    }
+
+    // 4. Fill Description
     const descInput = document.querySelector('textarea#description, textarea[name="M_description"]');
     if (descInput && metadata.description) {
+      logger.step(`Injecting description: "${metadata.description.slice(0, 40)}..."`);
       setNativeValue(descInput, metadata.description);
+      descInput.dispatchEvent(new Event('input', { bubbles: true }));
+      descInput.dispatchEvent(new Event('change', { bubbles: true }));
+      await sleep(250);
     }
 
-    // 3. Category Pairs
+    // 5. Clear Categories if populated
+    if (options.clearExisting !== false) {
+      await this.clearCategoriesIfNotEmpty();
+      await sleep(150);
+    }
+
+    // 6. Category Pairs
     const categories = metadata.categories || options.categories || [];
+    const isAi = Boolean(options.isAiGenerated);
 
-    if (options.isAiGenerated) {
-      // Category 1 & 2 filled from metadata if available
-      const cat1 = categories[0];
-      if (cat1) {
-        const c1Select = document.querySelector('select#M_Category_1, select[name="M_Category_1"]');
-        const s1Select = document.querySelector('select#M_Subcategory_1, select[name="M_Subcategory_1"]');
-        await this.setCategoryPair(
-          c1Select,
-          s1Select,
-          cat1.main || cat1.mainId || cat1.categoryId || cat1,
-          cat1.sub || cat1.subId || cat1.subcategoryId
-        );
-      }
-
-      const cat2 = categories[1];
-      if (cat2) {
-        const c2Select = document.querySelector('select#M_Category_2, select[name="M_Category_2"]');
-        const s2Select = document.querySelector('select#M_Subcategory_2, select[name="M_Subcategory_2"]');
-        await this.setCategoryPair(
-          c2Select,
-          s2Select,
-          cat2.main || cat2.mainId || cat2.categoryId || cat2,
-          cat2.sub || cat2.subId || cat2.subcategoryId
-        );
-      }
-
-      // Category 3 AI Hardcoded Special Rule:
-      // Main: "Illustration & Clipart" (ID: 172), Subcategory: "Generative AI" (ID: 212)
-      const c3Select = document.querySelector('select#M_Category_3, select[name="M_Category_3"]');
-      const s3Select = document.querySelector('select#M_Subcategory_3, select[name="M_Subcategory_3"]');
-      await this.setCategoryPair(c3Select, s3Select, 'Illustration & Clipart', 'Generative AI');
-    } else {
-      // Non-AI mode: fill up to 3 pairs from metadata
-      for (let i = 0; i < Math.min(categories.length, 3); i++) {
-        const cat = categories[i];
-        const cSelect = document.querySelector(`select#M_Category_${i + 1}, select[name="M_Category_${i + 1}"]`);
-        const sSelect = document.querySelector(`select#M_Subcategory_${i + 1}, select[name="M_Subcategory_${i + 1}"]`);
-        await this.setCategoryPair(
-          cSelect,
-          sSelect,
-          cat.main || cat.mainId || cat.categoryId || cat,
-          cat.sub || cat.subId || cat.subcategoryId
-        );
-      }
+    // Category 1
+    const cat1 = categories[0];
+    if (cat1) {
+      const c1Select = document.querySelector('select#M_Category_1, select[name="M_Category_1"]');
+      const s1Select = document.querySelector('select#M_Subcategory_1, select[name="M_Subcategory_1"]');
+      const m1 = cat1.main || cat1.mainId || cat1.categoryId || cat1;
+      const sub1 = cat1.sub || cat1.subId || cat1.subcategoryId;
+      logger.step(`Setting Category 1: Main="${m1}", Sub="${sub1}"...`);
+      await this.setCategoryPair(c1Select, s1Select, m1, sub1);
+      await sleep(250);
     }
 
-    // 4. Keywords: Comma-separated chip injection clamped <= 70 tags
+    // Category 2
+    const cat2 = categories[1];
+    if (cat2) {
+      const c2Select = document.querySelector('select#M_Category_2, select[name="M_Category_2"]');
+      const s2Select = document.querySelector('select#M_Subcategory_2, select[name="M_Subcategory_2"]');
+      const m2 = cat2.main || cat2.mainId || cat2.categoryId || cat2;
+      const sub2 = cat2.sub || cat2.subId || cat2.subcategoryId;
+      logger.step(`Setting Category 2: Main="${m2}", Sub="${sub2}"...`);
+      await this.setCategoryPair(c2Select, s2Select, m2, sub2);
+      await sleep(250);
+    }
+
+    // Category 3 (Special AI Mode Rule or standard 3rd category)
+    const c3Select = document.querySelector('select#M_Category_3, select[name="M_Category_3"]');
+    const s3Select = document.querySelector('select#M_Subcategory_3, select[name="M_Subcategory_3"]');
+    if (isAi) {
+      logger.step('AI Declaration active: Setting Category 3 to "Illustration & Clipart" / "Generative AI"...');
+      await this.setCategoryPair(c3Select, s3Select, 'Illustration & Clipart', 'Generative AI');
+      await sleep(250);
+    } else if (categories[2]) {
+      const cat3 = categories[2];
+      const m3 = cat3.main || cat3.mainId || cat3.categoryId || cat3;
+      const sub3 = cat3.sub || cat3.subId || cat3.subcategoryId;
+      logger.step(`Setting Category 3: Main="${m3}", Sub="${sub3}"...`);
+      await this.setCategoryPair(c3Select, s3Select, m3, sub3);
+      await sleep(250);
+    }
+
+    // 7. Clear Keywords if populated
+    if (options.clearExisting !== false) {
+      await this.clearKeywordsIfNotEmpty();
+      await sleep(150);
+    }
+
+    // 8. Keywords: Single-word per tag splitting, deduplication, clamped <= 70 tags
     if (metadata.keywords && metadata.keywords.length > 0) {
       const kwInput = document.querySelector('input#keywords_tag, div.popup__row--keywords input');
       if (kwInput) {
@@ -342,56 +536,150 @@ export class DreamstimeAdapter extends BaseAdapter {
           ? metadata.keywords
           : String(metadata.keywords).split(',');
 
-        const cleanKeywords = rawKeywords
-          .map((k) => (typeof k === 'string' ? k.trim() : ''))
-          .filter((k) => k.length > 0)
-          .slice(0, 70)
-          .join(', ');
+        const seenWords = new Set();
+        const cleanSingleWords = [];
 
-        setNativeValue(kwInput, cleanKeywords);
+        for (const kw of rawKeywords) {
+          const parts = String(kw || '')
+            .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+            .split(/\s+/)
+            .map(w => w.trim().toLowerCase())
+            .filter(w => w.length >= 2);
+
+          for (const word of parts) {
+            if (!seenWords.has(word)) {
+              seenWords.add(word);
+              cleanSingleWords.push(word);
+            }
+          }
+        }
+
+        const finalTags = cleanSingleWords.slice(0, 70).join(', ');
+        logger.step(`Injecting ${cleanSingleWords.slice(0, 70).length} single-word keywords...`);
+        kwInput.focus();
+        setNativeValue(kwInput, finalTags);
         simulateEnterKey(kwInput);
+        kwInput.dispatchEvent(new Event('input', { bubbles: true }));
+        kwInput.dispatchEvent(new Event('change', { bubbles: true }));
+        await sleep(300);
       }
     }
 
-    // 5. License Type Selection: Commercial (RF) vs Editorial (ED)
-    const isEditorial = options.isEditorial || options.licenseType === 'editorial';
-    if (isEditorial) {
-      const edBtn = Array.from(document.querySelectorAll('a, div.popup__form-element--buttons a')).find(
-        (a) => a.textContent && a.textContent.includes('Editorial (ED)')
-      ) || document.querySelector('div.popup__form-element--buttons a:last-child');
-      if (edBtn) simulateClick(edBtn);
-    } else {
-      const comBtn = Array.from(document.querySelectorAll('a, div.popup__form-element--buttons a')).find(
-        (a) => a.textContent && a.textContent.includes('Commercial (RF)')
-      ) || document.querySelector('div.popup__form-element--buttons a:first-child');
-      if (comBtn) simulateClick(comBtn);
-    }
+    // 9. License Type Selection: Commercial (RF) vs Editorial (ED)
+    const isEditorial = Boolean(options.isEditorial || options.licenseType === 'editorial');
+    await this.setLicenseType(isEditorial);
 
+    logger.success('Metadata injection completed for current asset.');
     return true;
   }
 
   /**
-   * Saves current edits as draft and awaits toast or status message confirmation.
+   * Saves current edits as draft and awaits toast appearance AND disappearance.
    * @returns {Promise<boolean>} True if draft saved.
    */
   async saveDraft() {
     if (typeof document === 'undefined') return true;
 
     const saveBtn = document.querySelector('#js-savededits, div#js-savededits');
-    if (saveBtn) {
-      simulateClick(saveBtn);
+    if (!saveBtn) {
+      logger.warn('Save edits button (#js-savededits) not found.');
+      return false;
     }
 
-    try {
-      await waitForElement(
-        '.noty_type__dt-success, #js-submit-message:not([style*="none"])',
-        document,
-        4000
+    logger.step('Clicking "Save edits" button (#js-savededits)...');
+    simulateClick(saveBtn);
+
+    // 1. Wait for noty toast or success message to appear (up to 4000ms)
+    logger.step('Waiting for save confirmation toast to appear...');
+    let toast = null;
+    const appearStart = Date.now();
+    while ((Date.now() - appearStart) < 4000) {
+      toast = document.querySelector(
+        '.noty_bar.noty_type__dt-success, #noty_layout__bottomRight .noty_bar, #js-submit-message:not([style*="none"])'
       );
-      return true;
-    } catch {
-      return true;
+      if (toast && !toast.getAttribute('style')?.includes('display: none')) {
+        break;
+      }
+      await sleep(150);
     }
+
+    // 2. Wait for noty toast to disappear completely from DOM (up to 8000ms)
+    if (toast) {
+      logger.step('Save toast appeared. Waiting for toast to disappear...');
+      const disappearStart = Date.now();
+      while ((Date.now() - disappearStart) < 8000) {
+        const activeToast = document.querySelector(
+          '.noty_bar.noty_type__dt-success, #noty_layout__bottomRight .noty_bar'
+        );
+        if (!activeToast || activeToast.classList.contains('noty_effects_close') || activeToast.getAttribute('style')?.includes('display: none')) {
+          break;
+        }
+        await sleep(200);
+      }
+      logger.success('Save toast resolved. Edits saved successfully.');
+    } else {
+      logger.info('No toast detected or status updated immediately.');
+    }
+
+    await sleep(300);
+    return true;
+  }
+
+  /**
+   * Submits active file for curator review (Mode B: Submit Immediately) and waits for toast disappearance.
+   * @param {boolean} [isEditorial=false]
+   * @returns {Promise<boolean>} True if submitted.
+   */
+  async submitForReview(isEditorial = false) {
+    if (typeof document === 'undefined') return false;
+
+    const submitBtn = document.querySelector(
+      'a#submitbutton, #submitbutton, a#js-next-submit, #js-next-submit'
+    );
+    if (!submitBtn) {
+      logger.warn('Submit button (#submitbutton) not found.');
+      return false;
+    }
+
+    const label = isEditorial ? 'Submit editorial' : 'Submit commercial';
+    logger.step(`Clicking "${label}" button (#submitbutton)...`);
+    simulateClick(submitBtn);
+
+    // 1. Wait for submit toast / notification to appear
+    logger.step('Waiting for submit toast notification to appear...');
+    let toast = null;
+    const appearStart = Date.now();
+    while ((Date.now() - appearStart) < 3000) {
+      toast = document.querySelector(
+        '.noty_bar, #noty_layout__bottomRight .noty_bar, #js-submit-message:not([style*="none"])'
+      );
+      if (toast && !toast.getAttribute('style')?.includes('display: none')) {
+        break;
+      }
+      if (typeof process !== 'undefined' && !document.querySelector('#noty_layout__bottomRight, .noty_bar, #js-submit-message')) {
+        break;
+      }
+      await sleep(150);
+    }
+
+    // 2. Wait for toast to disappear
+    if (toast) {
+      logger.step('Submit toast appeared. Waiting for toast to disappear...');
+      const disappearStart = Date.now();
+      while ((Date.now() - disappearStart) < 8000) {
+        const activeToast = document.querySelector(
+          '.noty_bar, #noty_layout__bottomRight .noty_bar'
+        );
+        if (!activeToast || activeToast.classList.contains('noty_effects_close') || activeToast.getAttribute('style')?.includes('display: none')) {
+          break;
+        }
+        await sleep(200);
+      }
+      logger.success('Submit notification resolved.');
+    }
+
+    await sleep(400);
+    return true;
   }
 
   /**
@@ -411,35 +699,47 @@ export class DreamstimeAdapter extends BaseAdapter {
     }
 
     const nextArrow = document.querySelector(
-      'a#js-next-submit.popup-nav__btn--next, a.popup-nav__btn--next'
+      'a#js-next-submit.popup-nav__btn--next, #js-next-submit'
     );
     if (!nextArrow) {
+      logger.info('Next button (#js-next-submit) not found. Finished all assets.');
       return { done: true, nextAssetId: null };
     }
 
+    logger.step('Clicking next arrow (#js-next-submit)...');
     simulateClick(nextArrow);
-    await sleep(500);
 
-    const nextId = this.getCurrentAssetId();
-    if (!nextId || nextId === this.firstAssetId || this.processedAssetIds.has(nextId)) {
+    // Wait for asset ID or image to update (polling up to 5000ms)
+    let nextId = null;
+    const navStart = Date.now();
+    while ((Date.now() - navStart) < 5000) {
+      await sleep(200);
+      const candId = this.getCurrentAssetId();
+      if (candId && candId !== currentId) {
+        nextId = candId;
+        break;
+      }
+    }
+
+    // Fallback: re-check ID
+    if (!nextId) {
+      nextId = this.getCurrentAssetId();
+    }
+
+    // If cycled back to first asset or already processed
+    if (nextId && (nextId === this.firstAssetId || this.processedAssetIds.has(nextId))) {
+      logger.banner(`Carousel loop cycle complete. Returned to first asset (ID: ${nextId}).`);
       return { done: true, nextAssetId: nextId };
     }
 
-    return { done: false, nextAssetId: nextId };
-  }
-
-  /**
-   * Submits active file for curator review.
-   * @returns {Promise<boolean>} True if submitted.
-   */
-  async submitForReview() {
-    if (typeof document === 'undefined') return false;
-
-    const submitBtn = document.querySelector('a#js-next-submit, #js-next-submit');
-    if (submitBtn) {
-      simulateClick(submitBtn);
-      return true;
+    // If modal closed or navigated away
+    const modalActive = document.querySelector('div.popup-upload.popup-upload--submit, div.popup-upload');
+    if (!modalActive && typeof window !== 'undefined' && !window.location.pathname.includes('/upload/edit')) {
+      logger.info('Edit modal closed or returned to uploads. Automation complete.');
+      return { done: true, nextAssetId: null };
     }
-    return false;
+
+    logger.info(`Navigated to next asset (ID: ${nextId || 'unknown'}).`);
+    return { done: false, nextAssetId: nextId };
   }
 }

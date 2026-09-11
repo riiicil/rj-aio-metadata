@@ -959,7 +959,138 @@ export class OverlayHUD {
       this.isCardProcessing = false;
       let processedCount = 0;
 
-      // 6. Sequential Asset Processing Loop
+      // 6A. Dreamstime In-Page Carousel Loop
+      if (this.platformId === 'dreamstime') {
+        let assetIdx = 0;
+        while (!signal.aborted && !this.isStopping) {
+          const currentCards = adapter.getAssetCards();
+          const card = currentCards && currentCards.length > 0 ? currentCards[0] : null;
+          if (!card) break;
+
+          const currentId = adapter.getCurrentAssetId();
+          if (countText) countText.textContent = `Asset ${assetIdx + 1}${currentId ? ` (ID ${currentId})` : ''}`;
+          if (statusText) statusText.textContent = this.isStopping ? 'Stopping...' : 'Processing...';
+          if (pillStatus) pillStatus.textContent = `Asset ${assetIdx + 1}`;
+
+          logger.asset(assetIdx + 1, 'Carousel');
+
+          this.isCardProcessing = true;
+          try {
+            // Step 1: Wait for Editor Ready
+            await adapter.waitForEditorReady(card, 4000);
+            if (signal.aborted) break;
+            await sleep(300);
+
+            // Step 2: Extract preview thumbnail
+            const thumb = adapter.getThumbnailUrl(card);
+
+            // Step 3: AI Metadata Generation
+            if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving)...' : 'Generating AI...';
+
+            let keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 70;
+            const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
+            const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
+            const isAiGenerated = Boolean(this.shadow?.querySelector('#rjToggleAiDeclaration')?.checked);
+            const language = this.currentConfig?.platformSettings?.dreamstime?.language || 'en';
+
+            const sanitizedData = await generateMetadata({
+              image: thumb,
+              platformId: 'dreamstime',
+              assetType: 'image',
+              targetKeywordCount: keywordCount,
+              customKeywords,
+              isAiGenerated,
+              editorialPrefix: '',
+              language,
+              assetIndex: assetIdx,
+              providerConfig: this.currentConfig
+            });
+
+            if (signal.aborted) break;
+            await sleep(400);
+
+            // Step 4: Inject sanitized metadata
+            if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving)...' : 'Injecting metadata...';
+
+            const platformSettings = this.currentConfig?.platformSettings?.dreamstime || {};
+            const isEditorial = Boolean(platformSettings.isEditorial);
+            const platformOptions = {
+              ...platformSettings,
+              isAiGenerated,
+              isEditorial,
+              language
+            };
+
+            await adapter.fillMetadata(sanitizedData, platformOptions);
+            processedCount++;
+
+            // Step 5: Save edits (waits for toast appear & disappear)
+            if (statusText) statusText.textContent = 'Saving edits...';
+            await adapter.saveDraft();
+
+            // Step 6: If Mode B (submit_direct), submit for review
+            if (platformSettings.mode === 'submit_direct') {
+              if (statusText) statusText.textContent = 'Submitting file...';
+              await adapter.submitForReview(isEditorial);
+            }
+
+            logger.success(`Completed asset ${assetIdx + 1}${currentId ? ` (ID: ${currentId})` : ''}`);
+          } catch (assetErr) {
+            if (signal.aborted || assetErr?.message === 'ABORTED') break;
+            logger.warn(`Error processing asset ${assetIdx + 1}:`, assetErr);
+          } finally {
+            this.isCardProcessing = false;
+          }
+
+          if (this.isStopping || signal.aborted) break;
+
+          // Step 7: Cooldown Delay
+          if (statusText) statusText.textContent = 'Cooldown...';
+          const minWait = this._cooldownMin ?? 1000;
+          const maxWait = this._cooldownMax ?? 4000;
+          const cooldownTarget = Math.floor(Math.random() * (maxWait - minWait + 1)) + minWait;
+          const cooldownStart = Date.now();
+          while (Date.now() - cooldownStart < cooldownTarget) {
+            if (this.isStopping || signal.aborted) break;
+            await sleep(100).catch(() => {});
+          }
+
+          if (this.isStopping || signal.aborted) break;
+
+          // Step 8: Navigate to next
+          if (statusText) statusText.textContent = 'Next asset...';
+          const navResult = await adapter.navigateToNext();
+          if (navResult?.done) {
+            break;
+          }
+
+          assetIdx++;
+          await sleep(500);
+        }
+
+        if (this.isStopping || signal.aborted) {
+          logger.banner('Dreamstime automation stopped.');
+          this.isStopping = false;
+          this.isAutomationRunning = false;
+          this.updateAutomationUI(false);
+          if (statusText) statusText.textContent = 'Stopped';
+        } else {
+          logger.success(`Dreamstime automation finished ${processedCount} assets.`);
+          if (progressFill) progressFill.style.width = '100%';
+          if (countText) countText.textContent = `Finished ${processedCount} assets`;
+          this.lastCompletedAssetLabel = `Finished ${processedCount} assets`;
+          if (badge) badge.classList.remove('rj-running');
+          if (statusText) statusText.textContent = 'Completed';
+          if (pillStatus) pillStatus.textContent = 'Finished';
+
+          const finishWait = this._completionWait ?? 3000;
+          await sleep(finishWait);
+          this.updateAutomationUI(false);
+        }
+        return;
+      }
+
+      // 6B. Sequential Asset Processing Loop (Grid / List platforms)
       for (let i = 0; i < total; i++) {
         if (signal.aborted || this.isStopping) break;
 

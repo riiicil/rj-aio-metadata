@@ -205,13 +205,18 @@ export function sanitizeKeywords(rawKeywords, {
 } = {}) {
   const normPlatform = String(platformId || 'default').toLowerCase();
   const isVecteezy = normPlatform === 'vecteezy';
+  const isDreamstime = normPlatform === 'dreamstime';
 
   // 1. Normalize custom keywords
-  const customList = Array.isArray(customKeywords)
+  let customList = Array.isArray(customKeywords)
     ? customKeywords
     : typeof customKeywords === 'string'
       ? customKeywords.split(',')
       : [];
+
+  if (isDreamstime) {
+    customList = customList.flatMap(item => String(item).split(/\s+/).filter(Boolean));
+  }
 
   const cleanedCustom = [];
   for (const item of customList) {
@@ -220,11 +225,15 @@ export function sanitizeKeywords(rawKeywords, {
   }
 
   // 2. Normalize raw keywords
-  const rawList = Array.isArray(rawKeywords)
+  let rawList = Array.isArray(rawKeywords)
     ? rawKeywords
     : typeof rawKeywords === 'string'
       ? rawKeywords.split(',')
       : [];
+
+  if (isDreamstime) {
+    rawList = rawList.flatMap(item => String(item).split(/\s+/).filter(Boolean));
+  }
 
   const cleanedRaw = [];
   for (const item of rawList) {

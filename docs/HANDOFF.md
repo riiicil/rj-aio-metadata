@@ -5,9 +5,9 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 4: Platform Adapters (Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Live Fixes Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Live Fixes Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(vecteezy): dispatch enter key, blur input, and dismiss lingering popover on custom ai software`
+- **Latest Commit**: `fix(dreamstime): add subcategory polling, single-word keywords, toast waiting, and carousel loop`
 - **Working Tree**: Clean local branch
 - **Build / Test State**: Verified healthy (680/680 assertions passed across all test suites, zero emoji clean)
 
@@ -15,8 +15,16 @@
 
 ## 2. Active In-Flight Context
 
-Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1 & Tier 2 platforms, and aligned Vecteezy and Freepik (Magnific):
-1. **Vecteezy Live Alignment & Form Scoping (`contributors.vecteezy.com`)**:
+Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned Dreamstime, Vecteezy, and Freepik (Magnific):
+1. **Dreamstime Live Alignment & Carousel Orchestration (`dreamstime.com/upload/edit*`)**:
+   - **Subcategory AJAX Latency Resolution**: Dreamstime populates `<select id="M_Subcategory_X">` asynchronously via an internal AJAX call triggered upon main category selection. Added async option polling (`subcatSelect.options.length > 1` with a 3000ms timeout) before selecting the subcategory, preventing the selection from being overwritten when the AJAX response renders.
+   - **Granular Condition-Checked Clear Buttons**: Dreamstime provides clear buttons `#js-remove-title`, `#js-remove-all-description`, `#js-remove-cat1..3`, and `#js-remove-all-key`. Each button carries `data-state="hidden"` when empty and `data-state="visible"` when populated. Replaced unconditional clicking with granular checking (`clearTitleIfNotEmpty`, `clearDescriptionIfNotEmpty`, `clearCategoriesIfNotEmpty`, `clearKeywordsIfNotEmpty`), avoiding unnecessary DOM mutations.
+   - **Strict Single-Word Keyword Splitting**: Dreamstime strictly prohibits multi-word keywords (e.g., "bus station" splits into "bus" and "station"). Updated `SanitizerService.js` to split strings by whitespace `/\s+/`, filter, deduplicate, and clamp to the 70 tag quota. Added duplicate protection in `DreamstimeAdapter.js:fillMetadata()`.
+   - **License Type Selection (Commercial RF vs Editorial ED)**: Interacts with `#licensesubmissiontype a` (`a#tab-rf` / `a#tab-ed`), verifying active classes (`selected`, `active`) and clicking the desired license model.
+   - **Save Edits & Submit Toast Lifecycle Polling**: Both Save Edits (`#js-savededits`) and Submit (`#submitbutton`) generate bottom-right toasts (`#noty_layout__bottomRight .noty_bar.noty_type__dt-success`). Implemented two-stage toast waiting: first polls for `.noty_bar` to appear, then polls until `.noty_bar` disappears from the DOM, guaranteeing the server has acknowledged the update before advancing.
+   - **Section 6A In-Page Carousel Loop**: In `/upload/edit*`, assets are presented in a continuous carousel rather than a static grid. Implemented an in-page carousel loop in `src/overlay/overlay.js` that inspects the active asset, executes AI generation and injection, saves edits (Mode A) or submits directly (Mode B), and clicks `#js-next-submit`. Detects cycle completion when the asset ID returns to `firstAssetId`.
+   - **Full LoggerService Integration**: All steps emit structured, formatted console messages with `.step()`, `.asset()`, `.info()`, and `.success()`.
+2. **Vecteezy Live Alignment & Form Scoping (`contributors.vecteezy.com`)**:
    - Scoped all metadata editor queries strictly to the right panel (`div.right, div[class*="right"]`), eliminating selector collision with the left filter sidebar (`<aside>`) which had identical `pro`, `free`, `editorial` and radio group attributes.
    - Added pre-automation preparation hook (`VecteezyAdapter.prepareAutomation()`): automatically closes the left filter sidebar if open, and clicks toolbar `"Deselect all"` button if any cards are currently selected before card 1. Skips cleanly if already `"Select all"`.
    - Integrated title clear X icon (`div[data-testid="text-input"] svg[position="end"]`, `svg.sc-gsqrwE`, `svg`) and keywords bulk ClearIcon (`svg[data-testid="ClearIcon"]`) adjacent to `div[data-testid="tagger-input"]`.

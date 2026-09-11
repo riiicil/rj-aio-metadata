@@ -54,12 +54,20 @@ export class LoggerService {
    */
   asset(current, total) {
     if (!this.enabled) return;
-    console.log(
-      `%c${this.prefix} --- Processing asset %d of %d ---`,
-      `color: ${this.colors.brand}; font-weight: bold;`,
-      current,
-      total
-    );
+    if (typeof total === 'number' && !isNaN(total)) {
+      console.log(
+        `%c${this.prefix} --- Processing asset %d of %d ---`,
+        `color: ${this.colors.brand}; font-weight: bold;`,
+        current,
+        total
+      );
+    } else {
+      console.log(
+        `%c${this.prefix} --- Processing asset %s ---`,
+        `color: ${this.colors.brand}; font-weight: bold;`,
+        total ? `${current} (${total})` : String(current)
+      );
+    }
   }
 
   /**
