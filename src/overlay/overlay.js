@@ -297,12 +297,14 @@ export class OverlayHUD {
 
     // 7. MiriCanvas
     if (host.includes('miricanvas.com')) {
-      const elements = document.querySelectorAll('div.css-1qnaji9.e1pyeb4g3, div.panda-ehlNbj div.panda-gFNlpN');
+      const elements = document.querySelectorAll(
+        'article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, article'
+      );
       const count = elements.length;
       return {
         count,
         label: count > 0 ? `${count} Asset${count === 1 ? '' : 's'} Found` : '0 Assets Detected',
-        selector: 'div.css-1qnaji9.e1pyeb4g3'
+        selector: 'article[data-f="CA-d943"], ul > li > article'
       };
     }
 

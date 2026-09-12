@@ -5,18 +5,39 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 4: Platform Adapters (Depositphotos Full-String Native Comma Splitting & Chip Overwrite Elimination, Strict Scoping, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Live Fixes Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Base UI data-f Selectors, Sidebar Pre-Collapse, Trash-Button Clearing & Bulk Save Lifecycle, Depositphotos Full-String Native Comma Splitting & Chip Overwrite Elimination, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(depositphotos): inject full comma string for native multi-chip splitting and prevent chip overwrite`
+- **Latest Commit**: `fix(miricanvas): align card selectors, sidebar pre-collapse, trash-button clearing, and bulk save lifecycle`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (748/748 assertions passed across all test suites, zero emoji clean)
+- **Build / Test State**: Verified healthy (751/751 assertions passed across all test suites, zero emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned Depositphotos, Dreamstime, Vecteezy, and Freepik (Magnific):
-1. **Depositphotos Live Alignment & Form Scoping (`depositphotos.com/files/unfinished.html`)**:
+Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned MiriCanvas, Depositphotos, Dreamstime, Vecteezy, and Freepik (Magnific):
+1. **MiriCanvas Live Alignment (`designhub.miricanvas.com/en/element/to-do`)**:
+   - **Modern Article Card Extraction**: Reverse-engineered user session recording (`dev-tools/recordings/rekaman-miri-20260912_194256-v2.json`). Updated `detectAssetCount()` and `getAssetCards()` to query modern Base UI `article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, article`, resolving the "0 Assets Detected" bug on automation start.
+   - **Pre-Automation Preparation Hook (`prepareAutomation()`)**:
+     1. Left Navigation Sidebar Pre-Collapse: Inspects `nav[data-f="MN-02f2"], nav.panda-cAaCsB`. If open (`panda-mVcIL` class or `offsetWidth > 100`), automatically collapses it via `button[data-f="SB-82b8"]`.
+     2. Navbar Select All Checkbox Reset: Inspects `nav[data-f="CT-a2b2"] input[data-f="CI-66e5"]`. If unchecked, clicks to check then uncheck (flushing any stale grid selection); if checked, clicks to uncheck.
+   - **Safe Single-Card Selection (`selectCard()`)**: Clicks thumbnail image `img.css-l67sxu.er317d31` / `div[data-f="DT-1ecb"]` rather than card checkbox (`CI-66e5`), preventing multi-asset batch edit selection during single-card processing.
+   - **Editor Readiness Guard (`waitForEditorReady()`)**: Awaits right panel metadata form via `textarea[data-f="DT-9450"], textarea[placeholder*="Element Name"], div[data-f="SD-e6c2"]`.
+   - **Trash-Button Based Metadata Clearing (`clearMetadata()`)**:
+     1. Title: Clicks trash button `div[data-f="SD-e6c2"] button[data-f="TT-c273"]` (or `div[data-f="FA-93a1"] button`), with `setNativeValue(titleInput, '')` fallback.
+     2. Keywords: Clicks trash button `div[data-f="SD-e7b2"] button[data-f="TT-c273"]` (or `div[data-f="IA-61ae"] button`), with fallback to individual chip remove SVGs `span[data-f="CL-67aa"] svg[data-f="CD-213b"]`.
+   - **Form Field Injection**:
+     1. AI Declaration: Reads Base UI `span[data-f="CC-bb45"][role="checkbox"]` inside container `div[data-f="AD-8705"]` and clicks to align with `options.isAiGenerated`.
+     2. Content Tier (Pricing): Selects radio input `input[name="contentTier"][value="STANDARD"]` vs `input[name="contentTier"][value="PREMIUM"]` based on preference.
+     3. Title: Clamped to <= 100 characters and injected via `setNativeValue`.
+     4. Keywords: Clamped to <= 25 tags, formatted as comma-separated string, and committed via `simulateEnterKey`.
+   - **Bulk Save Lifecycle & Navbar Cleanup (`bulkSave()`)**:
+     1. Checks navbar Select All checkbox `nav[data-f="CT-a2b2"] input[data-f="CI-66e5"]`.
+     2. Clicks Save Metadata button `button[data-f="SG-8f01"]`.
+     3. Waits up to 6000ms until Save button becomes disabled or toast notification `section[data-f="SL-2fb0"]` appears.
+     4. Unchecks navbar Select All checkbox to restore clean unselected grid state.
+   - **Full LoggerService Integration**: Emits structured console logs with `.step()`, `.asset()`, `.info()`, and `.success()`.
+2. **Depositphotos Live Alignment & Form Scoping (`depositphotos.com/files/unfinished.html`)**:
    - **Strict Card Scoping & Zero Cross-Card Leakage**: Removed dangerous `document.querySelector` fallback from `_queryScoped(root, selector)`. When querying within a card container (`root`), searches are 100% strictly scoped to `root` and return `null` if not found, eliminating the bug where Card 1's tag search leaked to Card 2's existing chips.
    - **Full-String Direct Comma Injection & Native Multi-Chip Splitting**: Depositphotos' native Backbone collection (`DP.Collection.Tags` in `unfinished.js`) defines `splitModelByKeywordNameRegex: /[,;]/g`. When `keydown Enter` is fired on `span.tagseditor__item_new > span.tagseditor__tag` with a full comma-separated string (`cleanTagsString`), Depositphotos natively parses the string, splits it by commas, and creates all 50 tag chips at once.
    - **Chip Overwrite Elimination**: Completely removed `div.tagseditor span[contenteditable="true"]` from active input selectors. Since every committed tag chip has `contenteditable="true"` on its inner span, querying it caused subsequent loop iterations to repeatedly overwrite the first created chip, leaving only the 50th keyword. Fallback queries now strictly isolate `span.tagseditor__item_new > span.tagseditor__tag, span.tagseditor__item[data-type="input"] > span.tagseditor__tag`.
