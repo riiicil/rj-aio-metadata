@@ -463,91 +463,23 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
         (this.logger || logger).step('keywords', `Injecting ${cleanTags.length} keywords...`);
 
-        // A. Fast-path: Attempt clipboard paste event with comma-separated tags
-        try {
-          if (typeof ClipboardEvent !== 'undefined' && typeof DataTransfer !== 'undefined') {
-            const dt = new DataTransfer();
-            dt.setData('text/plain', cleanTags.join(', '));
-            const pasteEvt = new ClipboardEvent('paste', {
-              bubbles: true,
-              cancelable: true,
-              clipboardData: dt
-            });
-            kwInput.dispatchEvent(pasteEvt);
-            await sleep(50);
-          }
-        } catch {
-          // Ignore clipboard errors in restricted browser contexts
+        if (typeof kwInput.focus === 'function') {
+          kwInput.focus();
         }
 
-        // B. Sequential Tag Entry: Type each tag and simulate Enter + Comma key events
+        // Sequential Tag Entry: Commit each tag individually once via Enter key simulation
         for (const tag of cleanTags) {
-          if (typeof kwInput.focus === 'function') {
-            kwInput.focus();
-          }
-
           setNativeValue(kwInput, tag);
           kwInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-          // Simulate Enter key sequence (keydown -> change -> keyup)
-          const enterKd = new KeyboardEvent('keydown', {
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13,
-            which: 13,
-            bubbles: true,
-            cancelable: true
-          });
-          kwInput.dispatchEvent(enterKd);
-
+          simulateEnterKey(kwInput);
           kwInput.dispatchEvent(new Event('change', { bubbles: true }));
 
-          const enterKu = new KeyboardEvent('keyup', {
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13,
-            which: 13,
-            bubbles: true,
-            cancelable: true
-          });
-          kwInput.dispatchEvent(enterKu);
-
-          // Fallback: If tag was not cleared by Enter, simulate Comma key sequence
-          if (kwInput.value) {
-            setNativeValue(kwInput, tag + ',');
-            kwInput.dispatchEvent(new Event('input', { bubbles: true }));
-
-            const commaKd = new KeyboardEvent('keydown', {
-              key: ',',
-              code: 'Comma',
-              keyCode: 188,
-              which: 188,
-              bubbles: true,
-              cancelable: true
-            });
-            kwInput.dispatchEvent(commaKd);
-
-            kwInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-            const commaKu = new KeyboardEvent('keyup', {
-              key: ',',
-              code: 'Comma',
-              keyCode: 188,
-              which: 188,
-              bubbles: true,
-              cancelable: true
-            });
-            kwInput.dispatchEvent(commaKu);
-          }
-
-          await sleep(35);
+          await sleep(40);
         }
 
-        // C. Clean up leftover text in input if any
-        if (kwInput.value && !document.querySelector?.('span[data-f="CL-67aa"]')) {
-          // Fallback for mock environments where React state is absent
-          simulateEnterKey(kwInput);
-        } else if (kwInput.value) {
+        // Clean up leftover uncommitted text in input if any
+        if (kwInput.value) {
           setNativeValue(kwInput, '');
         }
 
