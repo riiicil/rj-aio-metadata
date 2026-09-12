@@ -5,9 +5,9 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Trash Button Direct Click & Copy Button Filtering, Chip Loop Elimination, Streamlined Single-Pass Keyword Batch Injection, Ghost Sizer Elimination, Active Card Selection Check, Trash Button Discrimination, Base UI data-f Selectors, Sidebar Pre-Collapse, Trash-Button Clearing & Bulk Save Lifecycle, Depositphotos Full-String Native Comma Splitting & Chip Overwrite Elimination, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Keyword Chip Creation, Trash Button Discrimination & Verification Polling, Bulk Save Button Disabled & Toast Wait with 2000ms Sync Buffer & Fresh Navbar Uncheck, Depositphotos Full-String Native Comma Splitting, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(miricanvas): filter copy buttons, click trash button directly, eliminate chip loop, and streamline keyword batch commit`
+- **Latest Commit**: `8879594` `fix(miricanvas): resolve keyword chip creation, trash button targeting, and bulk save uncheck lifecycle`
 - **Working Tree**: Clean local branch
 - **Build / Test State**: Verified healthy (112/112 passed on Tier 3, 750+ assertions across all suites, zero emoji clean)
 
@@ -17,9 +17,9 @@
 
 Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned MiriCanvas, Depositphotos, Dreamstime, Vecteezy, and Freepik (Magnific):
 1. **MiriCanvas Live Alignment (`designhub.miricanvas.com/en/element/to-do`)**:
-   - **Trash Button Discrimination & Copy Button Filtering (`_findTrashButton()`)**: Explicitly filters out copy buttons (`div[data-f="CD-7f75"], svg[data-f="ID-430b"]`). Returns `buttons[0]` which in MiriCanvas DOM is the dedicated trash button (`div[data-f="DD-04b4"]` / `svg[data-f="DD-e725"]`), preventing accidental copy actions.
-   - **One-Shot Trash Clearing (`clearKeywords()`, `clearTitle()`)**: Directly clicks `trashBtn` via `simulateClick(trashBtn)`. Eliminates the problematic chip-by-chip `remainingRemoveSvgs` click loop that was causing rapid asynchronous state corruption in React 18 and leaving behind zombie chips. Actively polls up to 800ms until chips disappear from the DOM.
-   - **Streamlined Single-Pass Batch Keyword Commit (`fillMetadata()`)**: Injects the complete comma-delimited string (`cleanTags.join(', ')`) in a single pass without premature blur, dispatches `input`, and commits once via `simulateEnterKey(kwInput)` and `change`. Eliminates duplicate comma/enter fallback logic that caused double-injection. Clamped to <= 25 tags max, preventing 31/25 overflow and validation errors.
+   - **Keyword Chip Creation via Non-Blur Setter & Paste InputEvent (`fillMetadata()`)**: Solved the issue where pasted keywords failed to convert into chips (`span[data-f="CL-67aa"]`). Directly sets native input value via `HTMLInputElement.prototype.value` descriptor without premature `blur`. Dispatches synthetic `InputEvent` (`inputType: 'insertFromPaste'`), Enter key sequence (`keydown` -> `change` -> `keyup`), active polling verification for chip creation (up to 1200ms), comma + Enter fallback, sequential tag injection fallback, DOM chip verification logging, and only clears leftover uncommitted text after chips are confirmed.
+   - **Trash Button Discrimination & Copy Button Filtering (`_findTrashButton()`)**: Explicitly prioritizes `button:has(div[data-f="DD-04b4"]), button:has(svg[data-f="DD-e725"])` and filters out copy buttons (`div[data-f="CD-7f75"], svg[data-f="ID-430b"]`). When multiple buttons are present, selects `buttons[1]` (the dedicated trash button in MiriCanvas DOM), preventing accidental copy actions.
+   - **One-Shot Trash Clearing (`clearKeywords()`, `clearTitle()`)**: Directly clicks `trashBtn` via `simulateClick(trashBtn)`. Eliminates the problematic chip-by-chip `remainingRemoveSvgs` click loop that caused asynchronous state corruption in React 18. Actively polls up to 1200ms (12 attempts) until chips disappear from the DOM.
    - **Ghost Sizer (`ul[data-f="GU-fa4b"]`) Exclusion**: Filtered out hidden virtualizer dummy card (`ul[data-f="GU-fa4b"]`) in `getAssetCards()` and `overlay.js:detectAssetCount()`, ensuring asset counts accurately match real visible cards from `ul[data-f="TU-5eb5"]`.
    - **Active Card Selection Guard (`selectCard()`)**: Inspects `.css-1510m7j` on card container; if already active, skips thumbnail click to prevent accidental unselection and editor form unmounting.
    - **Smooth In-View Scroll (`selectCard()`)**: Clicks thumbnail image `img.css-l67sxu.er317d31` / `div[data-f="DT-1ecb"]` with `cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' })` to bring cards into viewport cleanly without activating card multi-edit checkboxes (`CI-66e5`).
@@ -31,12 +31,13 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
      1. AI Declaration: Reads Base UI `span[data-f="CC-bb45"][role="checkbox"]` inside container `div[data-f="AD-8705"]` and clicks to align with `options.isAiGenerated`.
      2. Content Tier (Pricing): Selects radio input `input[name="contentTier"][value="STANDARD"]` vs `input[name="contentTier"][value="PREMIUM"]` based on preference.
      3. Title: Clamped to <= 100 characters and injected via `setNativeValue`.
-     4. Keywords: Clamped to <= 25 tags, injected as single batch and committed via Enter.
+     4. Keywords: Clamped to <= 25 tags, injected with paste event and committed via Enter.
    - **Bulk Save Lifecycle & Navbar Cleanup (`bulkSave()`)**:
      1. Checks navbar Select All checkbox `nav[data-f="CT-a2b2"] input[data-f="CI-66e5"]`.
      2. Clicks Save Metadata button `button[data-f="SG-8f01"]`.
-     3. Waits up to 6000ms until Save button becomes disabled or toast notification `section[data-f="SL-2fb0"]` appears.
-     4. Unchecks navbar Select All checkbox to restore clean unselected grid state.
+     3. Waits up to 8000ms until Save button becomes disabled (`saveBtn.disabled || saveBtn.hasAttribute('disabled') || saveBtn.getAttribute('aria-disabled') === 'true'`) or toast notification `section[data-f="SL-2fb0"]` appears.
+     4. Waits 2000ms buffer for background synchronization / network persistence.
+     5. Re-queries navbar Select All checkbox fresh to prevent stale DOM references and unchecks it to restore clean unselected grid state.
    - **Full LoggerService Integration**: Emits structured console logs with `.step()`, `.asset()`, `.info()`, and `.success()`.
 2. **Depositphotos Live Alignment & Form Scoping (`depositphotos.com/files/unfinished.html`)**:
    - **Strict Card Scoping & Zero Cross-Card Leakage**: Removed dangerous `document.querySelector` fallback from `_queryScoped(root, selector)`. When querying within a card container (`root`), searches are 100% strictly scoped to `root` and return `null` if not found, eliminating the bug where Card 1's tag search leaked to Card 2's existing chips.
@@ -201,6 +202,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 34 | 2026-09-13 | `task/platform-adapters` | `8879594` | Resolved MiriCanvas keyword chip conversion via non-blur setter + insertFromPaste InputEvent + Enter/comma fallback, trash button discrimination (`DD-04b4`), and bulk save 8000ms disabled/toast wait with 2000ms sync buffer & fresh navbar uncheck, verified 112/112 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 33 | 2026-09-12 | `task/platform-adapters` | `fix(miricanvas)` | Eliminated redundant paste event and dual comma fallback in MiriCanvas keyword injection, verified 112/112 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 32 | 2026-09-12 | `task/platform-adapters` | `fix(miricanvas)` | Eliminated ghost sizer card in `ul[data-f="GU-fa4b"]`, added active selection check to prevent toggle-off, discriminated copy vs trash buttons (`DD-04b4`), verified 112/112 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 31 | 2026-09-10 | `task/platform-adapters` | `feat(logging)` | Implemented LoggerService.js, wired into AdobeStockAdapter, disabled global clearMetadata in overlay, verified 336/336 tests | Phase 5: End-to-End Live Browser Testing & Polish |

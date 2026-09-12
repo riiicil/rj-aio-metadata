@@ -246,13 +246,16 @@ export class MiriCanvasAdapter extends BaseAdapter {
     }
     if (!container) return null;
 
-    const buttons = Array.from(container.querySelectorAll('button[data-f="TT-c273"], button'));
-    // Explicitly filter out copy buttons (which contain CD-7f75 or ID-430b)
-    const nonCopyButtons = buttons.filter(
-      (btn) => !btn.querySelector?.('div[data-f="CD-7f75"], svg[data-f="ID-430b"]')
+    // 1. Direct match: button containing div[data-f="DD-04b4"] or svg[data-f="DD-e725"]
+    const directTrash = container.querySelector?.(
+      'button:has(div[data-f="DD-04b4"]), button:has(svg[data-f="DD-e725"])'
     );
+    if (directTrash) return directTrash;
 
-    for (const btn of nonCopyButtons) {
+    const buttons = Array.from(container.querySelectorAll('button[data-f="TT-c273"], button'));
+
+    // 2. Search by inner elements or SVG path
+    for (const btn of buttons) {
       if (btn.querySelector?.('div[data-f="DD-04b4"], svg[data-f="DD-e725"]')) {
         return btn;
       }
@@ -262,9 +265,19 @@ export class MiriCanvasAdapter extends BaseAdapter {
       }
     }
 
-    // Fallback: In MiriCanvas DOM, button[0] is the trash button, button[1] is copy button
+    // 3. Filter out copy buttons (which contain CD-7f75 or ID-430b)
+    const nonCopyButtons = buttons.filter(
+      (btn) => !btn.querySelector?.('div[data-f="CD-7f75"], svg[data-f="ID-430b"]')
+    );
+
     if (nonCopyButtons.length > 0) {
-      return nonCopyButtons[0];
+      // In MiriCanvas DOM, button[0] is Copy (CD-7f75) and button[1] is Trash (DD-04b4)
+      return nonCopyButtons[nonCopyButtons.length - 1];
+    }
+
+    // If 2 buttons present, button 1 is trash
+    if (buttons.length >= 2) {
+      return buttons[1];
     }
 
     return buttons[0] || null;
@@ -322,7 +335,7 @@ export class MiriCanvasAdapter extends BaseAdapter {
     if (typeof document === 'undefined') return true;
 
     const existingChips = Array.from(
-      document.querySelectorAll('span[data-f="CL-67aa"], div[data-f="SD-e7b2"] span[data-f="CL-67aa"]')
+      document.querySelectorAll('div[data-f="SD-e7b2"] span[data-f="CL-67aa"], span[data-f="CL-67aa"]')
     );
     if (existingChips.length === 0) {
       return true;
@@ -339,10 +352,12 @@ export class MiriCanvasAdapter extends BaseAdapter {
     if (trashBtn && !trashBtn.disabled && !trashBtn.hasAttribute?.('disabled')) {
       simulateClick(trashBtn);
 
-      // Await DOM update and verify chips disappeared
-      for (let attempt = 0; attempt < 8; attempt++) {
+      // Await DOM update and verify chips disappeared (up to 1200ms)
+      for (let attempt = 0; attempt < 12; attempt++) {
         await sleep(100);
-        const chipsLeft = document.querySelectorAll('span[data-f="CL-67aa"]');
+        const chipsLeft = document.querySelectorAll(
+          'div[data-f="SD-e7b2"] span[data-f="CL-67aa"], span[data-f="CL-67aa"]'
+        );
         if (chipsLeft.length === 0) {
           break;
         }
@@ -460,7 +475,7 @@ export class MiriCanvasAdapter extends BaseAdapter {
       }
     }
 
-    // 5. Keywords: Clamped to <= 25 tags max, injected as single batch and committed via Enter
+    // 5. Keywords: Clamped to <= 25 tags max, injected as comma-delimited batch and committed via Enter
     if (metadata.keywords && metadata.keywords.length > 0) {
       const kwInput = document.querySelector(
         'div[data-f="SD-e7b2"] input, input[data-f="II-b5a4"], input[placeholder*="Separate multiple keywords"], input.panda-eNrFAg'
@@ -483,18 +498,121 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
         const tagBatchString = cleanTags.join(', ');
 
-        setNativeValue(kwInput, tagBatchString);
-        kwInput.dispatchEvent(new Event('input', { bubbles: true }));
+        // Safely set native value WITHOUT triggering premature blur
+        const prototype = (typeof HTMLInputElement !== 'undefined' && kwInput instanceof HTMLInputElement)
+          ? HTMLInputElement.prototype
+          : Object.getPrototypeOf(kwInput);
+        const descriptor = prototype ? Object.getOwnPropertyDescriptor(prototype, 'value') : null;
+        if (descriptor?.set) {
+          descriptor.set.call(kwInput, tagBatchString);
+        } else {
+          kwInput.value = tagBatchString;
+        }
 
-        // Commit all tags at once via Enter simulation
-        simulateEnterKey(kwInput);
+        // Dispatch input event mimicking paste
+        try {
+          const inputEvt = typeof InputEvent !== 'undefined'
+            ? new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertFromPaste', data: tagBatchString })
+            : new Event('input', { bubbles: true });
+          kwInput.dispatchEvent(inputEvt);
+        } catch {
+          kwInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        // Helper to dispatch keyboard events safely without mutating read-only Event getters
+        const dispatchKeyEvent = (type, key, code, keyCode) => {
+          let evt;
+          const options = { bubbles: true, cancelable: true, key, code, keyCode, which: keyCode };
+          try {
+            if (typeof KeyboardEvent !== 'undefined') {
+              evt = new KeyboardEvent(type, options);
+            }
+          } catch {}
+
+          if (!evt && typeof Event !== 'undefined') {
+            try {
+              evt = new Event(type, { bubbles: true, cancelable: true });
+            } catch {}
+          }
+
+          if (evt) {
+            try { evt.keyCode = keyCode; } catch {}
+            try { evt.which = keyCode; } catch {}
+            try { evt.key = key; } catch {}
+            try { evt.code = code; } catch {}
+            kwInput.dispatchEvent(evt);
+          }
+        };
+
+        // Dispatch Enter key sequence (keydown -> change -> keyup)
+        dispatchKeyEvent('keydown', 'Enter', 'Enter', 13);
         kwInput.dispatchEvent(new Event('change', { bubbles: true }));
+        dispatchKeyEvent('keyup', 'Enter', 'Enter', 13);
 
-        await sleep(250);
+        const getChipCount = () =>
+          document.querySelectorAll('div[data-f="SD-e7b2"] span[data-f="CL-67aa"], span[data-f="CL-67aa"]').length;
+
+        // Polling wait for chips to appear (up to 1200ms)
+        let chipsCreated = false;
+        for (let attempt = 0; attempt < 8; attempt++) {
+          await sleep(150);
+          if (getChipCount() > 0) {
+            chipsCreated = true;
+            break;
+          }
+        }
+
+        // Fallback 1: If chips not formed or input still contains text, simulate Comma key then Enter
+        if (!chipsCreated || kwInput.value) {
+          dispatchKeyEvent('keydown', ',', 'Comma', 188);
+          kwInput.dispatchEvent(new Event('change', { bubbles: true }));
+          dispatchKeyEvent('keyup', ',', 'Comma', 188);
+
+          dispatchKeyEvent('keydown', 'Enter', 'Enter', 13);
+          kwInput.dispatchEvent(new Event('change', { bubbles: true }));
+          dispatchKeyEvent('keyup', 'Enter', 'Enter', 13);
+
+          await sleep(200);
+          if (getChipCount() > 0) {
+            chipsCreated = true;
+          }
+        }
+
+        // Fallback 2: If chips still 0, inject tags sequentially with comma and enter
+        if (getChipCount() === 0) {
+          (this.logger || logger).step('keywords', 'Batch commit fallback: entering tags sequentially...');
+          for (const tag of cleanTags) {
+            if (descriptor?.set) {
+              descriptor.set.call(kwInput, tag + ',');
+            } else {
+              kwInput.value = tag + ',';
+            }
+            kwInput.dispatchEvent(new Event('input', { bubbles: true }));
+            dispatchKeyEvent('keydown', ',', 'Comma', 188);
+            dispatchKeyEvent('keydown', 'Enter', 'Enter', 13);
+            kwInput.dispatchEvent(new Event('change', { bubbles: true }));
+            dispatchKeyEvent('keyup', 'Enter', 'Enter', 13);
+            dispatchKeyEvent('keyup', ',', 'Comma', 188);
+            await sleep(40);
+          }
+        }
+
+        // Additional Verification: Check and log chips active in DOM
+        const finalChips = getChipCount();
+        if (finalChips > 0) {
+          (this.logger || logger).step('keywords', `Verified: ${finalChips} keyword chips active in editor.`);
+        } else {
+          (this.logger || logger).warn(`Keyword verification: 0 chips detected after batch injection.`);
+        }
 
         // Clean up leftover uncommitted text in input if any
         if (kwInput.value) {
-          setNativeValue(kwInput, '');
+          if (descriptor?.set) {
+            descriptor.set.call(kwInput, '');
+          } else {
+            kwInput.value = '';
+          }
+          kwInput.dispatchEvent(new Event('input', { bubbles: true }));
         }
 
         if (typeof kwInput.blur === 'function') {
@@ -548,25 +666,41 @@ export class MiriCanvasAdapter extends BaseAdapter {
     (this.logger || logger).step('bulkSave', 'Clicking Save Metadata button...');
     simulateClick(saveBtn);
 
-    // 3. Wait until button becomes disabled or toast notification appears (max 6000ms)
+    // 3. Wait until button becomes disabled or toast notification appears (max 8000ms)
     const startTime = Date.now();
-    while (Date.now() - startTime < 6000) {
+    let saveConfirmed = false;
+    while (Date.now() - startTime < 8000) {
       await sleep(200);
+      const isBtnDisabled = Boolean(
+        saveBtn.disabled ||
+        saveBtn.hasAttribute?.('disabled') ||
+        saveBtn.getAttribute?.('aria-disabled') === 'true'
+      );
       const toast = document.querySelector(
         'section[data-f="SL-2fb0"], div[role="alert"], section.panda-HgOzd'
       );
-      if (saveBtn.disabled || toast) {
+      if (isBtnDisabled || toast) {
+        saveConfirmed = true;
+        (this.logger || logger).step('bulkSave', 'Save confirmed via button disabled state or toast notification');
         break;
       }
     }
 
-    await sleep(200);
+    if (!saveConfirmed) {
+      (this.logger || logger).warn('Save confirmation timeout reached (8000ms), continuing buffer wait...');
+    }
 
-    // 4. Uncheck navbar Select All checkbox to restore clean unselected state
-    if (selectAllCheckbox && selectAllCheckbox.checked) {
+    // Allow 2000ms buffer for background synchronization / network persistence
+    await sleep(2000);
+
+    // 4. Re-query fresh navbar Select All checkbox to restore clean unselected state
+    const currentSelectAllCheckbox = document.querySelector(
+      'nav[data-f="CT-a2b2"] input[data-f="CI-66e5"], nav input[type="checkbox"][data-f="CI-66e5"], nav div.panda-cVAOOe input[type="checkbox"], nav input[type="checkbox"]'
+    );
+    if (currentSelectAllCheckbox && currentSelectAllCheckbox.checked) {
       (this.logger || logger).step('bulkSave', 'Unchecking navbar Select All checkbox...');
-      simulateClick(selectAllCheckbox);
-      await sleep(150);
+      simulateClick(currentSelectAllCheckbox);
+      await sleep(200);
     }
 
     (this.logger || logger).success('MiriCanvas bulk save completed');
