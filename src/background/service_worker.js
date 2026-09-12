@@ -28,9 +28,10 @@ const PLATFORM_DESTINATIONS = {
     url: 'https://contributors.vecteezy.com/content'
   },
   freepik: {
-    name: 'Freepik',
-    hostPattern: 'contributor.freepik.com',
-    url: 'https://contributor.freepik.com/files'
+    name: 'Freepik (Magnific)',
+    hostPattern: 'contributor.magnific.com',
+    hostPatterns: ['contributor.freepik.com', 'contributor.magnific.com'],
+    url: 'https://contributor.magnific.com/catalog/pending-files/1'
   },
   depositphotos: {
     name: 'Depositphotos',
@@ -124,7 +125,10 @@ export function evaluateTabPlatform(url = '') {
   try {
     const urlObj = new URL(url);
     for (const [platformId, def] of Object.entries(PLATFORM_DESTINATIONS)) {
-      if (urlObj.hostname.includes(def.hostPattern)) {
+      const isMatch = def.hostPatterns
+        ? def.hostPatterns.some((pattern) => urlObj.hostname.includes(pattern))
+        : urlObj.hostname.includes(def.hostPattern);
+      if (isMatch) {
         return { detectedPlatform: platformId, platformDef: def, isMatched: true };
       }
     }
@@ -170,6 +174,10 @@ export function buildProviderRequestParams({ provider, activeKey, payload }) {
   if (isGemini) {
     endpointUrl += `${endpointUrl.includes('?') ? '&' : '?'}key=${encodeURIComponent(activeKey)}`;
     headers['x-goog-api-key'] = activeKey;
+    if (payload && typeof payload.model === 'string') {
+      // Gemini's OpenAI /chat/completions endpoint expects model name without 'models/' prefix
+      payload.model = payload.model.replace(/^models\//, '');
+    }
   } else if (isOpenRouter) {
     headers['Authorization'] = `Bearer ${activeKey}`;
     headers['HTTP-Referer'] = 'https://github.com/riiicil/rj-aio-metadata';
@@ -205,6 +213,7 @@ export async function executeVisionRequestWithRetry({
   baseDelay = 1000
 }) {
   let attempt = 0;
+  const adaptations = [];
 
   while (attempt <= maxRetries) {
     let response;
@@ -228,6 +237,9 @@ export async function executeVisionRequestWithRetry({
 
     if (response.ok) {
       const json = await response.json();
+      if (json && typeof json === 'object') {
+        json._adaptations = adaptations;
+      }
       return json;
     }
 
@@ -255,6 +267,44 @@ export async function executeVisionRequestWithRetry({
       err.status = status;
       err.details = errText;
       throw err;
+    }
+
+    // 400 Bad Request: Self-healing parameter adaptation retry
+    if (status === 400 && typeof payload === 'object' && payload !== null && attempt < maxRetries) {
+      const lowerErr = (errText || '').toLowerCase();
+      let changed = false;
+
+      // 1. Temperature parameter rejection (e.g. gpt-5-nano, o-series only support default 1)
+      if (lowerErr.includes('temperature') && 'temperature' in payload) {
+        delete payload.temperature;
+        changed = true;
+        adaptations.push(`Auto-removed unsupported temperature parameter (${errText.slice(0, 80)})`);
+      }
+
+      // 2. Token parameter mismatch
+      if (lowerErr.includes('max_completion_tokens') && lowerErr.includes('not supported') && 'max_completion_tokens' in payload) {
+        payload.max_tokens = payload.max_completion_tokens;
+        delete payload.max_completion_tokens;
+        changed = true;
+        adaptations.push('Swapped max_completion_tokens to max_tokens');
+      } else if (lowerErr.includes('max_tokens') && (lowerErr.includes('not supported') || lowerErr.includes('use max_completion_tokens')) && 'max_tokens' in payload) {
+        payload.max_completion_tokens = payload.max_tokens;
+        delete payload.max_tokens;
+        changed = true;
+        adaptations.push('Swapped max_tokens to max_completion_tokens');
+      }
+
+      // 3. Response format json_object rejection (e.g. base gpt-4)
+      if (lowerErr.includes('response_format') && 'response_format' in payload) {
+        delete payload.response_format;
+        changed = true;
+        adaptations.push('Auto-removed unsupported response_format');
+      }
+
+      if (changed) {
+        attempt++;
+        continue;
+      }
     }
 
     // Retryable status codes: 429 (rate limit), 500, 502, 503, 504 (server errors)
@@ -351,20 +401,103 @@ export async function handleGenerateVisionMetadata(request, { fetchFn, sleepFn, 
     maxRetries
   });
 
-  const rawContent = json?.choices?.[0]?.message?.content || '';
+  if (json?.error) {
+    const msg = json.error.message || (typeof json.error === 'string' ? json.error : JSON.stringify(json.error));
+    const err = new Error(`Provider API error: ${msg}`);
+    err.code = json.error.code || 'PROVIDER_ERROR';
+    throw err;
+  }
+
+  const choice = json?.choices?.[0];
+  let rawContent = '';
+
+  if (typeof choice?.message?.content === 'string') {
+    rawContent = choice.message.content;
+  } else if (Array.isArray(choice?.message?.content)) {
+    rawContent = choice.message.content
+      .map(part => (typeof part === 'string' ? part : (part?.text || part?.content || '')))
+      .join('');
+  } else if (typeof choice?.text === 'string') {
+    rawContent = choice.text;
+  }
+
+  // Check refusal or finish reason
+  if (!rawContent || !rawContent.trim()) {
+    if (choice?.message?.refusal) {
+      const err = new Error(`AI Model Refusal: ${choice.message.refusal}`);
+      err.code = 'MODEL_REFUSAL';
+      throw err;
+    }
+    if (choice?.finish_reason === 'length') {
+      const err = new Error('Model token limit exceeded before completion (finish_reason: length). Please increase token quota or choose a different model.');
+      err.code = 'TOKEN_LIMIT_EXCEEDED';
+      throw err;
+    }
+    // Check reasoning_content fallback
+    if (typeof choice?.message?.reasoning_content === 'string' && choice.message.reasoning_content.includes('{')) {
+      rawContent = choice.message.reasoning_content;
+    }
+  }
+
+  if (!rawContent || !rawContent.trim()) {
+    const finishReason = choice?.finish_reason || 'unknown';
+    const err = new Error(`Empty AI response content (finish_reason: ${finishReason}).`);
+    err.code = 'EMPTY_AI_RESPONSE';
+    throw err;
+  }
 
   return {
     success: true,
     rawContent,
     provider: activeProviderKey,
     model: payload.model,
-    usedKeyIndex: assetIndex
+    usedKeyIndex: assetIndex,
+    adaptations: json?._adaptations || []
   };
+}
+
+/**
+ * Fetches a cross-origin image using background worker host_permissions and returns it as a base64 Data URL.
+ * Bypasses content script CORS restrictions for CDN-hosted thumbnails.
+ *
+ * @param {string} imageUrl - Cross-origin image URL.
+ * @returns {Promise<string>} base64 Data URL.
+ */
+export async function fetchImageAsBase64(imageUrl) {
+  if (!imageUrl) {
+    throw new Error('Image URL is required.');
+  }
+
+  const response = await fetch(imageUrl);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image from URL: ${imageUrl} (Status: ${response.status})`);
+  }
+
+  const blob = await response.blob();
+  const arrayBuffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuffer);
+
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+
+  const base64 = btoa(binary);
+  const contentType = blob.type || response.headers.get('content-type') || 'image/jpeg';
+  return `data:${contentType};base64,${base64}`;
 }
 
 // Runtime message dispatcher
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'FETCH_IMAGE_AS_BASE64') {
+      fetchImageAsBase64(message.url)
+        .then(dataUrl => sendResponse({ success: true, dataUrl }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true; // Keep message channel open for async response
+    }
+
     if (message.action === 'GENERATE_VISION_METADATA') {
       handleGenerateVisionMetadata(message)
         .then(result => sendResponse(result))

@@ -4,7 +4,7 @@
  * active tab platform matching, and 100% modular platform-dynamic form rendering.
  */
 
-import { StorageService, DEFAULT_CONFIG } from '../services/StorageService.js';
+import { StorageService, DEFAULT_CONFIG, FREEPIK_BASE_MODELS, VECTEEZY_AI_SOFTWARE } from '../services/StorageService.js';
 import { CustomSelect } from './custom_select.js';
 import { DEPOSITPHOTOS_COUNTRIES } from './depositphotos_countries.js';
 
@@ -169,7 +169,11 @@ function updateTabMatchStatus() {
 
   const targetPlatform = activeTabInfo.destinations[selectedPlatform];
   const currentUrl = activeTabInfo.url || '';
-  const isMatch = targetPlatform && currentUrl.includes(targetPlatform.hostPattern);
+  const isMatch = targetPlatform && (
+    targetPlatform.hostPatterns
+      ? targetPlatform.hostPatterns.some((p) => currentUrl.includes(p))
+      : currentUrl.includes(targetPlatform.hostPattern)
+  );
 
   if (isMatch) {
     platformStatusBadge.className = 'rj-status-badge rj-status-matched';
@@ -293,22 +297,30 @@ function saveActiveFormStateToMemory(platformId) {
   } else if (platformId === 'shutterstock') {
     const isEd = platformDynamicForm.querySelector('#shutterstock_isEditorial');
     const ep = platformDynamicForm.querySelector('#shutterstock_editorialPrefix');
-    if (isEd) settings.isEditorial = isEd.checked;
-    if (ep) settings.editorialPrefix = ep.value.trim();
+    const isChecked = Boolean(isEd && isEd.checked);
+    settings.isEditorial = isChecked;
+    settings.editorialPrefix = (isChecked && ep) ? ep.value.trim() : '';
   } else if (platformId === 'freepik') {
     const ai = platformDynamicForm.querySelector('#freepik_isAiGenerated');
     const model = platformDynamicForm.querySelector('#freepik_aiModel');
-    const customModel = platformDynamicForm.querySelector('#freepik_customAiModel');
-    if (ai) settings.isAiGenerated = ai.checked;
+    if (ai) {
+      settings.isAiGenerated = ai.checked;
+      if (ai.checked && settings.keywordCount > 49) {
+        settings.keywordCount = 49;
+      }
+    }
     if (model) settings.aiModel = model.value;
-    if (customModel) settings.customAiModel = customModel.value.trim();
+    delete settings.customAiModel;
   } else if (platformId === 'vecteezy') {
     const lt = platformDynamicForm.querySelector('#vecteezy_licenseType');
     const ai = platformDynamicForm.querySelector('#vecteezy_isAiGenerated');
-    const tool = platformDynamicForm.querySelector('#vecteezy_aiToolName');
+    const sw = platformDynamicForm.querySelector('#vecteezy_aiSoftware');
+    const customSw = platformDynamicForm.querySelector('#vecteezy_customAiSoftware');
     if (lt) settings.licenseType = lt.value;
     if (ai) settings.isAiGenerated = ai.checked;
-    if (tool) settings.aiToolName = tool.value.trim();
+    if (sw) settings.aiSoftware = sw.value;
+    if (customSw) settings.customAiSoftware = customSw.value.trim();
+    delete settings.aiToolName;
   } else if (platformId === 'dreamstime') {
     const mode = platformDynamicForm.querySelector('#dreamstime_mode');
     const isEd = platformDynamicForm.querySelector('#dreamstime_isEditorial');
@@ -343,8 +355,15 @@ function renderPlatformDynamicForm(platformId) {
   platformSettingsHeaderTitle.textContent = `${platName} Settings`;
 
   const settings = currentConfig.platformSettings[platformId] || {};
-  const limits = PLATFORM_LIMITS[platformId] || { min: 8, max: 50 };
-  const currentCount = (typeof settings.keywordCount === 'number') ? settings.keywordCount : limits.max;
+  let limits = PLATFORM_LIMITS[platformId] || { min: 8, max: 50, hint: 'Min 8, Max 50' };
+  if (platformId === 'freepik' && settings.isAiGenerated) {
+    limits = { min: 8, max: 49, hint: 'Min 8, Max 49 (Freepik AI limit)' };
+  }
+  let currentCount = (typeof settings.keywordCount === 'number') ? settings.keywordCount : limits.max;
+  if (platformId === 'freepik' && settings.isAiGenerated && currentCount > 49) {
+    currentCount = 49;
+    settings.keywordCount = 49;
+  }
 
   // Universal Controls: Stepper (1) & Specific Keywords (2)
   let html = `
@@ -429,8 +448,7 @@ function renderPlatformDynamicForm(platformId) {
     `;
   } else if (platformId === 'freepik') {
     const isAi = Boolean(settings.isAiGenerated);
-    const aiModel = settings.aiModel || 'Adobe Firefly';
-    const showCustom = isAi && (aiModel === 'Custom');
+    const aiModel = settings.aiModel || 'Midjourney 6';
     html += `
       <div class="rj-switch-row">
         <div class="rj-switch-info">
@@ -445,23 +463,18 @@ function renderPlatformDynamicForm(platformId) {
 
       <div id="freepik_aiModelGroup" class="rj-field-group rj-conditional-field ${isAi ? 'rj-visible' : ''}">
         <select id="freepik_aiModel" class="rj-select">
-          <option value="Adobe Firefly" ${aiModel === 'Adobe Firefly' ? 'selected' : ''}>Adobe Firefly</option>
-          <option value="Flux 1.0 Fast" ${aiModel === 'Flux 1.0 Fast' ? 'selected' : ''}>Flux 1.0 Fast</option>
-          <option value="Midjourney" ${aiModel === 'Midjourney' ? 'selected' : ''}>Midjourney</option>
-          <option value="Stable Diffusion" ${aiModel === 'Stable Diffusion' ? 'selected' : ''}>Stable Diffusion</option>
-          <option value="DALL-E 3" ${aiModel === 'DALL-E 3' ? 'selected' : ''}>DALL-E 3</option>
-          <option value="Ideogram" ${aiModel === 'Ideogram' ? 'selected' : ''}>Ideogram</option>
-          <option value="Custom" ${aiModel === 'Custom' ? 'selected' : ''}>Other / Custom</option>
+          ${FREEPIK_BASE_MODELS.map(m => `
+            <option value="${escapeHtml(m)}" ${aiModel === m ? 'selected' : ''}>${escapeHtml(m)}</option>
+          `).join('')}
         </select>
-      </div>
-
-      <div id="freepik_customAiModelGroup" class="rj-field-group rj-conditional-field ${showCustom ? 'rj-visible' : ''}">
-        <input type="text" id="freepik_customAiModel" class="rj-input" placeholder="Enter custom AI model name..." value="${escapeHtml(settings.customAiModel || '')}">
       </div>
     `;
   } else if (platformId === 'vecteezy') {
     const license = settings.licenseType || 'free';
     const isAi = Boolean(settings.isAiGenerated);
+    const aiSoftware = settings.aiSoftware || 'Midjourney';
+    const customAiSoftware = settings.customAiSoftware || '';
+    const showCustom = isAi && (aiSoftware === 'Other');
     html += `
       <div class="rj-field-group">
         <label class="rj-field-label" for="vecteezy_licenseType">
@@ -477,7 +490,7 @@ function renderPlatformDynamicForm(platformId) {
       <div class="rj-switch-row">
         <div class="rj-switch-info">
           <span class="rj-switch-title">AI / Generative Declaration</span>
-          <span class="rj-switch-desc">Declare AI generation &amp; specify tool name</span>
+          <span class="rj-switch-desc">Declare AI generation &amp; select software</span>
         </div>
         <label class="rj-switch">
           <input type="checkbox" id="vecteezy_isAiGenerated" ${isAi ? 'checked' : ''}>
@@ -485,8 +498,16 @@ function renderPlatformDynamicForm(platformId) {
         </label>
       </div>
 
-      <div id="vecteezy_aiToolGroup" class="rj-field-group rj-conditional-field ${isAi ? 'rj-visible' : ''}">
-        <input type="text" id="vecteezy_aiToolName" class="rj-input" placeholder="e.g. Midjourney v6, Flux.1" value="${escapeHtml(settings.aiToolName || '')}">
+      <div id="vecteezy_aiSoftwareGroup" class="rj-field-group rj-conditional-field ${isAi ? 'rj-visible' : ''}">
+        <select id="vecteezy_aiSoftware" class="rj-select">
+          ${VECTEEZY_AI_SOFTWARE.map(s => `
+            <option value="${escapeHtml(s)}" ${aiSoftware === s ? 'selected' : ''}>${escapeHtml(s)}</option>
+          `).join('')}
+        </select>
+      </div>
+
+      <div id="vecteezy_customAiSoftwareGroup" class="rj-field-group rj-conditional-field ${showCustom ? 'rj-visible' : ''}">
+        <input type="text" id="vecteezy_customAiSoftware" class="rj-input" placeholder="e.g. Flux.1, Adobe Firefly, Leonardo.ai" value="${escapeHtml(customAiSoftware)}">
       </div>
     `;
   } else if (platformId === 'dreamstime') {
@@ -615,12 +636,17 @@ function renderPlatformDynamicForm(platformId) {
   if (platformId === 'shutterstock') {
     const isEd = platformDynamicForm.querySelector('#shutterstock_isEditorial');
     const group = platformDynamicForm.querySelector('#shutterstock_editorialGroup');
+    const ep = platformDynamicForm.querySelector('#shutterstock_editorialPrefix');
     if (isEd && group) {
       isEd.addEventListener('change', () => {
         if (isEd.checked) {
           group.classList.add('rj-visible');
         } else {
           group.classList.remove('rj-visible');
+          if (ep) ep.value = '';
+          if (currentConfig.platformSettings?.shutterstock) {
+            currentConfig.platformSettings.shutterstock.editorialPrefix = '';
+          }
         }
       });
     }
@@ -628,44 +654,71 @@ function renderPlatformDynamicForm(platformId) {
     const aiToggle = platformDynamicForm.querySelector('#freepik_isAiGenerated');
     const modelGroup = platformDynamicForm.querySelector('#freepik_aiModelGroup');
     const modelSelect = platformDynamicForm.querySelector('#freepik_aiModel');
-    const customGroup = platformDynamicForm.querySelector('#freepik_customAiModelGroup');
 
-    if (aiToggle && modelGroup && modelSelect && customGroup) {
+    if (aiToggle && modelGroup && modelSelect) {
       aiToggle.addEventListener('change', () => {
         const checked = aiToggle.checked;
+        const countInput = platformDynamicForm.querySelector('#keywordCountInput');
+        const hintEl = platformDynamicForm.querySelector('#keywordCountLimitHint');
+
         if (checked) {
           modelGroup.classList.add('rj-visible');
           CustomSelect.refresh(modelSelect);
-          if (modelSelect.value === 'Custom') {
-            customGroup.classList.add('rj-visible');
-          } else {
-            customGroup.classList.remove('rj-visible');
+          if (hintEl) hintEl.textContent = 'Min 8, Max 49 (Freepik AI limit)';
+          if (countInput) {
+            countInput.max = '49';
+            if (Number(countInput.value) >= 50) {
+              countInput.value = '49';
+              if (currentConfig.platformSettings?.freepik) {
+                currentConfig.platformSettings.freepik.keywordCount = 49;
+              }
+            }
           }
         } else {
           modelGroup.classList.remove('rj-visible');
-          customGroup.classList.remove('rj-visible');
-        }
-      });
-
-      modelSelect.addEventListener('change', () => {
-        if (aiToggle.checked) {
-          if (modelSelect.value === 'Custom') {
-            customGroup.classList.add('rj-visible');
-          } else {
-            customGroup.classList.remove('rj-visible');
+          if (hintEl) hintEl.textContent = 'Min 8, Max 50';
+          if (countInput) {
+            countInput.max = '50';
+            if (Number(countInput.value) === 49) {
+              countInput.value = '50';
+              if (currentConfig.platformSettings?.freepik) {
+                currentConfig.platformSettings.freepik.keywordCount = 50;
+              }
+            }
           }
         }
       });
     }
   } else if (platformId === 'vecteezy') {
     const aiToggle = platformDynamicForm.querySelector('#vecteezy_isAiGenerated');
-    const toolGroup = platformDynamicForm.querySelector('#vecteezy_aiToolGroup');
-    if (aiToggle && toolGroup) {
+    const softwareGroup = platformDynamicForm.querySelector('#vecteezy_aiSoftwareGroup');
+    const softwareSelect = platformDynamicForm.querySelector('#vecteezy_aiSoftware');
+    const customGroup = platformDynamicForm.querySelector('#vecteezy_customAiSoftwareGroup');
+
+    if (aiToggle && softwareGroup && softwareSelect && customGroup) {
       aiToggle.addEventListener('change', () => {
-        if (aiToggle.checked) {
-          toolGroup.classList.add('rj-visible');
+        const checked = aiToggle.checked;
+        if (checked) {
+          softwareGroup.classList.add('rj-visible');
+          CustomSelect.refresh(softwareSelect);
+          if (softwareSelect.value === 'Other') {
+            customGroup.classList.add('rj-visible');
+          } else {
+            customGroup.classList.remove('rj-visible');
+          }
         } else {
-          toolGroup.classList.remove('rj-visible');
+          softwareGroup.classList.remove('rj-visible');
+          customGroup.classList.remove('rj-visible');
+        }
+      });
+
+      softwareSelect.addEventListener('change', () => {
+        if (aiToggle.checked) {
+          if (softwareSelect.value === 'Other') {
+            customGroup.classList.add('rj-visible');
+          } else {
+            customGroup.classList.remove('rj-visible');
+          }
         }
       });
     }
@@ -1014,7 +1067,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (response && response.success && response.models) {
         // Save to current config
         currentConfig.providers[activeProvId].models = response.models;
-        currentConfig.providers[activeProvId].selectedModel = response.models[0];
+        const prevSelected = currentConfig.providers[activeProvId].selectedModel;
+        if (!prevSelected || !response.models.includes(prevSelected)) {
+          currentConfig.providers[activeProvId].selectedModel = response.models[0] || '';
+        }
         // Re-render select
         updateModelDropdownState(currentConfig.providers[activeProvId]);
         showToast(`Fetched ${response.models.length} models successfully`);

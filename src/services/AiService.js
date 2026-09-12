@@ -66,6 +66,26 @@ export async function imageToBase64(imageSource) {
 
   // 2. HTTP / HTTPS / Blob URL
   if (/^(https?:\/\/|blob:)/i.test(str)) {
+    // If running in browser extension and it's an HTTP/HTTPS URL, proxy via background worker to bypass CORS
+    if (/^https?:\/\//i.test(str) && typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
+      try {
+        const bgRes = await new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage({ action: 'FETCH_IMAGE_AS_BASE64', url: str }, response => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve(response);
+            }
+          });
+        });
+        if (bgRes && bgRes.success && bgRes.dataUrl) {
+          return bgRes.dataUrl;
+        }
+      } catch {
+        // Fall back to direct fetch if background communication fails
+      }
+    }
+
     const res = await fetch(str);
     if (!res.ok) {
       const err = new Error(`Failed to fetch image from URL: ${str} (Status: ${res.status})`);
@@ -127,7 +147,8 @@ export async function generateMetadata({
   isAiGenerated = false,
   editorialPrefix = '',
   assetIndex = 0,
-  providerConfig = null
+  providerConfig = null,
+  maxTokens = null
 } = {}) {
   // 1. Convert image to base64 Data URL
   const imageBase64 = image ? await imageToBase64(image) : '';
@@ -172,11 +193,21 @@ export async function generateMetadata({
     model: provider.selectedModel,
     systemPrompt,
     userInstruction,
-    imageBase64
+    imageBase64,
+    maxTokens
   });
+
+  console.log(
+    '%c[RJ AIO Metadata] Requesting AI metadata for asset %d to %s (%s)...',
+    'color: #079183; font-weight: bold;',
+    (assetIndex ?? 0) + 1,
+    activeProviderKey,
+    provider.selectedModel
+  );
 
   // 6. Dispatch request
   let rawContent = '';
+  let adaptations = [];
 
   if (customDispatcher) {
     const res = await customDispatcher({ payload, providerConfig: config, assetIndex });
@@ -185,9 +216,11 @@ export async function generateMetadata({
       const msg = res?.error?.message || res?.error || 'Vision metadata generation failed';
       const err = new Error(msg);
       err.code = code;
+      console.error('%c[RJ AIO Metadata] API Error (%s): %s', 'color: #ff5c5c; font-weight: bold;', code, msg);
       throw err;
     }
     rawContent = res.rawContent || '';
+    adaptations = res.adaptations || [];
   } else if (typeof chrome !== 'undefined' && chrome?.runtime?.sendMessage) {
     const res = await new Promise((resolve, reject) => {
       chrome.runtime.sendMessage(
@@ -209,14 +242,31 @@ export async function generateMetadata({
       const msg = res?.error?.message || res?.error || 'Vision metadata generation failed';
       const err = new Error(msg);
       err.code = code;
+      console.error('%c[RJ AIO Metadata] API Error (%s): %s', 'color: #ff5c5c; font-weight: bold;', code, msg);
       throw err;
     }
     rawContent = res.rawContent || '';
+    adaptations = res.adaptations || [];
   } else {
     // Non-extension environment without mock dispatcher: direct executor fallback
     const { handleGenerateVisionMetadata } = await import('../background/service_worker.js');
     const res = await handleGenerateVisionMetadata({ payload, providerConfig: config, assetIndex });
     rawContent = res.rawContent || '';
+    adaptations = res.adaptations || [];
+  }
+
+  if (adaptations && adaptations.length > 0) {
+    for (const note of adaptations) {
+      console.warn('%c[RJ AIO Metadata] Parameter auto-adapted: %s', 'color: #f5a623;', note);
+    }
+  }
+
+  // Log raw parsed content
+  try {
+    const rawParsed = JSON.parse(rawContent);
+    console.log('%c[RJ AIO Metadata] Raw metadata from AI:', 'color: #57c1ff;', rawParsed);
+  } catch {
+    console.log('%c[RJ AIO Metadata] Raw metadata from AI (text):', 'color: #57c1ff;', rawContent);
   }
 
   // 7. Sanitize output
@@ -226,6 +276,13 @@ export async function generateMetadata({
     customKeywords,
     editorialPrefix
   });
+
+  console.log(
+    '%c[RJ AIO Metadata] Sanitized metadata for asset %d:',
+    'color: #59d499;',
+    (assetIndex ?? 0) + 1,
+    sanitized
+  );
 
   // 8. Return sanitized metadata object
   return sanitized;

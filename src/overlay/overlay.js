@@ -4,6 +4,11 @@
  * Reference: ADR-002 (Dual UI Strategy), DESIGN.md (Raycast Dark Precision)
  */
 
+import { getAdapterForUrl, getAdapterForPlatform } from '../adapters/index.js';
+import { generateMetadata } from '../services/AiService.js';
+import { randomDelay, sleep } from '../adapters/utils/dom_helpers.js';
+import { logger } from '../services/LoggerService.js';
+
 // Platform Keyword Count Constraints & Hints
 const PLATFORM_LIMITS = {
   adobestock: { min: 8, max: 49, hint: 'Min 8, Max 49' },
@@ -38,6 +43,7 @@ export class OverlayHUD {
     this.platformName = this.detectPlatform();
     this.assetCount = 0;
     this.isAutomationRunning = false;
+    this.abortController = null;
     this.scanInterval = null;
     this.mutationObserver = null;
     this.saveDebounceTimer = null;
@@ -73,7 +79,7 @@ export class OverlayHUD {
     if (host.includes('shutterstock.com')) return 'shutterstock';
     if (host.includes('dreamstime.com')) return 'dreamstime';
     if (host.includes('vecteezy.com')) return 'vecteezy';
-    if (host.includes('freepik.com')) return 'freepik';
+    if (host.includes('freepik.com') || host.includes('magnific.com')) return 'freepik';
     if (host.includes('depositphotos.com')) return 'depositphotos';
     if (host.includes('miricanvas.com')) return 'miricanvas';
     return 'unknown';
@@ -89,7 +95,7 @@ export class OverlayHUD {
     if (host.includes('shutterstock.com')) return 'Shutterstock';
     if (host.includes('dreamstime.com')) return 'Dreamstime';
     if (host.includes('vecteezy.com')) return 'Vecteezy';
-    if (host.includes('freepik.com')) return 'Freepik';
+    if (host.includes('freepik.com') || host.includes('magnific.com')) return 'Freepik (Magnific)';
     if (host.includes('depositphotos.com')) return 'Depositphotos';
     if (host.includes('miricanvas.com')) return 'MiriCanvas';
     return 'Unknown Page';
@@ -160,14 +166,17 @@ export class OverlayHUD {
       };
     }
 
-    // 3. Freepik
-    if (host.includes('freepik.com')) {
-      const elements = document.querySelectorAll('div.catalog__item');
+    // 3. Freepik / Magnific
+    if (host.includes('freepik.com') || host.includes('magnific.com')) {
+      const allElements = Array.from(document.querySelectorAll('div.catalog__item, div[data-testid*="catalog-item"]'));
+      const elements = allElements.filter(
+        (el) => !el.classList?.contains('catalog__item--fake') && !(el.getAttribute?.('class') || '').includes('catalog__item--fake')
+      );
       const count = elements.length;
       return {
         count,
         label: count > 0 ? `${count} Asset${count === 1 ? '' : 's'} Found` : '0 Assets Detected',
-        selector: 'div.catalog__item'
+        selector: 'div.catalog__item:not(.catalog__item--fake)'
       };
     }
 
@@ -256,16 +265,16 @@ export class OverlayHUD {
         }
       }
 
-      // C. Fallback: table rows on page
+      // C. Fallback: modern item cards or table rows on page
       const rows = document.querySelectorAll(
-        'div._unfinished__section_items table tbody tr, table.unfinished-files tbody tr, tr.unfinished__item'
+        '.itemslist > div.itemeditor, div._unfinished__section_items table tbody tr, table.unfinished-files tbody tr, tr.unfinished__item'
       );
       if (rows.length > 0) {
         return {
           count: rows.length,
           mediaType: 'Assets',
           label: `${rows.length} Asset${rows.length === 1 ? '' : 's'} Detected`,
-          selector: 'div._unfinished__section_items table tbody tr'
+          selector: '.itemslist > div.itemeditor'
         };
       }
 
@@ -288,12 +297,24 @@ export class OverlayHUD {
 
     // 7. MiriCanvas
     if (host.includes('miricanvas.com')) {
-      const elements = document.querySelectorAll('div.css-1qnaji9.e1pyeb4g3, div.panda-ehlNbj div.panda-gFNlpN');
-      const count = elements.length;
+      const realListArticles = Array.from(
+        document.querySelectorAll(
+          'ul[data-f="TU-5eb5"] article[data-f="CA-d943"], ul[data-f="TU-5eb5"] > li > article, ul[data-f="TU-5eb5"] article'
+        )
+      );
+      const validArticles = realListArticles.length > 0
+        ? realListArticles
+        : Array.from(
+            document.querySelectorAll(
+              'article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, article'
+            )
+          ).filter((a) => !a.closest?.('ul[data-f="GU-fa4b"], ul.panda-ecnXzs'));
+
+      const count = validArticles.length;
       return {
         count,
         label: count > 0 ? `${count} Asset${count === 1 ? '' : 's'} Found` : '0 Assets Detected',
-        selector: 'div.css-1qnaji9.e1pyeb4g3'
+        selector: 'ul[data-f="TU-5eb5"] article, article[data-f="CA-d943"]'
       };
     }
 
@@ -681,6 +702,13 @@ export class OverlayHUD {
     const aiToggle = this.shadow.querySelector('#rjToggleAiDeclaration');
     if (aiToggle) {
       aiToggle.addEventListener('change', () => {
+        if (this.platformId === 'freepik') {
+          if (aiToggle.checked && inputCount && Number(inputCount.value) >= 50) {
+            inputCount.value = 49;
+          } else if (!aiToggle.checked && inputCount && Number(inputCount.value) === 49) {
+            inputCount.value = 50;
+          }
+        }
         this.saveFormStateToStorage();
       });
     }
@@ -690,20 +718,13 @@ export class OverlayHUD {
     if (btnAutomation) {
       btnAutomation.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!this.isAutomationRunning && !this.isProviderReady(this.currentConfig)) {
-          return;
+        if (this.isStopping) {
+          this.stopAutomation(true);
+        } else if (this.isAutomationRunning) {
+          this.stopAutomation();
+        } else {
+          this.startAutomation();
         }
-        this.isAutomationRunning = !this.isAutomationRunning;
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          chrome.storage.local.set({
-            rj_automation_state: {
-              isRunning: this.isAutomationRunning,
-              platformId: this.platformId,
-              timestamp: Date.now()
-            }
-          });
-        }
-        this.updateAutomationUI(this.isAutomationRunning);
       });
     }
 
@@ -795,7 +816,11 @@ export class OverlayHUD {
       if (state) {
         const isRunning = Boolean(state.isRunning);
         if (this.isAutomationRunning !== isRunning) {
-          this.updateAutomationUI(isRunning);
+          if (!isRunning && this.isAutomationRunning) {
+            this.stopAutomation();
+          } else if (isRunning && !this.isAutomationRunning) {
+            this.startAutomation();
+          }
         }
       }
     }
@@ -856,31 +881,518 @@ export class OverlayHUD {
   }
 
   /**
+   * Starts sequential AI metadata generation and injection across detected assets.
+   */
+  async startAutomation() {
+    if (this.isAutomationRunning || this.isStopping) return;
+
+    // 1. Resolve active platform adapter
+    const currentUrl = typeof window !== 'undefined' ? window.location?.href : '';
+    let adapter = getAdapterForUrl(currentUrl);
+    if (!adapter && this.platformId && this.platformId !== 'unknown') {
+      adapter = getAdapterForPlatform(this.platformId);
+    }
+    if (adapter && (!this.platformId || this.platformId === 'unknown')) {
+      this.platformId = adapter.platformId;
+    }
+
+    if (!adapter) {
+      logger.warn('No platform adapter matched for URL:', currentUrl);
+      const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
+      if (statusText) statusText.textContent = 'Unsupported Page';
+      return;
+    }
+
+    // 2. Validate active provider credentials
+    if (!this.currentConfig) {
+      await this.syncFromStorage();
+    }
+    if (!this.isProviderReady(this.currentConfig)) {
+      logger.warn('AI Provider is not ready. Configure in popup first.');
+      const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
+      if (statusText) statusText.textContent = 'Setup Model';
+      return;
+    }
+
+    // 3. Initialize AbortController
+    this.abortController = new AbortController();
+    const signal = this.abortController.signal;
+
+    // 4. Update HUD UI state to Running
+    this.updateAutomationUI(true);
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({
+        rj_automation_state: {
+          isRunning: true,
+          platformId: this.platformId,
+          timestamp: Date.now()
+        }
+      });
+    }
+
+    const progressFill = this.shadow?.querySelector('#rjProgressFill');
+    const countText = this.shadow?.querySelector('#rjAssetCountText');
+    const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
+    const pillStatus = this.shadow?.querySelector('#rjPillStatus');
+    const badge = this.shadow?.querySelector('#rjAutomationBadge');
+
+    try {
+      // 5. Query asset cards on the page
+      const rawCards = adapter.getAssetCards();
+      const cards = Array.isArray(rawCards) ? rawCards : (rawCards ? Array.from(rawCards) : []);
+      const total = cards.length;
+
+      if (total === 0) {
+        this.updateAutomationUI(false);
+        if (countText) countText.textContent = '0 Assets Detected';
+        if (statusText) statusText.textContent = '0 Assets Detected';
+        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+          chrome.storage.local.set({
+            rj_automation_state: {
+              isRunning: false,
+              platformId: this.platformId,
+              timestamp: Date.now()
+            }
+          });
+        }
+        return;
+      }
+
+      logger.banner(`Automation started on ${this.platformId} with ${total} assets`);
+
+      // Pre-automation initialization (e.g. deselecting header select-all checkboxes)
+      if (typeof adapter.prepareAutomation === 'function') {
+        await adapter.prepareAutomation();
+        if (signal.aborted || this.isStopping) return;
+        await sleep(300);
+      }
+
+      this.isStopping = false;
+      this.isCardProcessing = false;
+      let processedCount = 0;
+
+      // 6A. Dreamstime In-Page Carousel Loop
+      if (this.platformId === 'dreamstime') {
+        let assetIdx = 0;
+        while (!signal.aborted && !this.isStopping) {
+          const currentCards = adapter.getAssetCards();
+          const card = currentCards && currentCards.length > 0 ? currentCards[0] : null;
+          if (!card) break;
+
+          const currentId = adapter.getCurrentAssetId();
+          if (countText) countText.textContent = `Asset ${assetIdx + 1}${currentId ? ` (ID ${currentId})` : ''}`;
+          if (statusText) statusText.textContent = this.isStopping ? 'Stopping...' : 'Processing...';
+          if (pillStatus) pillStatus.textContent = `Asset ${assetIdx + 1}`;
+
+          logger.asset(assetIdx + 1, 'Carousel');
+
+          this.isCardProcessing = true;
+          try {
+            // Step 1: Wait for Editor Ready
+            await adapter.waitForEditorReady(card, 4000);
+            if (signal.aborted) break;
+            await sleep(300);
+
+            // Step 2: Extract preview thumbnail
+            const thumb = adapter.getThumbnailUrl(card);
+
+            // Step 3: AI Metadata Generation
+            if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving)...' : 'Generating AI...';
+
+            let keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 70;
+            const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
+            const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
+            const isAiGenerated = Boolean(this.shadow?.querySelector('#rjToggleAiDeclaration')?.checked);
+            const language = this.currentConfig?.platformSettings?.dreamstime?.language || 'en';
+
+            const sanitizedData = await generateMetadata({
+              image: thumb,
+              platformId: 'dreamstime',
+              assetType: 'image',
+              targetKeywordCount: keywordCount,
+              customKeywords,
+              isAiGenerated,
+              editorialPrefix: '',
+              language,
+              assetIndex: assetIdx,
+              providerConfig: this.currentConfig
+            });
+
+            if (signal.aborted) break;
+            await sleep(400);
+
+            // Step 4: Inject sanitized metadata
+            if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving)...' : 'Injecting metadata...';
+
+            const platformSettings = this.currentConfig?.platformSettings?.dreamstime || {};
+            const isEditorial = Boolean(platformSettings.isEditorial);
+            const platformOptions = {
+              ...platformSettings,
+              isAiGenerated,
+              isEditorial,
+              language
+            };
+
+            await adapter.fillMetadata(sanitizedData, platformOptions);
+            processedCount++;
+
+            // Step 5: Save edits (waits for toast appear & disappear)
+            if (statusText) statusText.textContent = 'Saving edits...';
+            await adapter.saveDraft();
+
+            // Step 6: If Mode B (submit_direct), submit for review
+            if (platformSettings.mode === 'submit_direct') {
+              if (statusText) statusText.textContent = 'Submitting file...';
+              await adapter.submitForReview(isEditorial);
+            }
+
+            logger.success(`Completed asset ${assetIdx + 1}${currentId ? ` (ID: ${currentId})` : ''}`);
+          } catch (assetErr) {
+            if (signal.aborted || assetErr?.message === 'ABORTED') break;
+            logger.warn(`Error processing asset ${assetIdx + 1}:`, assetErr);
+          } finally {
+            this.isCardProcessing = false;
+          }
+
+          if (this.isStopping || signal.aborted) break;
+
+          // Step 7: Cooldown Delay
+          if (statusText) statusText.textContent = 'Cooldown...';
+          const minWait = this._cooldownMin ?? 1000;
+          const maxWait = this._cooldownMax ?? 4000;
+          const cooldownTarget = Math.floor(Math.random() * (maxWait - minWait + 1)) + minWait;
+          const cooldownStart = Date.now();
+          while (Date.now() - cooldownStart < cooldownTarget) {
+            if (this.isStopping || signal.aborted) break;
+            await sleep(100).catch(() => {});
+          }
+
+          if (this.isStopping || signal.aborted) break;
+
+          // Step 8: Navigate to next
+          if (statusText) statusText.textContent = 'Next asset...';
+          const navResult = await adapter.navigateToNext();
+          if (navResult?.done) {
+            break;
+          }
+
+          assetIdx++;
+          await sleep(500);
+        }
+
+        if (this.isStopping || signal.aborted) {
+          logger.banner('Dreamstime automation stopped.');
+          this.isStopping = false;
+          this.isAutomationRunning = false;
+          this.updateAutomationUI(false);
+          if (statusText) statusText.textContent = 'Stopped';
+        } else {
+          logger.success(`Dreamstime automation finished ${processedCount} assets.`);
+          if (progressFill) progressFill.style.width = '100%';
+          if (countText) countText.textContent = `Finished ${processedCount} assets`;
+          this.lastCompletedAssetLabel = `Finished ${processedCount} assets`;
+          if (badge) badge.classList.remove('rj-running');
+          if (statusText) statusText.textContent = 'Completed';
+          if (pillStatus) pillStatus.textContent = 'Finished';
+
+          const finishWait = this._completionWait ?? 3000;
+          await sleep(finishWait);
+          this.updateAutomationUI(false);
+        }
+        return;
+      }
+
+      // 6B. Sequential Asset Processing Loop (Grid / List platforms)
+      for (let i = 0; i < total; i++) {
+        if (signal.aborted || this.isStopping) break;
+
+        const card = cards[i];
+
+        // Update HUD progress
+        const pct = Math.round((i / total) * 100);
+        if (progressFill) progressFill.style.width = `${pct}%`;
+        if (countText) countText.textContent = `Asset ${i + 1} of ${total}`;
+        if (statusText) statusText.textContent = this.isStopping ? 'Stopping...' : 'Processing...';
+        if (pillStatus) pillStatus.textContent = `${i + 1}/${total} (${pct}%)`;
+
+        logger.asset(i + 1, total);
+
+        this.isCardProcessing = true;
+        try {
+          // Step 1: Select Card
+          await adapter.selectCard(card);
+          if (signal.aborted) break;
+          await sleep(600);
+
+          // Step 2: Wait for Editor Ready
+          const isEditorReady = await adapter.waitForEditorReady(card, 4000);
+          if (signal.aborted) break;
+          if (!isEditorReady && this.platformId === 'miricanvas') {
+            logger.warn(`Editor not ready for asset ${i + 1}, retrying card selection...`);
+            await adapter.selectCard(card);
+            await adapter.waitForEditorReady(card, 2000);
+          }
+          await sleep(300);
+
+          // Step 3: Extract preview thumbnail
+          const thumb = adapter.getThumbnailUrl(card);
+
+          // Step 4: AI Metadata Generation
+          if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving card)...' : 'Generating AI...';
+
+          let keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 50;
+          const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
+          const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
+          const isAiGenerated = (this.platformId !== 'shutterstock' && this.platformId !== 'depositphotos')
+            ? Boolean(this.shadow?.querySelector('#rjToggleAiDeclaration')?.checked)
+            : false;
+          if (this.platformId === 'freepik' && isAiGenerated) {
+            keywordCount = Math.min(keywordCount, 49);
+          }
+          const isShutterstockEditorial = this.platformId === 'shutterstock' && Boolean(this.currentConfig?.platformSettings?.shutterstock?.isEditorial);
+          const editorialPrefix = isShutterstockEditorial ? (this.currentConfig?.platformSettings?.shutterstock?.editorialPrefix || '') : '';
+          const language = this.currentConfig?.platformSettings?.[this.platformId]?.language || 'en';
+          const isVideo = this.platformId === 'shutterstock' && typeof window !== 'undefined' && window.location?.pathname?.includes('/video');
+          const assetType = isVideo ? 'video' : 'image';
+
+          const sanitizedData = await generateMetadata({
+            image: thumb,
+            platformId: this.platformId,
+            assetType,
+            targetKeywordCount: keywordCount,
+            customKeywords,
+            isAiGenerated,
+            editorialPrefix,
+            language,
+            assetIndex: i,
+            providerConfig: this.currentConfig
+          });
+
+          if (signal.aborted) break;
+          await sleep(500);
+
+          // Step 5: Clear existing metadata (Temporarily disabled/commented out; clearing delegated sequentially inside platform adapters)
+          /*
+          if (this.platformId !== 'adobestock') {
+            await adapter.clearMetadata();
+            if (signal.aborted) break;
+            await sleep(300);
+          }
+          */
+
+          // Step 6: Inject sanitized metadata
+          if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving card)...' : 'Injecting metadata...';
+
+          const platformSettings = this.currentConfig?.platformSettings?.[this.platformId] || {};
+          const platformOptions = {
+            ...platformSettings,
+            isAiGenerated,
+            language
+          };
+
+          await adapter.fillMetadata(sanitizedData, platformOptions, card);
+          processedCount++;
+
+          // Step 7: Per-item save (for Freepik and Dreamstime)
+          if (this.platformId === 'freepik' || this.platformId === 'dreamstime') {
+            await adapter.saveDraft();
+          }
+
+          logger.success(`Completed asset ${i + 1} of ${total}`);
+        } catch (assetErr) {
+          if (signal.aborted || assetErr?.message === 'ABORTED') {
+            break;
+          }
+          if (total === 1) {
+            throw assetErr;
+          }
+          logger.warn(`Error processing asset ${i + 1}/${total}:`, assetErr);
+          if (statusText) statusText.textContent = `Asset ${i + 1} skipped`;
+          await randomDelay(1000, 2000, signal);
+          continue;
+        } finally {
+          this.isCardProcessing = false;
+        }
+
+        // If stop was requested while processing this card, finish here and proceed to bulk save
+        if (this.isStopping || signal.aborted) break;
+
+        // Step 8: Cooldown Delay (Responsive to graceful stop)
+        if (statusText) statusText.textContent = 'Cooldown...';
+        const minWait = this._cooldownMin ?? 1000;
+        const maxWait = this._cooldownMax ?? 5000;
+        const cooldownTarget = Math.floor(Math.random() * (maxWait - minWait + 1)) + minWait;
+        const cooldownStart = Date.now();
+        while (Date.now() - cooldownStart < cooldownTarget) {
+          if (this.isStopping || signal.aborted) break;
+          await sleep(100).catch(() => {});
+        }
+
+        if (this.isStopping || signal.aborted) break;
+
+        // Dreamstime special carousel navigation
+        if (this.platformId === 'dreamstime') {
+          const navResult = await adapter.navigateToNext();
+          if (navResult?.done) {
+            break;
+          }
+        }
+      }
+
+      // End of Loop / Bulk Save (Triggers on completion or graceful stop)
+      const bulkSavePlatforms = ['adobestock', 'shutterstock', 'vecteezy', 'depositphotos', 'miricanvas'];
+      if (bulkSavePlatforms.includes(this.platformId) && processedCount > 0 && !signal.aborted) {
+        const saveLabel = this.isStopping ? 'Saving work...' : 'Saving all...';
+        logger.banner(
+          `${this.isStopping ? 'Stop requested. Triggering bulk save' : 'All assets processed. Triggering bulk save'} for ${this.platformId} (${processedCount} processed assets)...`
+        );
+        if (statusText) statusText.textContent = saveLabel;
+        await sleep(1000);
+        await adapter.bulkSave();
+        await sleep(1000);
+      }
+
+      if (this.isStopping || signal.aborted) {
+        logger.banner('Automation gracefully saved and stopped.');
+        this.isStopping = false;
+        this.isAutomationRunning = false;
+        this.updateAutomationUI(false);
+        if (statusText) statusText.textContent = 'Stopped';
+      } else {
+        logger.success('Automation completed successfully!');
+
+        // Completion status
+        if (progressFill) progressFill.style.width = '100%';
+        if (countText) countText.textContent = `Finished ${total} assets`;
+        this.lastCompletedAssetLabel = `Finished ${total} assets`;
+        if (badge) badge.classList.remove('rj-running');
+        if (statusText) statusText.textContent = 'Completed';
+        if (pillStatus) pillStatus.textContent = 'Finished';
+
+        const finishWait = this._completionWait ?? 3000;
+        await sleep(finishWait);
+        this.updateAutomationUI(false);
+      }
+    } catch (err) {
+      if (err.message === 'ABORTED' || signal.aborted) {
+        logger.info('Automation stopped.');
+        this.isStopping = false;
+        this.isAutomationRunning = false;
+        this.updateAutomationUI(false);
+        if (statusText) statusText.textContent = 'Stopped';
+      } else {
+        logger.error('Automation error:', err);
+        this.isStopping = false;
+        this.isAutomationRunning = false;
+        this.updateAutomationUI(false);
+        if (statusText) statusText.textContent = 'Error: ' + (err.message || 'Failed');
+      }
+    } finally {
+      this.isStopping = false;
+      this.isCardProcessing = false;
+      this.abortController = null;
+      this.isAutomationRunning = false;
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.set({
+          rj_automation_state: {
+            isRunning: false,
+            platformId: this.platformId,
+            timestamp: Date.now()
+          }
+        });
+      }
+    }
+  }
+
+  /**
+   * Stops automation gracefully with saving, or force aborts if clicked again.
+   * @param {boolean} [force=false]
+   */
+  stopAutomation(force = false) {
+    if (!this.isAutomationRunning && !this.isStopping) {
+      this.updateAutomationUI(false);
+      return;
+    }
+
+    const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
+
+    if (this.isStopping || force) {
+      // Second click or forced stop: immediate hard abort
+      logger.warn('Force stop requested. Aborting immediately...');
+      if (this.abortController) {
+        this.abortController.abort();
+        this.abortController = null;
+      }
+      this.isStopping = false;
+      this.isCardProcessing = false;
+      this.isAutomationRunning = false;
+      this.updateAutomationUI(false);
+      if (statusText) statusText.textContent = 'Stopped';
+    } else {
+      // First click: graceful stop after active card finishes and saves
+      this.isStopping = true;
+      this.isAutomationRunning = false;
+      const btn = this.shadow?.querySelector('#rjBtnToggleAutomation');
+      const btnText = this.shadow?.querySelector('#rjAutomationBtnText');
+      if (btn) btn.title = 'Stopping automation (saving work)...';
+      if (btnText) btnText.textContent = 'Stopping...';
+      if (statusText) statusText.textContent = 'Stopping...';
+      logger.warn('Stop requested. Waiting for active card to finish then saving work...');
+    }
+
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({
+        rj_automation_state: {
+          isRunning: false,
+          platformId: this.platformId,
+          timestamp: Date.now()
+        }
+      });
+    }
+  }
+
+  /**
    * Synchronizes input values from chrome.storage.
    */
   async syncFromStorage() {
     if (!this.shadow || typeof chrome === 'undefined' || !chrome.storage) return;
 
     return new Promise((resolve) => {
-      const getter = chrome.storage.sync ? chrome.storage.sync : chrome.storage.local;
-      getter.get(null, (res) => {
-        let config = res || {};
-        if (chrome.runtime.lastError || !config.platformSettings) {
-          if (chrome.storage.local) {
-            chrome.storage.local.get(null, (localRes) => {
-              this.currentConfig = localRes || {};
-              this._applyConfigToInputs(this.currentConfig);
-              this.updateStartButtonReadiness();
-              resolve();
-            });
-            return;
-          }
-        }
-        this.currentConfig = config;
-        this._applyConfigToInputs(config);
+      const localStore = chrome.storage.local;
+      const syncStore = chrome.storage.sync;
+
+      const applyAndResolve = (config) => {
+        this.currentConfig = config || {};
+        this._applyConfigToInputs(this.currentConfig);
         this.updateStartButtonReadiness();
         resolve();
-      });
+      };
+
+      if (localStore) {
+        localStore.get(null, (localRes) => {
+          if (!chrome.runtime.lastError && localRes && Object.keys(localRes).length > 0 && localRes.platformSettings) {
+            applyAndResolve(localRes);
+            return;
+          }
+          if (syncStore) {
+            syncStore.get(null, (syncRes) => {
+              applyAndResolve(syncRes || localRes || {});
+            });
+          } else {
+            applyAndResolve(localRes || {});
+          }
+        });
+        return;
+      }
+
+      if (syncStore) {
+        syncStore.get(null, (syncRes) => {
+          applyAndResolve(syncRes || {});
+        });
+        return;
+      }
+
+      resolve();
     });
   }
 
@@ -911,6 +1423,14 @@ export class OverlayHUD {
     if (aiToggle && platSettings.isAiGenerated !== undefined) {
       aiToggle.checked = Boolean(platSettings.isAiGenerated);
     }
+
+    if (inputCount && inputCount !== this.shadow.activeElement) {
+      let val = typeof platSettings.keywordCount === 'number' ? platSettings.keywordCount : limits.max;
+      if (this.platformId === 'freepik' && aiToggle?.checked && val > 49) {
+        val = 49;
+      }
+      inputCount.value = Math.max(limits.min, Math.min(limits.max, val));
+    }
   }
 
   /**
@@ -926,11 +1446,17 @@ export class OverlayHUD {
       const specificInput = this.shadow?.querySelector('#rjInputSpecificKeywords');
       const aiToggle = this.shadow?.querySelector('#rjToggleAiDeclaration');
 
-      const keywordCount = countInput ? Math.max(limits.min, Math.min(limits.max, Number(countInput.value) || limits.max)) : limits.max;
+      let keywordCount = countInput ? Math.max(limits.min, Math.min(limits.max, Number(countInput.value) || limits.max)) : limits.max;
       const specificKeywords = specificInput ? specificInput.value.trim() : '';
       const isAiGenerated = aiToggle ? aiToggle.checked : false;
+      if (this.platformId === 'freepik' && isAiGenerated && keywordCount > 49) {
+        keywordCount = 49;
+      }
 
-      const getter = chrome.storage.sync ? chrome.storage.sync : chrome.storage.local;
+      const localStore = chrome.storage.local;
+      const syncStore = chrome.storage.sync;
+      const getter = localStore || syncStore;
+
       getter.get(null, (res) => {
         const config = res || {};
         if (!config.platformSettings) config.platformSettings = {};
@@ -942,16 +1468,24 @@ export class OverlayHUD {
           config.platformSettings[this.platformId].isAiGenerated = isAiGenerated;
         }
 
-        if (chrome.storage.sync) {
-          chrome.storage.sync.set(config, () => {
-            if (chrome.runtime.lastError && chrome.storage.local) {
-              chrome.storage.local.set(config);
-            } else if (chrome.storage.local) {
-              chrome.storage.local.set(config);
+        if (localStore) {
+          localStore.set(config, () => {
+            if (syncStore) {
+              try {
+                const syncConfig = JSON.parse(JSON.stringify(config));
+                if (syncConfig.providers) {
+                  Object.keys(syncConfig.providers).forEach(k => {
+                    if (Array.isArray(syncConfig.providers[k]?.models)) {
+                      syncConfig.providers[k].models = syncConfig.providers[k].models.slice(0, 5);
+                    }
+                  });
+                }
+                syncStore.set(syncConfig, () => {});
+              } catch {}
             }
           });
-        } else if (chrome.storage.local) {
-          chrome.storage.local.set(config);
+        } else if (syncStore) {
+          syncStore.set(config);
         }
       });
     }, 300);
@@ -1210,7 +1744,7 @@ export class OverlayHUD {
 
       chrome.storage.local.get(['rj_hud_pos'], (res) => {
         if (chrome.runtime.lastError) {
-          console.warn('[RJ AIO Metadata] Storage load error:', chrome.runtime.lastError);
+          logger.warn('Storage load error:', chrome.runtime.lastError);
           resolve();
           return;
         }
@@ -1249,7 +1783,7 @@ export class OverlayHUD {
       }
     }, () => {
       if (chrome.runtime.lastError) {
-        console.warn('[RJ AIO Metadata] Failed to persist HUD position:', chrome.runtime.lastError);
+        logger.warn('Failed to persist HUD position:', chrome.runtime.lastError);
       }
     });
   }
@@ -1258,6 +1792,10 @@ export class OverlayHUD {
    * Cleanup method to clear intervals and observers when tearing down.
    */
   destroy() {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
     if (this.scanInterval) clearInterval(this.scanInterval);
     if (this.mutationObserver) this.mutationObserver.disconnect();
     if (this.saveDebounceTimer) clearTimeout(this.saveDebounceTimer);
