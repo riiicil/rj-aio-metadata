@@ -5,9 +5,9 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Keyword Chip Creation, Trash Button Discrimination & Verification Polling, Bulk Save Button Disabled & Toast Wait with 2000ms Sync Buffer & Fresh Navbar Uncheck, Depositphotos Full-String Native Comma Splitting, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Dual-Strategy Keyword Chip Clearing via Trash Button & Per-Chip Remove Icon Fallback, Sequential Form Ordering, Keyword Chip Creation, Trash Button Discrimination, Bulk Save Button Disabled & Toast Wait with 2000ms Sync Buffer & Fresh Navbar Uncheck, Depositphotos Full-String Native Comma Splitting, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `8879594` `fix(miricanvas): resolve keyword chip creation, trash button targeting, and bulk save uncheck lifecycle`
+- **Latest Commit**: `fix(miricanvas): implement dual-strategy keyword chip clearing with per-chip remove icon fallback`
 - **Working Tree**: Clean local branch
 - **Build / Test State**: Verified healthy (112/112 passed on Tier 3, 750+ assertions across all suites, zero emoji clean)
 
@@ -17,9 +17,12 @@
 
 Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned MiriCanvas, Depositphotos, Dreamstime, Vecteezy, and Freepik (Magnific):
 1. **MiriCanvas Live Alignment (`designhub.miricanvas.com/en/element/to-do`)**:
+   - **Dual-Strategy Keyword Chip Clearing & Per-Chip Remove Icon Fallback (`clearKeywords()`, `clearTitle()`)**: Solved the issue where pre-existing chips failed to delete, accumulating to 29/25 and 26/25 chips. Implemented a dual-strategy mechanism:
+     1. *Strategy 1 (Primary Bulk Deletion)*: Locates the verified trash button (`div[data-f="DD-04b4"]`, `svg[data-f="DD-e725"]`) and dispatches pointerdown, pointerup, and bubbling `MouseEvent('click')` events to both the inner icon element and the `<button>`. Actively polls up to 800ms for chip count to reach 0.
+     2. *Strategy 2 (Resilient Per-Chip Removal Fallback)*: If any keyword chips remain in the DOM (`span[data-f="CL-67aa"]`), iterates through each remaining chip, locates its specific 'x' remove icon (`svg[data-f="CD-213b"]` or `path[d*="10.587"]`), and clicks it with a 50ms pacing between clicks to allow React 18 / Base UI state reconciler to cleanly unmount without state collision.
+   - **Sequential Form Injection Ordering (`fillMetadata()`)**: Restructured the form injection flow to strictly adhere to user sequence: AI generator checkbox toggle -> Pricing tier radio selection -> Content type radio selection -> `clearTitle()` + Title injection -> `clearKeywords()` + Keywords injection. Eliminates UI re-renders from toggles that previously decoupled cleared chip state.
    - **Keyword Chip Creation via Non-Blur Setter & Paste InputEvent (`fillMetadata()`)**: Solved the issue where pasted keywords failed to convert into chips (`span[data-f="CL-67aa"]`). Directly sets native input value via `HTMLInputElement.prototype.value` descriptor without premature `blur`. Dispatches synthetic `InputEvent` (`inputType: 'insertFromPaste'`), Enter key sequence (`keydown` -> `change` -> `keyup`), active polling verification for chip creation (up to 1200ms), comma + Enter fallback, sequential tag injection fallback, DOM chip verification logging, and only clears leftover uncommitted text after chips are confirmed.
    - **Trash Button Discrimination & Copy Button Filtering (`_findTrashButton()`)**: Explicitly prioritizes `button:has(div[data-f="DD-04b4"]), button:has(svg[data-f="DD-e725"])` and filters out copy buttons (`div[data-f="CD-7f75"], svg[data-f="ID-430b"]`). When multiple buttons are present, selects `buttons[1]` (the dedicated trash button in MiriCanvas DOM), preventing accidental copy actions.
-   - **One-Shot Trash Clearing (`clearKeywords()`, `clearTitle()`)**: Directly clicks `trashBtn` via `simulateClick(trashBtn)`. Eliminates the problematic chip-by-chip `remainingRemoveSvgs` click loop that caused asynchronous state corruption in React 18. Actively polls up to 1200ms (12 attempts) until chips disappear from the DOM.
    - **Ghost Sizer (`ul[data-f="GU-fa4b"]`) Exclusion**: Filtered out hidden virtualizer dummy card (`ul[data-f="GU-fa4b"]`) in `getAssetCards()` and `overlay.js:detectAssetCount()`, ensuring asset counts accurately match real visible cards from `ul[data-f="TU-5eb5"]`.
    - **Active Card Selection Guard (`selectCard()`)**: Inspects `.css-1510m7j` on card container; if already active, skips thumbnail click to prevent accidental unselection and editor form unmounting.
    - **Smooth In-View Scroll (`selectCard()`)**: Clicks thumbnail image `img.css-l67sxu.er317d31` / `div[data-f="DT-1ecb"]` with `cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' })` to bring cards into viewport cleanly without activating card multi-edit checkboxes (`CI-66e5`).
@@ -202,6 +205,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 35 | 2026-09-13 | `task/platform-adapters` | `fix(miricanvas)` | Implemented dual-strategy keyword chip clearing (bulk trash button + per-chip 'x' remove icon fallback with 50ms pacing) and sequential form ordering in MiriCanvas, verified 112/112 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 34 | 2026-09-13 | `task/platform-adapters` | `8879594` | Resolved MiriCanvas keyword chip conversion via non-blur setter + insertFromPaste InputEvent + Enter/comma fallback, trash button discrimination (`DD-04b4`), and bulk save 8000ms disabled/toast wait with 2000ms sync buffer & fresh navbar uncheck, verified 112/112 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 33 | 2026-09-12 | `task/platform-adapters` | `fix(miricanvas)` | Eliminated redundant paste event and dual comma fallback in MiriCanvas keyword injection, verified 112/112 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 32 | 2026-09-12 | `task/platform-adapters` | `fix(miricanvas)` | Eliminated ghost sizer card in `ul[data-f="GU-fa4b"]`, added active selection check to prevent toggle-off, discriminated copy vs trash buttons (`DD-04b4`), verified 112/112 tests | Phase 5: End-to-End Live Browser Testing & Polish |

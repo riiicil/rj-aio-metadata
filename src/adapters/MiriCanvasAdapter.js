@@ -246,11 +246,17 @@ export class MiriCanvasAdapter extends BaseAdapter {
     }
     if (!container) return null;
 
-    // 1. Direct match: button containing div[data-f="DD-04b4"] or svg[data-f="DD-e725"]
-    const directTrash = container.querySelector?.(
-      'button:has(div[data-f="DD-04b4"]), button:has(svg[data-f="DD-e725"])'
-    );
-    if (directTrash) return directTrash;
+    // 1. Direct match: search for container with DD-04b4 or DD-e725 and find its button
+    const trashIcon = container.querySelector?.('div[data-f="DD-04b4"], svg[data-f="DD-e725"]');
+    if (trashIcon) {
+      let cur = trashIcon;
+      while (cur && cur !== container) {
+        if (cur.tagName === 'BUTTON' || (typeof cur.matches === 'function' && cur.matches('button'))) {
+          return cur;
+        }
+        cur = cur.parentElement || cur.parent;
+      }
+    }
 
     const buttons = Array.from(container.querySelectorAll('button[data-f="TT-c273"], button'));
 
@@ -314,7 +320,20 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
     if (trashBtn && !trashBtn.disabled && !trashBtn.hasAttribute?.('disabled')) {
       (this.logger || logger).step('title', 'Clearing pre-existing title via trash button...');
+
+      const innerIcon = trashBtn.querySelector?.('div[data-f="DD-04b4"], svg[data-f="DD-e725"], svg, path');
+      if (innerIcon) {
+        simulateClick(innerIcon);
+        try {
+          innerIcon.dispatchEvent?.(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+        } catch {}
+      }
+
       simulateClick(trashBtn);
+      try {
+        trashBtn.dispatchEvent?.(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      } catch {}
+
       await sleep(100);
     }
 
@@ -327,41 +346,99 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
   /**
    * Clears existing keyword chips using the section trash button.
-   * Clicks the trash button and verifies chip removal.
-   * Does NOT click chips one-by-one to avoid React state corruption.
+   * Strategy 1: Bulk deletion via dedicated section trash button with active disappearance polling.
+   * Strategy 2: Resilient per-chip removal ('x' icon) fallback if chips remain in DOM.
+   *
    * @returns {Promise<boolean>}
    */
   async clearKeywords() {
     if (typeof document === 'undefined') return true;
 
-    const existingChips = Array.from(
-      document.querySelectorAll('div[data-f="SD-e7b2"] span[data-f="CL-67aa"], span[data-f="CL-67aa"]')
-    );
+    const getExistingChips = () =>
+      Array.from(
+        document.querySelectorAll('div[data-f="SD-e7b2"] span[data-f="CL-67aa"], span[data-f="CL-67aa"]')
+      );
+
+    let existingChips = getExistingChips();
     if (existingChips.length === 0) {
       return true;
     }
 
     (this.logger || logger).step(
       'keywords',
-      `Clearing ${existingChips.length} pre-existing keywords via trash button...`
+      `Clearing ${existingChips.length} pre-existing keywords...`
     );
 
+    // --- Strategy 1: Fast Bulk Deletion via Trash Button ---
     const kwSection = document.querySelector('div[data-f="SD-e7b2"]');
     const trashBtn = this._findTrashButton(kwSection, 'div[data-f="IA-61ae"], div[data-f="SD-e7b2"]');
 
     if (trashBtn && !trashBtn.disabled && !trashBtn.hasAttribute?.('disabled')) {
-      simulateClick(trashBtn);
+      (this.logger || logger).step('keywords', 'Clicking keyword trash button...');
 
-      // Await DOM update and verify chips disappeared (up to 1200ms)
-      for (let attempt = 0; attempt < 12; attempt++) {
+      const innerIcon = trashBtn.querySelector?.('div[data-f="DD-04b4"], svg[data-f="DD-e725"], svg, path');
+      if (innerIcon) {
+        simulateClick(innerIcon);
+        try {
+          innerIcon.dispatchEvent?.(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+        } catch {}
+      }
+
+      simulateClick(trashBtn);
+      try {
+        trashBtn.dispatchEvent?.(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      } catch {}
+
+      // Await DOM update and verify chips disappeared (up to 800ms)
+      for (let attempt = 0; attempt < 8; attempt++) {
         await sleep(100);
-        const chipsLeft = document.querySelectorAll(
-          'div[data-f="SD-e7b2"] span[data-f="CL-67aa"], span[data-f="CL-67aa"]'
-        );
-        if (chipsLeft.length === 0) {
-          break;
+        existingChips = getExistingChips();
+        if (existingChips.length === 0) {
+          (this.logger || logger).step('keywords', 'Verified: All keyword chips cleared via trash button.');
+          return true;
         }
       }
+    } else {
+      (this.logger || logger).warn('Keyword trash button not found or disabled, proceeding to chip deletion fallback...');
+    }
+
+    // --- Strategy 2: Resilient Per-Chip Removal Fallback ---
+    // If trash button failed or left chips behind, delete remaining chips individually via remove icon
+    existingChips = getExistingChips();
+    if (existingChips.length > 0) {
+      (this.logger || logger).step(
+        'keywords',
+        `Trash button did not clear all chips (${existingChips.length} remaining). Removing chips individually via 'x' icon...`
+      );
+
+      for (let pass = 0; pass < 2; pass++) {
+        existingChips = getExistingChips();
+        if (existingChips.length === 0) break;
+
+        for (const chip of existingChips) {
+          const removeIcon =
+            chip.querySelector?.('svg[data-f="CD-213b"], svg:has(path[d*="10.587"]), path[d*="10.587"], svg') ||
+            chip;
+
+          simulateClick(removeIcon);
+          try {
+            removeIcon.dispatchEvent?.(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+          } catch {}
+
+          // 50ms pacing allows React 18 state reconciler to unmount the chip cleanly
+          await sleep(50);
+        }
+
+        await sleep(100);
+      }
+    }
+
+    // Final verification
+    const remaining = getExistingChips().length;
+    if (remaining === 0) {
+      (this.logger || logger).step('keywords', 'Verified: All keyword chips successfully cleared.');
+    } else {
+      (this.logger || logger).warn(`Keyword clearing: ${remaining} chips still remain in DOM.`);
     }
 
     return true;
@@ -388,10 +465,6 @@ export class MiriCanvasAdapter extends BaseAdapter {
     );
     if (!hasEditor) {
       await this.waitForEditorReady(cardElement, 3000);
-    }
-
-    if (options.clearExisting !== false) {
-      await this.clearMetadata();
     }
 
     // 1. AI Generated Content Checkbox Toggle
@@ -463,6 +536,9 @@ export class MiriCanvasAdapter extends BaseAdapter {
     }
 
     // 4. Element Name (Title): Clamped to <= 100 characters
+    if (options.clearExisting !== false) {
+      await this.clearTitle();
+    }
     if (metadata.title) {
       const nameTextarea = document.querySelector(
         'div[data-f="SD-e6c2"] textarea, textarea[data-f="DT-9450"], textarea[placeholder*="Element Name"], textarea[placeholder*="Multiple names"], textarea.panda-eDQUvt'
@@ -476,6 +552,9 @@ export class MiriCanvasAdapter extends BaseAdapter {
     }
 
     // 5. Keywords: Clamped to <= 25 tags max, injected as comma-delimited batch and committed via Enter
+    if (options.clearExisting !== false) {
+      await this.clearKeywords();
+    }
     if (metadata.keywords && metadata.keywords.length > 0) {
       const kwInput = document.querySelector(
         'div[data-f="SD-e7b2"] input, input[data-f="II-b5a4"], input[placeholder*="Separate multiple keywords"], input.panda-eNrFAg'
