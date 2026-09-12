@@ -345,19 +345,23 @@ export class MiriCanvasAdapter extends BaseAdapter {
   }
 
   /**
-   * Clears existing keyword chips using the section trash button.
-   * Strategy 1: Bulk deletion via dedicated section trash button with active disappearance polling.
-   * Strategy 2: Resilient per-chip removal ('x' icon) fallback if chips remain in DOM.
+   * Clears existing keyword chips sequentially using per-chip remove ('x') icons.
+   * Eliminates the bulk trash button approach completely for keywords as requested,
+   * relying entirely on reactive, verified per-chip removal with active disappearance polling
+   * to accommodate container scrolling and React 18 state reconciler unmounting.
    *
    * @returns {Promise<boolean>}
    */
   async clearKeywords() {
     if (typeof document === 'undefined') return true;
 
-    const getExistingChips = () =>
-      Array.from(
-        document.querySelectorAll('div[data-f="SD-e7b2"] span[data-f="CL-67aa"], span[data-f="CL-67aa"]')
-      );
+    const getExistingChips = () => {
+      const kwSection = document.querySelector('div[data-f="SD-e7b2"]');
+      if (kwSection) {
+        return Array.from(kwSection.querySelectorAll('span[data-f="CL-67aa"]'));
+      }
+      return Array.from(document.querySelectorAll('span[data-f="CL-67aa"]'));
+    };
 
     let existingChips = getExistingChips();
     if (existingChips.length === 0) {
@@ -366,69 +370,71 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
     (this.logger || logger).step(
       'keywords',
-      `Clearing ${existingChips.length} pre-existing keywords...`
+      `Clearing ${existingChips.length} pre-existing keywords individually via remove icon...`
     );
 
-    // --- Strategy 1: Fast Bulk Deletion via Trash Button ---
-    const kwSection = document.querySelector('div[data-f="SD-e7b2"]');
-    const trashBtn = this._findTrashButton(kwSection, 'div[data-f="IA-61ae"], div[data-f="SD-e7b2"]');
+    let consecutiveFailures = 0;
+    const maxIterations = 60;
+    let iteration = 0;
 
-    if (trashBtn && !trashBtn.disabled && !trashBtn.hasAttribute?.('disabled')) {
-      (this.logger || logger).step('keywords', 'Clicking keyword trash button...');
+    while (iteration < maxIterations && consecutiveFailures < 4) {
+      iteration++;
+      const currentChips = getExistingChips();
+      if (currentChips.length === 0) {
+        break;
+      }
 
-      const innerIcon = trashBtn.querySelector?.('div[data-f="DD-04b4"], svg[data-f="DD-e725"], svg, path');
-      if (innerIcon) {
-        simulateClick(innerIcon);
+      const prevCount = currentChips.length;
+
+      // Handle scrollable chip container:
+      // Deleting bottom-up (last chip first, matching human interaction in recording)
+      // naturally shrinks scroll height. On failure, alternate to top chip (first chip).
+      const targetChip = (consecutiveFailures % 2 === 0)
+        ? currentChips[currentChips.length - 1]
+        : currentChips[0];
+
+      if (!targetChip) break;
+
+      // Ensure chip is scrolled into view within the scrollable container
+      try {
+        if (typeof targetChip.scrollIntoView === 'function') {
+          targetChip.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+        }
+      } catch {}
+
+      const removeIcon =
+        targetChip.querySelector?.('svg[data-f="CD-213b"], svg:has(path[d*="10.587"]), path[d*="10.587"], svg') ||
+        targetChip;
+
+      const innerPath = removeIcon.querySelector?.('path') || (removeIcon.tagName === 'path' ? removeIcon : null);
+
+      if (innerPath) {
+        simulateClick(innerPath);
         try {
-          innerIcon.dispatchEvent?.(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+          innerPath.dispatchEvent?.(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
         } catch {}
       }
 
-      simulateClick(trashBtn);
+      simulateClick(removeIcon);
       try {
-        trashBtn.dispatchEvent?.(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+        removeIcon.dispatchEvent?.(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
       } catch {}
 
-      // Await DOM update and verify chips disappeared (up to 800ms)
-      for (let attempt = 0; attempt < 8; attempt++) {
-        await sleep(100);
-        existingChips = getExistingChips();
-        if (existingChips.length === 0) {
-          (this.logger || logger).step('keywords', 'Verified: All keyword chips cleared via trash button.');
-          return true;
+      // Active polling: wait for chip count to decrease before moving to next chip
+      // Gives React 18 state reconciler time to unmount without dropping concurrent clicks
+      let chipRemoved = false;
+      for (let poll = 0; poll < 8; poll++) {
+        await sleep(75);
+        const updatedCount = getExistingChips().length;
+        if (updatedCount < prevCount) {
+          chipRemoved = true;
+          consecutiveFailures = 0;
+          break;
         }
       }
-    } else {
-      (this.logger || logger).warn('Keyword trash button not found or disabled, proceeding to chip deletion fallback...');
-    }
 
-    // --- Strategy 2: Resilient Per-Chip Removal Fallback ---
-    // If trash button failed or left chips behind, delete remaining chips individually via remove icon
-    existingChips = getExistingChips();
-    if (existingChips.length > 0) {
-      (this.logger || logger).step(
-        'keywords',
-        `Trash button did not clear all chips (${existingChips.length} remaining). Removing chips individually via 'x' icon...`
-      );
-
-      for (let pass = 0; pass < 2; pass++) {
-        existingChips = getExistingChips();
-        if (existingChips.length === 0) break;
-
-        for (const chip of existingChips) {
-          const removeIcon =
-            chip.querySelector?.('svg[data-f="CD-213b"], svg:has(path[d*="10.587"]), path[d*="10.587"], svg') ||
-            chip;
-
-          simulateClick(removeIcon);
-          try {
-            removeIcon.dispatchEvent?.(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
-          } catch {}
-
-          // 50ms pacing allows React 18 state reconciler to unmount the chip cleanly
-          await sleep(50);
-        }
-
+      if (!chipRemoved) {
+        consecutiveFailures++;
         await sleep(100);
       }
     }
@@ -438,7 +444,7 @@ export class MiriCanvasAdapter extends BaseAdapter {
     if (remaining === 0) {
       (this.logger || logger).step('keywords', 'Verified: All keyword chips successfully cleared.');
     } else {
-      (this.logger || logger).warn(`Keyword clearing: ${remaining} chips still remain in DOM.`);
+      (this.logger || logger).warn(`Keyword clearing: ${remaining} chips still remain in DOM after removal attempts.`);
     }
 
     return true;
