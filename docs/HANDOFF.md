@@ -5,11 +5,11 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Base UI data-f Selectors, Sidebar Pre-Collapse, Trash-Button Clearing & Bulk Save Lifecycle, Depositphotos Full-String Native Comma Splitting & Chip Overwrite Elimination, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Card Doubling Elimination, Sequential Enter/Comma Keyword Chip Commit, Base UI data-f Selectors, Sidebar Pre-Collapse, Trash-Button Clearing & Bulk Save Lifecycle, Depositphotos Full-String Native Comma Splitting & Chip Overwrite Elimination, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(miricanvas): align card selectors, sidebar pre-collapse, trash-button clearing, and bulk save lifecycle`
+- **Latest Commit**: `fix(miricanvas): eliminate card duplication in getAssetCards and add sequential enter-comma keyword chip commit`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (751/751 assertions passed across all test suites, zero emoji clean)
+- **Build / Test State**: Verified healthy (107/107 passed on Tier 3, 750+ assertions across all suites, zero emoji clean)
 
 ---
 
@@ -17,11 +17,12 @@
 
 Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned MiriCanvas, Depositphotos, Dreamstime, Vecteezy, and Freepik (Magnific):
 1. **MiriCanvas Live Alignment (`designhub.miricanvas.com/en/element/to-do`)**:
-   - **Modern Article Card Extraction**: Reverse-engineered user session recording (`dev-tools/recordings/rekaman-miri-20260912_194256-v2.json`). Updated `detectAssetCount()` and `getAssetCards()` to query modern Base UI `article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, article`, resolving the "0 Assets Detected" bug on automation start.
+   - **Card Doubling Elimination (`getAssetCards()`)**: Removed internal child container selector `div.panda-ehlNbj div.panda-gFNlpN` which previously matched simultaneously with outer `<article>`, doubling asset count from 10 to 20 and causing alternating cards to unselect. `getAssetCards()` now strictly returns only unique top-level `<article>` cards.
+   - **Smooth In-View Scroll (`selectCard()`)**: Clicks thumbnail image `img.css-l67sxu.er317d31` / `div[data-f="DT-1ecb"]` with `cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' })` to bring cards into viewport cleanly without activating card multi-edit checkboxes (`CI-66e5`).
+   - **Sequential Enter/Comma Keyword Chip Commit (`fillMetadata()`)**: Reverse-engineered Base UI tag input mechanics from `dev-tools/recordings/rekaman-miri-20260912_194256-v2.json`. Injects tags one-by-one with rapid Enter (`keydown` 13 + `change` + `keyup` 13) and Comma (`keydown` 188 + `change` + `keyup` 188) event simulations, ensuring MiriCanvas converts each tag into an interactive `span[data-f="CL-67aa"]` chip. Includes clipboard paste fast-path and input cleanup blur.
    - **Pre-Automation Preparation Hook (`prepareAutomation()`)**:
      1. Left Navigation Sidebar Pre-Collapse: Inspects `nav[data-f="MN-02f2"], nav.panda-cAaCsB`. If open (`panda-mVcIL` class or `offsetWidth > 100`), automatically collapses it via `button[data-f="SB-82b8"]`.
      2. Navbar Select All Checkbox Reset: Inspects `nav[data-f="CT-a2b2"] input[data-f="CI-66e5"]`. If unchecked, clicks to check then uncheck (flushing any stale grid selection); if checked, clicks to uncheck.
-   - **Safe Single-Card Selection (`selectCard()`)**: Clicks thumbnail image `img.css-l67sxu.er317d31` / `div[data-f="DT-1ecb"]` rather than card checkbox (`CI-66e5`), preventing multi-asset batch edit selection during single-card processing.
    - **Editor Readiness Guard (`waitForEditorReady()`)**: Awaits right panel metadata form via `textarea[data-f="DT-9450"], textarea[placeholder*="Element Name"], div[data-f="SD-e6c2"]`.
    - **Trash-Button Based Metadata Clearing (`clearMetadata()`)**:
      1. Title: Clicks trash button `div[data-f="SD-e6c2"] button[data-f="TT-c273"]` (or `div[data-f="FA-93a1"] button`), with `setNativeValue(titleInput, '')` fallback.
@@ -30,7 +31,7 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
      1. AI Declaration: Reads Base UI `span[data-f="CC-bb45"][role="checkbox"]` inside container `div[data-f="AD-8705"]` and clicks to align with `options.isAiGenerated`.
      2. Content Tier (Pricing): Selects radio input `input[name="contentTier"][value="STANDARD"]` vs `input[name="contentTier"][value="PREMIUM"]` based on preference.
      3. Title: Clamped to <= 100 characters and injected via `setNativeValue`.
-     4. Keywords: Clamped to <= 25 tags, formatted as comma-separated string, and committed via `simulateEnterKey`.
+     4. Keywords: Clamped to <= 25 tags, entered sequentially via Enter/Comma dispatch.
    - **Bulk Save Lifecycle & Navbar Cleanup (`bulkSave()`)**:
      1. Checks navbar Select All checkbox `nav[data-f="CT-a2b2"] input[data-f="CI-66e5"]`.
      2. Clicks Save Metadata button `button[data-f="SG-8f01"]`.

@@ -110,14 +110,20 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
   /**
    * Scans and retrieves all element cards in the grid.
+   * Prioritizes top-level article elements to avoid duplicate child containers.
    * @returns {HTMLElement[]} Array of element card containers.
    */
   getAssetCards() {
     if (typeof document === 'undefined') return [];
-    return Array.from(
+    const articles = Array.from(
       document.querySelectorAll(
-        'article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, div.panda-ehlNbj div.panda-gFNlpN, article'
+        'article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, article'
       )
+    );
+    if (articles.length > 0) return articles;
+
+    return Array.from(
+      document.querySelectorAll('div.css-1qnaji9.e1pyeb4g3, div.css-1qnaji9')
     );
   }
 
@@ -136,12 +142,18 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
   /**
    * Selects an element card in the grid to open the sidebar editor.
-   * Clicks the thumbnail or card element (avoids clicking the card checkbox).
+   * Scrolls into view and clicks the thumbnail image (avoids clicking the card checkbox).
    * @param {HTMLElement} cardElement - Element card to select.
    */
   selectCard(cardElement) {
     if (!cardElement) return;
-    const clickTarget = cardElement.querySelector?.('img, div[data-f="DT-1ecb"], .er317d31') || cardElement;
+    try {
+      cardElement.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    } catch {
+      // Ignore scroll errors in mock environments
+    }
+    const clickTarget =
+      cardElement.querySelector?.('img.css-l67sxu.er317d31, img, div[data-f="DT-1ecb"], .er317d31') || cardElement;
     simulateClick(clickTarget);
   }
 
@@ -337,7 +349,7 @@ export class MiriCanvasAdapter extends BaseAdapter {
       }
     }
 
-    // 5. Keywords: Clamped to <= 25 tags max, entered and committed via Enter
+    // 5. Keywords: Clamped to <= 25 tags max, entered and committed via sequential Enter/Comma events
     if (metadata.keywords && metadata.keywords.length > 0) {
       const kwInput = document.querySelector(
         'div[data-f="SD-e7b2"] input, input[data-f="II-b5a4"], input[placeholder*="Separate multiple keywords"], input.panda-eNrFAg'
@@ -354,10 +366,98 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
         (this.logger || logger).step('keywords', `Injecting ${cleanTags.length} keywords...`);
 
-        const commaSeparated = cleanTags.join(', ') + ',';
-        setNativeValue(kwInput, commaSeparated);
-        simulateEnterKey(kwInput);
-        await sleep(80);
+        // A. Fast-path: Attempt clipboard paste event with comma-separated tags
+        try {
+          if (typeof ClipboardEvent !== 'undefined' && typeof DataTransfer !== 'undefined') {
+            const dt = new DataTransfer();
+            dt.setData('text/plain', cleanTags.join(', '));
+            const pasteEvt = new ClipboardEvent('paste', {
+              bubbles: true,
+              cancelable: true,
+              clipboardData: dt
+            });
+            kwInput.dispatchEvent(pasteEvt);
+            await sleep(50);
+          }
+        } catch {
+          // Ignore clipboard errors in restricted browser contexts
+        }
+
+        // B. Sequential Tag Entry: Type each tag and simulate Enter + Comma key events
+        for (const tag of cleanTags) {
+          if (typeof kwInput.focus === 'function') {
+            kwInput.focus();
+          }
+
+          setNativeValue(kwInput, tag);
+          kwInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+          // Simulate Enter key sequence (keydown -> change -> keyup)
+          const enterKd = new KeyboardEvent('keydown', {
+            key: 'Enter',
+            code: 'Enter',
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true
+          });
+          kwInput.dispatchEvent(enterKd);
+
+          kwInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+          const enterKu = new KeyboardEvent('keyup', {
+            key: 'Enter',
+            code: 'Enter',
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true
+          });
+          kwInput.dispatchEvent(enterKu);
+
+          // Fallback: If tag was not cleared by Enter, simulate Comma key sequence
+          if (kwInput.value) {
+            setNativeValue(kwInput, tag + ',');
+            kwInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+            const commaKd = new KeyboardEvent('keydown', {
+              key: ',',
+              code: 'Comma',
+              keyCode: 188,
+              which: 188,
+              bubbles: true,
+              cancelable: true
+            });
+            kwInput.dispatchEvent(commaKd);
+
+            kwInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+            const commaKu = new KeyboardEvent('keyup', {
+              key: ',',
+              code: 'Comma',
+              keyCode: 188,
+              which: 188,
+              bubbles: true,
+              cancelable: true
+            });
+            kwInput.dispatchEvent(commaKu);
+          }
+
+          await sleep(35);
+        }
+
+        // C. Clean up leftover text in input if any
+        if (kwInput.value && !document.querySelector?.('span[data-f="CL-67aa"]')) {
+          // Fallback for mock environments where React state is absent
+          simulateEnterKey(kwInput);
+        } else if (kwInput.value) {
+          setNativeValue(kwInput, '');
+        }
+
+        if (typeof kwInput.blur === 'function') {
+          kwInput.blur();
+        }
+        await sleep(60);
       }
     }
 
