@@ -247,7 +247,12 @@ export class MiriCanvasAdapter extends BaseAdapter {
     if (!container) return null;
 
     const buttons = Array.from(container.querySelectorAll('button[data-f="TT-c273"], button'));
-    for (const btn of buttons) {
+    // Explicitly filter out copy buttons (which contain CD-7f75 or ID-430b)
+    const nonCopyButtons = buttons.filter(
+      (btn) => !btn.querySelector?.('div[data-f="CD-7f75"], svg[data-f="ID-430b"]')
+    );
+
+    for (const btn of nonCopyButtons) {
       if (btn.querySelector?.('div[data-f="DD-04b4"], svg[data-f="DD-e725"]')) {
         return btn;
       }
@@ -257,12 +262,11 @@ export class MiriCanvasAdapter extends BaseAdapter {
       }
     }
 
-    // Fallback: If 2 TT-c273 buttons exist, the 2nd one is the trash button
-    if (buttons.length >= 2) {
-      return buttons[1];
+    // Fallback: In MiriCanvas DOM, button[0] is the trash button, button[1] is copy button
+    if (nonCopyButtons.length > 0) {
+      return nonCopyButtons[0];
     }
 
-    // Fallback to first button or null
     return buttons[0] || null;
   }
 
@@ -295,10 +299,10 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
     const trashBtn = this._findTrashButton(titleSection, 'div[data-f="FA-93a1"], div[data-f="SD-e6c2"]');
 
-    if (trashBtn && !trashBtn.disabled) {
+    if (trashBtn && !trashBtn.disabled && !trashBtn.hasAttribute?.('disabled')) {
       (this.logger || logger).step('title', 'Clearing pre-existing title via trash button...');
       simulateClick(trashBtn);
-      await sleep(80);
+      await sleep(100);
     }
 
     if (titleInput && titleInput.value) {
@@ -309,31 +313,40 @@ export class MiriCanvasAdapter extends BaseAdapter {
   }
 
   /**
-   * Clears existing keyword chips using the section trash button or individual remove icons.
+   * Clears existing keyword chips using the section trash button.
+   * Clicks the trash button and verifies chip removal.
+   * Does NOT click chips one-by-one to avoid React state corruption.
    * @returns {Promise<boolean>}
    */
   async clearKeywords() {
     if (typeof document === 'undefined') return true;
 
+    const existingChips = Array.from(
+      document.querySelectorAll('span[data-f="CL-67aa"], div[data-f="SD-e7b2"] span[data-f="CL-67aa"]')
+    );
+    if (existingChips.length === 0) {
+      return true;
+    }
+
+    (this.logger || logger).step(
+      'keywords',
+      `Clearing ${existingChips.length} pre-existing keywords via trash button...`
+    );
+
     const kwSection = document.querySelector('div[data-f="SD-e7b2"]');
     const trashBtn = this._findTrashButton(kwSection, 'div[data-f="IA-61ae"], div[data-f="SD-e7b2"]');
 
-    if (trashBtn && !trashBtn.disabled) {
-      (this.logger || logger).step('keywords', 'Clearing pre-existing keywords via trash button...');
+    if (trashBtn && !trashBtn.disabled && !trashBtn.hasAttribute?.('disabled')) {
       simulateClick(trashBtn);
-      await sleep(100);
-    }
 
-    // Fallback: click individual chip delete icons if any remain
-    const remainingRemoveSvgs = Array.from(
-      document.querySelectorAll(
-        'span[data-f="CL-67aa"] svg[data-f="CD-213b"], span[data-f="CL-67aa"] svg, div.panda-ebDdrq svg'
-      )
-    );
-
-    for (const btn of remainingRemoveSvgs) {
-      simulateClick(btn);
-      await sleep(30);
+      // Await DOM update and verify chips disappeared
+      for (let attempt = 0; attempt < 8; attempt++) {
+        await sleep(100);
+        const chipsLeft = document.querySelectorAll('span[data-f="CL-67aa"]');
+        if (chipsLeft.length === 0) {
+          break;
+        }
+      }
     }
 
     return true;
@@ -447,7 +460,7 @@ export class MiriCanvasAdapter extends BaseAdapter {
       }
     }
 
-    // 5. Keywords: Clamped to <= 25 tags max, injected as comma-delimited batch and committed via Enter/Comma
+    // 5. Keywords: Clamped to <= 25 tags max, injected as single batch and committed via Enter
     if (metadata.keywords && metadata.keywords.length > 0) {
       const kwInput = document.querySelector(
         'div[data-f="SD-e7b2"] input, input[data-f="II-b5a4"], input[placeholder*="Separate multiple keywords"], input.panda-eNrFAg'
@@ -470,39 +483,14 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
         const tagBatchString = cleanTags.join(', ');
 
-        // Safely set the entire comma-delimited string without triggering blur before Enter
-        let setDirectly = false;
-        try {
-          const prototype = typeof HTMLInputElement !== 'undefined'
-            ? HTMLInputElement.prototype
-            : Object.getPrototypeOf(kwInput);
-          const descriptor = prototype ? Object.getOwnPropertyDescriptor(prototype, 'value') : null;
-          if (descriptor?.set) {
-            descriptor.set.call(kwInput, tagBatchString);
-            setDirectly = true;
-          }
-        } catch {
-          // Fall through
-        }
-
-        if (!setDirectly) {
-          setNativeValue(kwInput, tagBatchString);
-        } else {
-          kwInput.dispatchEvent(new Event('input', { bubbles: true }));
-        }
+        setNativeValue(kwInput, tagBatchString);
+        kwInput.dispatchEvent(new Event('input', { bubbles: true }));
 
         // Commit all tags at once via Enter simulation
         simulateEnterKey(kwInput);
         kwInput.dispatchEvent(new Event('change', { bubbles: true }));
 
-        await sleep(150);
-
-        // Fallback: If input still holds text, commit via comma/enter simulation
-        if (kwInput.value && kwInput.value.trim().length > 0) {
-          simulateCommaKey(kwInput);
-          simulateEnterKey(kwInput);
-          await sleep(100);
-        }
+        await sleep(250);
 
         // Clean up leftover uncommitted text in input if any
         if (kwInput.value) {

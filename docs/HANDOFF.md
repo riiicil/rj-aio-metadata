@@ -5,9 +5,9 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Full-Batch Comma-Delimited Keyword Injection with Enter Commit, Ghost Sizer Elimination, Active Card Selection Check, Trash Button Discrimination, Base UI data-f Selectors, Sidebar Pre-Collapse, Trash-Button Clearing & Bulk Save Lifecycle, Depositphotos Full-String Native Comma Splitting & Chip Overwrite Elimination, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Trash Button Direct Click & Copy Button Filtering, Chip Loop Elimination, Streamlined Single-Pass Keyword Batch Injection, Ghost Sizer Elimination, Active Card Selection Check, Trash Button Discrimination, Base UI data-f Selectors, Sidebar Pre-Collapse, Trash-Button Clearing & Bulk Save Lifecycle, Depositphotos Full-String Native Comma Splitting & Chip Overwrite Elimination, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(miricanvas): inject full comma-delimited string batch with enter commit for instant multi-chip creation`
+- **Latest Commit**: `fix(miricanvas): filter copy buttons, click trash button directly, eliminate chip loop, and streamline keyword batch commit`
 - **Working Tree**: Clean local branch
 - **Build / Test State**: Verified healthy (112/112 passed on Tier 3, 750+ assertions across all suites, zero emoji clean)
 
@@ -17,23 +17,21 @@
 
 Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned MiriCanvas, Depositphotos, Dreamstime, Vecteezy, and Freepik (Magnific):
 1. **MiriCanvas Live Alignment (`designhub.miricanvas.com/en/element/to-do`)**:
-   - **Full-Batch Comma-Delimited Keyword Injection & Instant Multi-Chip Splitting (`fillMetadata()`)**: Replaced the rapid 40ms sequential tag loop which caused React 18 / Base UI to batch-drop alternating tags (yielding exactly `12/25` chips). Injects the entire comma-separated batch string (`cleanTags.join(', ')`) in a single pass without premature blur, followed by `simulateEnterKey` and `change` event. MiriCanvas's native parser splits all 25 tokens simultaneously, creating all 25 chips at once. Includes fallback comma/enter commit and input cleanup.
+   - **Trash Button Discrimination & Copy Button Filtering (`_findTrashButton()`)**: Explicitly filters out copy buttons (`div[data-f="CD-7f75"], svg[data-f="ID-430b"]`). Returns `buttons[0]` which in MiriCanvas DOM is the dedicated trash button (`div[data-f="DD-04b4"]` / `svg[data-f="DD-e725"]`), preventing accidental copy actions.
+   - **One-Shot Trash Clearing (`clearKeywords()`, `clearTitle()`)**: Directly clicks `trashBtn` via `simulateClick(trashBtn)`. Eliminates the problematic chip-by-chip `remainingRemoveSvgs` click loop that was causing rapid asynchronous state corruption in React 18 and leaving behind zombie chips. Actively polls up to 800ms until chips disappear from the DOM.
+   - **Streamlined Single-Pass Batch Keyword Commit (`fillMetadata()`)**: Injects the complete comma-delimited string (`cleanTags.join(', ')`) in a single pass without premature blur, dispatches `input`, and commits once via `simulateEnterKey(kwInput)` and `change`. Eliminates duplicate comma/enter fallback logic that caused double-injection. Clamped to <= 25 tags max, preventing 31/25 overflow and validation errors.
    - **Ghost Sizer (`ul[data-f="GU-fa4b"]`) Exclusion**: Filtered out hidden virtualizer dummy card (`ul[data-f="GU-fa4b"]`) in `getAssetCards()` and `overlay.js:detectAssetCount()`, ensuring asset counts accurately match real visible cards from `ul[data-f="TU-5eb5"]`.
    - **Active Card Selection Guard (`selectCard()`)**: Inspects `.css-1510m7j` on card container; if already active, skips thumbnail click to prevent accidental unselection and editor form unmounting.
-   - **Dedicated Trash Button Discrimination (`clearMetadata()`)**: Specifically targets `div[data-f="DD-04b4"]` / `svg[data-f="DD-e725"]` to click the trash button, ignoring the copy button which shared the same `data-f="TT-c273"` attribute.
    - **Smooth In-View Scroll (`selectCard()`)**: Clicks thumbnail image `img.css-l67sxu.er317d31` / `div[data-f="DT-1ecb"]` with `cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' })` to bring cards into viewport cleanly without activating card multi-edit checkboxes (`CI-66e5`).
    - **Pre-Automation Preparation Hook (`prepareAutomation()`)**:
      1. Left Navigation Sidebar Pre-Collapse: Inspects `nav[data-f="MN-02f2"], nav.panda-cAaCsB`. If open (`panda-mVcIL` class or `offsetWidth > 100`), automatically collapses it via `button[data-f="SB-82b8"]`.
      2. Navbar Select All Checkbox Reset: Inspects `nav[data-f="CT-a2b2"] input[data-f="CI-66e5"]`. If unchecked, clicks to check then uncheck (flushing any stale grid selection); if checked, clicks to uncheck.
    - **Editor Readiness Guard (`waitForEditorReady()`)**: Awaits right panel metadata form via `textarea[data-f="DT-9450"], textarea[placeholder*="Element Name"], div[data-f="SD-e6c2"]`.
-   - **Trash-Button Based Metadata Clearing (`clearMetadata()`)**:
-     1. Title: Clicks trash button `div[data-f="SD-e6c2"] button[data-f="TT-c273"]` (or `div[data-f="FA-93a1"] button`), with `setNativeValue(titleInput, '')` fallback.
-     2. Keywords: Clicks trash button `div[data-f="SD-e7b2"] button[data-f="TT-c273"]` (or `div[data-f="IA-61ae"] button`), with fallback to individual chip remove SVGs `span[data-f="CL-67aa"] svg[data-f="CD-213b"]`.
    - **Form Field Injection**:
      1. AI Declaration: Reads Base UI `span[data-f="CC-bb45"][role="checkbox"]` inside container `div[data-f="AD-8705"]` and clicks to align with `options.isAiGenerated`.
      2. Content Tier (Pricing): Selects radio input `input[name="contentTier"][value="STANDARD"]` vs `input[name="contentTier"][value="PREMIUM"]` based on preference.
      3. Title: Clamped to <= 100 characters and injected via `setNativeValue`.
-     4. Keywords: Clamped to <= 25 tags, entered sequentially via Enter/Comma dispatch.
+     4. Keywords: Clamped to <= 25 tags, injected as single batch and committed via Enter.
    - **Bulk Save Lifecycle & Navbar Cleanup (`bulkSave()`)**:
      1. Checks navbar Select All checkbox `nav[data-f="CT-a2b2"] input[data-f="CI-66e5"]`.
      2. Clicks Save Metadata button `button[data-f="SG-8f01"]`.
