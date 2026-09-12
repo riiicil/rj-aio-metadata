@@ -327,6 +327,55 @@ export function simulateEnterKey(element) {
 }
 
 /**
+ * Simulates pressing the Comma key on an input or textarea element.
+ * Triggers tag chip creation in platforms with comma-delimited tag inputs.
+ *
+ * @param {HTMLElement|Object} element - Target element to receive Comma key events.
+ * @returns {boolean} True if events were dispatched, false otherwise.
+ */
+export function simulateCommaKey(element) {
+  if (!element) return false;
+
+  if (typeof element.focus === 'function') {
+    element.focus();
+  }
+
+  const eventInit = {
+    key: ',',
+    code: 'Comma',
+    keyCode: 188,
+    which: 188,
+    bubbles: true,
+    cancelable: true
+  };
+
+  const createKeyboardEvent = (type) => {
+    if (typeof KeyboardEvent !== 'undefined') {
+      try {
+        return new KeyboardEvent(type, eventInit);
+      } catch {
+        // Fallback for environments where KeyboardEvent constructor is restricted
+      }
+    }
+    if (typeof Event !== 'undefined') {
+      const ev = new Event(type, { bubbles: true, cancelable: true });
+      Object.assign(ev, eventInit);
+      return ev;
+    }
+    return { type, ...eventInit };
+  };
+
+  if (typeof element.dispatchEvent === 'function') {
+    element.dispatchEvent(createKeyboardEvent('keydown'));
+    element.dispatchEvent(createKeyboardEvent('keypress'));
+    element.dispatchEvent(createKeyboardEvent('keyup'));
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Defensively clicks an element via full pointer and mouse event lifecycle.
  * Dispatches scrollIntoView, pointerdown, mousedown, pointerup, mouseup, and click
  * to trigger modern React 18, React Aria (@react-aria/interactions), and Adobe Spectrum handlers.

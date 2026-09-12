@@ -5,11 +5,11 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Card Doubling Elimination, Sequential Enter/Comma Keyword Chip Commit, Base UI data-f Selectors, Sidebar Pre-Collapse, Trash-Button Clearing & Bulk Save Lifecycle, Depositphotos Full-String Native Comma Splitting & Chip Overwrite Elimination, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
+- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Full-Batch Comma-Delimited Keyword Injection with Enter Commit, Ghost Sizer Elimination, Active Card Selection Check, Trash Button Discrimination, Base UI data-f Selectors, Sidebar Pre-Collapse, Trash-Button Clearing & Bulk Save Lifecycle, Depositphotos Full-String Native Comma Splitting & Chip Overwrite Elimination, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
 - **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(miricanvas): eliminate card duplication in getAssetCards and add sequential enter-comma keyword chip commit`
+- **Latest Commit**: `fix(miricanvas): inject full comma-delimited string batch with enter commit for instant multi-chip creation`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (107/107 passed on Tier 3, 750+ assertions across all suites, zero emoji clean)
+- **Build / Test State**: Verified healthy (112/112 passed on Tier 3, 750+ assertions across all suites, zero emoji clean)
 
 ---
 
@@ -17,9 +17,11 @@
 
 Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned MiriCanvas, Depositphotos, Dreamstime, Vecteezy, and Freepik (Magnific):
 1. **MiriCanvas Live Alignment (`designhub.miricanvas.com/en/element/to-do`)**:
-   - **Card Doubling Elimination (`getAssetCards()`)**: Removed internal child container selector `div.panda-ehlNbj div.panda-gFNlpN` which previously matched simultaneously with outer `<article>`, doubling asset count from 10 to 20 and causing alternating cards to unselect. `getAssetCards()` now strictly returns only unique top-level `<article>` cards.
+   - **Full-Batch Comma-Delimited Keyword Injection & Instant Multi-Chip Splitting (`fillMetadata()`)**: Replaced the rapid 40ms sequential tag loop which caused React 18 / Base UI to batch-drop alternating tags (yielding exactly `12/25` chips). Injects the entire comma-separated batch string (`cleanTags.join(', ')`) in a single pass without premature blur, followed by `simulateEnterKey` and `change` event. MiriCanvas's native parser splits all 25 tokens simultaneously, creating all 25 chips at once. Includes fallback comma/enter commit and input cleanup.
+   - **Ghost Sizer (`ul[data-f="GU-fa4b"]`) Exclusion**: Filtered out hidden virtualizer dummy card (`ul[data-f="GU-fa4b"]`) in `getAssetCards()` and `overlay.js:detectAssetCount()`, ensuring asset counts accurately match real visible cards from `ul[data-f="TU-5eb5"]`.
+   - **Active Card Selection Guard (`selectCard()`)**: Inspects `.css-1510m7j` on card container; if already active, skips thumbnail click to prevent accidental unselection and editor form unmounting.
+   - **Dedicated Trash Button Discrimination (`clearMetadata()`)**: Specifically targets `div[data-f="DD-04b4"]` / `svg[data-f="DD-e725"]` to click the trash button, ignoring the copy button which shared the same `data-f="TT-c273"` attribute.
    - **Smooth In-View Scroll (`selectCard()`)**: Clicks thumbnail image `img.css-l67sxu.er317d31` / `div[data-f="DT-1ecb"]` with `cardElement.scrollIntoView({ behavior: 'smooth', block: 'center' })` to bring cards into viewport cleanly without activating card multi-edit checkboxes (`CI-66e5`).
-   - **Sequential Enter/Comma Keyword Chip Commit (`fillMetadata()`)**: Reverse-engineered Base UI tag input mechanics from `dev-tools/recordings/rekaman-miri-20260912_194256-v2.json`. Injects tags one-by-one with rapid Enter (`keydown` 13 + `change` + `keyup` 13) and Comma (`keydown` 188 + `change` + `keyup` 188) event simulations, ensuring MiriCanvas converts each tag into an interactive `span[data-f="CL-67aa"]` chip. Includes clipboard paste fast-path and input cleanup blur.
    - **Pre-Automation Preparation Hook (`prepareAutomation()`)**:
      1. Left Navigation Sidebar Pre-Collapse: Inspects `nav[data-f="MN-02f2"], nav.panda-cAaCsB`. If open (`panda-mVcIL` class or `offsetWidth > 100`), automatically collapses it via `button[data-f="SB-82b8"]`.
      2. Navbar Select All Checkbox Reset: Inspects `nav[data-f="CT-a2b2"] input[data-f="CI-66e5"]`. If unchecked, clicks to check then uncheck (flushing any stale grid selection); if checked, clicks to uncheck.

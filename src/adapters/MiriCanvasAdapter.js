@@ -11,7 +11,7 @@
  * - Card selection: clicks thumbnail/card body to open right inspector panel.
  * - Editor readiness wait (textarea[data-f="DT-9450"], textarea[placeholder*="Element Name"], div[data-f="SD-e6c2"]).
  * - Title clearing via trash button (div[data-f="SD-e6c2"] button[data-f="TT-c273"]) and single-string injection clamped <= 100 chars.
- * - Keywords clearing via trash button (div[data-f="SD-e7b2"] button[data-f="TT-c273"]) and tag entry clamped <= 25 tags.
+ * - Keywords clearing via trash button (div[data-f="SD-e7b2"] button[data-f="TT-c273"]) and single-batch comma-delimited tag entry clamped <= 25 tags + Enter key commit.
  * - Content Tier (Pricing) selection: STANDARD (Free) vs PREMIUM (Paid).
  * - AI Generated Declaration: checkbox toggle in AI image generator container (div[data-f="AD-8705"] span[data-f="CC-bb45"][role="checkbox"]).
  * - Bulk Save Strategy:
@@ -28,6 +28,7 @@ import {
   waitForElement,
   simulateClick,
   simulateEnterKey,
+  simulateCommaKey,
   extractThumbnailUrl,
   sleep
 } from './utils/dom_helpers.js';
@@ -446,7 +447,7 @@ export class MiriCanvasAdapter extends BaseAdapter {
       }
     }
 
-    // 5. Keywords: Clamped to <= 25 tags max, entered and committed via sequential Enter/Comma events
+    // 5. Keywords: Clamped to <= 25 tags max, injected as comma-delimited batch and committed via Enter/Comma
     if (metadata.keywords && metadata.keywords.length > 0) {
       const kwInput = document.querySelector(
         'div[data-f="SD-e7b2"] input, input[data-f="II-b5a4"], input[placeholder*="Separate multiple keywords"], input.panda-eNrFAg'
@@ -461,21 +462,46 @@ export class MiriCanvasAdapter extends BaseAdapter {
           .filter((k) => k.length > 0)
           .slice(0, 25);
 
-        (this.logger || logger).step('keywords', `Injecting ${cleanTags.length} keywords...`);
+        (this.logger || logger).step('keywords', `Injecting ${cleanTags.length} keywords as comma-delimited batch...`);
 
         if (typeof kwInput.focus === 'function') {
           kwInput.focus();
         }
 
-        // Sequential Tag Entry: Commit each tag individually once via Enter key simulation
-        for (const tag of cleanTags) {
-          setNativeValue(kwInput, tag);
+        const tagBatchString = cleanTags.join(', ');
+
+        // Safely set the entire comma-delimited string without triggering blur before Enter
+        let setDirectly = false;
+        try {
+          const prototype = typeof HTMLInputElement !== 'undefined'
+            ? HTMLInputElement.prototype
+            : Object.getPrototypeOf(kwInput);
+          const descriptor = prototype ? Object.getOwnPropertyDescriptor(prototype, 'value') : null;
+          if (descriptor?.set) {
+            descriptor.set.call(kwInput, tagBatchString);
+            setDirectly = true;
+          }
+        } catch {
+          // Fall through
+        }
+
+        if (!setDirectly) {
+          setNativeValue(kwInput, tagBatchString);
+        } else {
           kwInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
 
+        // Commit all tags at once via Enter simulation
+        simulateEnterKey(kwInput);
+        kwInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+        await sleep(150);
+
+        // Fallback: If input still holds text, commit via comma/enter simulation
+        if (kwInput.value && kwInput.value.trim().length > 0) {
+          simulateCommaKey(kwInput);
           simulateEnterKey(kwInput);
-          kwInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-          await sleep(40);
+          await sleep(100);
         }
 
         // Clean up leftover uncommitted text in input if any
