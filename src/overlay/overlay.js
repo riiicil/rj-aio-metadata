@@ -297,14 +297,24 @@ export class OverlayHUD {
 
     // 7. MiriCanvas
     if (host.includes('miricanvas.com')) {
-      const elements = document.querySelectorAll(
-        'article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, article'
+      const realListArticles = Array.from(
+        document.querySelectorAll(
+          'ul[data-f="TU-5eb5"] article[data-f="CA-d943"], ul[data-f="TU-5eb5"] > li > article, ul[data-f="TU-5eb5"] article'
+        )
       );
-      const count = elements.length;
+      const validArticles = realListArticles.length > 0
+        ? realListArticles
+        : Array.from(
+            document.querySelectorAll(
+              'article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, article'
+            )
+          ).filter((a) => !a.closest?.('ul[data-f="GU-fa4b"], ul.panda-ecnXzs'));
+
+      const count = validArticles.length;
       return {
         count,
         label: count > 0 ? `${count} Asset${count === 1 ? '' : 's'} Found` : '0 Assets Detected',
-        selector: 'article[data-f="CA-d943"], ul > li > article'
+        selector: 'ul[data-f="TU-5eb5"] article, article[data-f="CA-d943"]'
       };
     }
 
@@ -1115,8 +1125,13 @@ export class OverlayHUD {
           await sleep(600);
 
           // Step 2: Wait for Editor Ready
-          await adapter.waitForEditorReady(card, 4000);
+          const isEditorReady = await adapter.waitForEditorReady(card, 4000);
           if (signal.aborted) break;
+          if (!isEditorReady && this.platformId === 'miricanvas') {
+            logger.warn(`Editor not ready for asset ${i + 1}, retrying card selection...`);
+            await adapter.selectCard(card);
+            await adapter.waitForEditorReady(card, 2000);
+          }
           await sleep(300);
 
           // Step 3: Extract preview thumbnail

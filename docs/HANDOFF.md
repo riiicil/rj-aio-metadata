@@ -181,7 +181,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
    - **Vecteezy**: Banned terms trigger a modal; sanitize keywords prior to injection.
    - **Freepik**: Metadata is transient; you **MUST** trigger `saveDraft()` per asset before switching assets.
    - **Depositphotos**: Selecting a country triggers AJAX to load city options; raw tag paste trigger available.
-   - **MiriCanvas**: Capacity selector supports up to 1,000 items; must set both `contentType` and `contentTier`.
+   - **MiriCanvas**: Capacity selector supports up to 1,000 items; DOM contains hidden virtualizer sizer list `ul[data-f="GU-fa4b"]` with dummy card that must be filtered out in favor of `ul[data-f="TU-5eb5"]`; card selection toggles off if clicked while already active; trash vs copy buttons in section headers share `data-f="TT-c273"` and require disambiguation via `div[data-f="DD-04b4"]` / `svg[data-f="DD-e725"]`; sequential Enter/Comma events commit keyword tags into chips.
 
 ---
 
@@ -201,6 +201,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 32 | 2026-09-12 | `task/platform-adapters` | `fix(miricanvas)` | Eliminated ghost sizer card in `ul[data-f="GU-fa4b"]`, added active selection check to prevent toggle-off, discriminated copy vs trash buttons (`DD-04b4`), verified 112/112 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 31 | 2026-09-10 | `task/platform-adapters` | `feat(logging)` | Implemented LoggerService.js, wired into AdobeStockAdapter, disabled global clearMetadata in overlay, verified 336/336 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 30 | 2026-09-07 | `task/platform-adapters` | `feat(overlay)` | Implemented adapters/index.js registry, overlay.js automation orchestrator, dom_helpers abort delays, test_subphase_4_6.mjs with 57/57 assertions (Phase 4 100% complete) | Phase 5: End-to-End Live Browser Testing & Polish |
 | 29 | 2026-09-07 | `task/platform-adapters` | `feat(adapter)` | Implemented DreamstimeAdapter.js, DepositphotosAdapter.js, and MiriCanvasAdapter.js Tier 3 adapters with 107/107 assertions | Sub-phase 4.6: Adapter Registry, In-Page HUD Wiring & Verification Suite |

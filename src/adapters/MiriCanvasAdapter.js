@@ -110,17 +110,35 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
   /**
    * Scans and retrieves all element cards in the grid.
-   * Prioritizes top-level article elements to avoid duplicate child containers.
+   * Prioritizes the visible grid list (ul[data-f="TU-5eb5"]) and filters out
+   * the virtualizer ghost sizer container (ul[data-f="GU-fa4b"] / ul.panda-ecnXzs).
    * @returns {HTMLElement[]} Array of element card containers.
    */
   getAssetCards() {
     if (typeof document === 'undefined') return [];
-    const articles = Array.from(
+
+    // Prioritize visible grid list items in real MiriCanvas DOM
+    const visibleGridArticles = Array.from(
+      document.querySelectorAll(
+        'ul[data-f="TU-5eb5"] article[data-f="CA-d943"], ul[data-f="TU-5eb5"] > li > article, ul[data-f="TU-5eb5"] article'
+      )
+    );
+    if (visibleGridArticles.length > 0) return visibleGridArticles;
+
+    // Fallback: Query all article cards and filter out hidden sizer containers
+    const allArticles = Array.from(
       document.querySelectorAll(
         'article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, article'
       )
-    );
-    if (articles.length > 0) return articles;
+    ).filter((a) => {
+      // Exclude hidden sizer containers
+      if (typeof a.closest === 'function' && a.closest('ul[data-f="GU-fa4b"], ul.panda-ecnXzs')) {
+        return false;
+      }
+      return true;
+    });
+
+    if (allArticles.length > 0) return allArticles;
 
     return Array.from(
       document.querySelectorAll('div.css-1qnaji9.e1pyeb4g3, div.css-1qnaji9')
@@ -142,6 +160,7 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
   /**
    * Selects an element card in the grid to open the sidebar editor.
+   * Checks whether the card is already active/selected to prevent toggling it off.
    * Scrolls into view and clicks the thumbnail image (avoids clicking the card checkbox).
    * @param {HTMLElement} cardElement - Element card to select.
    */
@@ -152,6 +171,19 @@ export class MiriCanvasAdapter extends BaseAdapter {
     } catch {
       // Ignore scroll errors in mock environments
     }
+
+    // Check if card is already active/selected (.css-1510m7j or active indicator)
+    const isAlreadySelected = Boolean(
+      cardElement.querySelector?.('.css-1510m7j, [data-f="CT-5090"].css-1510m7j') ||
+      cardElement.classList?.contains?.('selected') ||
+      cardElement.getAttribute?.('data-selected') === 'true'
+    );
+
+    if (isAlreadySelected) {
+      (this.logger || logger).step('selectCard', 'Card is already selected/active. Skipping click to prevent toggle-off.');
+      return;
+    }
+
     const clickTarget =
       cardElement.querySelector?.('img.css-l67sxu.er317d31, img, div[data-f="DT-1ecb"], .er317d31') || cardElement;
     simulateClick(clickTarget);
@@ -159,6 +191,7 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
   /**
    * Waits for the sidebar editor form to become interactive.
+   * If editor is not ready and card is not selected, retries clicking the card once.
    * @param {HTMLElement} [cardElement=null] - Selected element card.
    * @param {number} [timeoutMs=4000] - Timeout in milliseconds.
    * @returns {Promise<boolean>} True if ready, false on timeout.
@@ -172,8 +205,64 @@ export class MiriCanvasAdapter extends BaseAdapter {
       );
       return true;
     } catch {
+      // Fallback: If not ready and cardElement exists, try clicking once more if unselected
+      if (cardElement && typeof document !== 'undefined') {
+        const isSelected = Boolean(
+          cardElement.querySelector?.('.css-1510m7j, [data-f="CT-5090"].css-1510m7j')
+        );
+        if (!isSelected) {
+          const clickTarget =
+            cardElement.querySelector?.('img.css-l67sxu.er317d31, img, div[data-f="DT-1ecb"], .er317d31') || cardElement;
+          simulateClick(clickTarget);
+          await sleep(500);
+          try {
+            await waitForElement(
+              'textarea[data-f="DT-9450"], textarea[placeholder*="Element Name"], textarea[placeholder*="Multiple names"], div[data-f="SD-e6c2"]',
+              document,
+              2000
+            );
+            return true;
+          } catch {
+            return false;
+          }
+        }
+      }
       return false;
     }
+  }
+
+  /**
+   * Helper to locate the trash/delete button inside a section header.
+   * Distinguishes the trash button (containing div[data-f="DD-04b4"] or svg[data-f="DD-e725"])
+   * from the copy button (which also has data-f="TT-c273").
+   * @param {HTMLElement|null} container - Section container element.
+   * @param {string} fallbackSelector - Fallback selector if container is not found.
+   * @returns {HTMLElement|null}
+   */
+  _findTrashButton(container, fallbackSelector = '') {
+    if (!container && fallbackSelector && typeof document !== 'undefined') {
+      container = document.querySelector(fallbackSelector);
+    }
+    if (!container) return null;
+
+    const buttons = Array.from(container.querySelectorAll('button[data-f="TT-c273"], button'));
+    for (const btn of buttons) {
+      if (btn.querySelector?.('div[data-f="DD-04b4"], svg[data-f="DD-e725"]')) {
+        return btn;
+      }
+      const path = btn.querySelector?.('path')?.getAttribute?.('d') || '';
+      if (path.startsWith('M17 6') || path.includes('h5v2')) {
+        return btn;
+      }
+    }
+
+    // Fallback: If 2 TT-c273 buttons exist, the 2nd one is the trash button
+    if (buttons.length >= 2) {
+      return buttons[1];
+    }
+
+    // Fallback to first button or null
+    return buttons[0] || null;
   }
 
   /**
@@ -203,8 +292,7 @@ export class MiriCanvasAdapter extends BaseAdapter {
       'div[data-f="SD-e6c2"] textarea, textarea[data-f="DT-9450"], textarea[placeholder*="Element Name"], textarea[placeholder*="Multiple names"]'
     );
 
-    const trashBtn = titleSection?.querySelector('button[data-f="TT-c273"]') ||
-      document.querySelector('div[data-f="FA-93a1"] button, div[data-f="SD-e6c2"] button');
+    const trashBtn = this._findTrashButton(titleSection, 'div[data-f="FA-93a1"], div[data-f="SD-e6c2"]');
 
     if (trashBtn && !trashBtn.disabled) {
       (this.logger || logger).step('title', 'Clearing pre-existing title via trash button...');
@@ -227,8 +315,7 @@ export class MiriCanvasAdapter extends BaseAdapter {
     if (typeof document === 'undefined') return true;
 
     const kwSection = document.querySelector('div[data-f="SD-e7b2"]');
-    const trashBtn = kwSection?.querySelector('button[data-f="TT-c273"]') ||
-      document.querySelector('div[data-f="IA-61ae"] button, div[data-f="SD-e7b2"] button');
+    const trashBtn = this._findTrashButton(kwSection, 'div[data-f="IA-61ae"], div[data-f="SD-e7b2"]');
 
     if (trashBtn && !trashBtn.disabled) {
       (this.logger || logger).step('keywords', 'Clearing pre-existing keywords via trash button...');
@@ -245,6 +332,7 @@ export class MiriCanvasAdapter extends BaseAdapter {
 
     for (const btn of remainingRemoveSvgs) {
       simulateClick(btn);
+      await sleep(30);
     }
 
     return true;
@@ -259,10 +347,19 @@ export class MiriCanvasAdapter extends BaseAdapter {
    *
    * @param {Object} metadata - Sanitized metadata payload.
    * @param {Object} [options={}] - Options (contentTier, isAiGenerated, licenseType, contentType, clearExisting).
+   * @param {HTMLElement} [cardElement=null] - Optional element card reference.
    * @returns {Promise<boolean>} True if injection succeeded.
    */
-  async fillMetadata(metadata, options = {}) {
+  async fillMetadata(metadata, options = {}, cardElement = null) {
     if (typeof document === 'undefined' || !metadata) return false;
+
+    // Check if editor is mounted; if not, wait for it
+    const hasEditor = document.querySelector(
+      'div[data-f="SD-e6c2"], textarea[data-f="DT-9450"], textarea[placeholder*="Element Name"], textarea[placeholder*="Multiple names"]'
+    );
+    if (!hasEditor) {
+      await this.waitForEditorReady(cardElement, 3000);
+    }
 
     if (options.clearExisting !== false) {
       await this.clearMetadata();
