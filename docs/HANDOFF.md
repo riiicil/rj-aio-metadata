@@ -24,9 +24,13 @@ Sub-phase 5.4 has completed asset optimization, visual theme alignment, minimize
    - Defined `@keyframes rj-spin` with continuous 360deg rotation and `.rj-hud-pill-status .rj-status-icon-spinner` (13x13px, stroke `#079183`).
    - Integrated `pillSpinnerSvg` during active processing (`Running...`, `Asset X of Y`, `Processing...`) and graceful stopping (`Stopping...`), providing a clear dynamic indicator that background tasks are active even when the HUD card is minimized.
    - Cleanly transitions to `pillReadySvg` checkmark on completion (`Finished`) and restores idle layers/ready status when reset.
-4. **Status Badge & Asset Label Ellipsis Clamping with Tooltips (`src/overlay/overlay.css`, `src/overlay/overlay.js`)**:
-   - Added flexbox truncation rules (`min-width: 0`, `overflow: hidden`, `text-overflow: ellipsis`, `white-space: nowrap`) to `.rj-hud-asset-label` and `span#rjAutomationStatusText`, clamping badge width (`max-width: 140px`) to prevent card distortion on long status strings.
-   - Implemented `setStatusBadge(text)` helper on `OverlayHUD` and inside `startAutomation()`, synchronizing `textContent` and `title` attributes across `#rjAutomationStatusText` and `.rj-hud-status-badge` so the full message is always viewable on hover.
+4. **Status Badge String Simplification & Ellipsis Clamping with Tooltips (`src/overlay/overlay.css`, `src/overlay/overlay.js`)**:
+   - Simplified all status badge string literals to concise canonical labels conforming to the audit specification (`scratch/pre_release_audit_notes.md:L92-L109`):
+     - Normal loop: `'Generating...'`, `'Injecting...'`, `'Saving...'`, `'Submitting...'`, `'Cooldown...'`, `'Next asset...'`, `'Completed'`, `'Stopped'`, `'Idle'`, `'Running'`.
+     - Problematic overflow labels resolved: `'Stopping (saving card)...'` and `'Stopping (saving)...'` simplified to `'Stopping...'`; `'Error: ' + ...` simplified to `'API Error'` or `'Failed'`.
+     - Full operational details (`Generating AI metadata...`, `Saving all assets (X processed)...`, `Error: 400 Bad Request...`) are cleanly routed to the second parameter `tooltip` of `setStatusBadge(text, tooltip = text)`.
+   - Added flexbox truncation rules (`min-width: 0`, `overflow: hidden`, `text-overflow: ellipsis`, `white-space: nowrap`) to `.rj-hud-asset-label` and `span#rjAutomationStatusText`, clamping badge width (`max-width: 140px`) to eliminate card distortion on edge cases.
+   - Synchronized `textContent` and `title` attributes across `#rjAutomationStatusText` and `.rj-hud-status-badge` so full context is always viewable on hover.
 5. **Preceding Sub-phase 5.3 Achievements (Popup Real-Time Auto-Save)**:
    - Centralized debounced (300ms) and immediate auto-save engine in Popup with anti-loop guards (`isSyncingFromStorage`, `isSavingLocally`).
 6. **Preceding Sub-phase 5.2 Achievements (Automation State Sync & Graceful Stop)**:

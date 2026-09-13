@@ -849,17 +849,18 @@ export class OverlayHUD {
   /**
    * Sets text and tooltip title on the automation status badge.
    * @param {string} text
+   * @param {string} [tooltip]
    */
-  setStatusBadge(text) {
+  setStatusBadge(text, tooltip = text) {
     if (!this.shadow) return;
     const statusText = this.shadow.querySelector('#rjAutomationStatusText');
     const badge = this.shadow.querySelector('#rjAutomationBadge');
     if (statusText) {
       statusText.textContent = text;
-      statusText.title = text;
+      statusText.title = tooltip;
     }
     if (badge) {
-      badge.title = text;
+      badge.title = tooltip;
     }
   }
 
@@ -997,13 +998,13 @@ export class OverlayHUD {
     const pillStatus = this.shadow?.querySelector('#rjPillStatus');
     const badge = this.shadow?.querySelector('#rjAutomationBadge');
 
-    const setStatusBadge = (text) => {
+    const setStatusBadge = (text, tooltip = text) => {
       if (statusText) {
         statusText.textContent = text;
-        statusText.title = text;
+        statusText.title = tooltip;
       }
       if (badge) {
-        badge.title = text;
+        badge.title = tooltip;
       }
     };
 
@@ -1075,7 +1076,10 @@ export class OverlayHUD {
             const thumb = adapter.getThumbnailUrl(card);
 
             // Step 3: AI Metadata Generation
-            setStatusBadge(this.isStopping ? 'Stopping (saving)...' : 'Generating AI...');
+            setStatusBadge(
+              this.isStopping ? 'Stopping...' : 'Generating...',
+              this.isStopping ? 'Stopping automation (saving work)...' : 'Generating AI metadata...'
+            );
 
             let keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 70;
             const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
@@ -1100,7 +1104,10 @@ export class OverlayHUD {
             await sleep(400);
 
             // Step 4: Inject sanitized metadata
-            setStatusBadge(this.isStopping ? 'Stopping (saving)...' : 'Injecting metadata...');
+            setStatusBadge(
+              this.isStopping ? 'Stopping...' : 'Injecting...',
+              this.isStopping ? 'Stopping automation (saving work)...' : 'Injecting metadata...'
+            );
 
             const platformSettings = this.currentConfig?.platformSettings?.dreamstime || {};
             const isEditorial = Boolean(platformSettings.isEditorial);
@@ -1115,12 +1122,12 @@ export class OverlayHUD {
             processedCount++;
 
             // Step 5: Save edits (waits for toast appear & disappear)
-            setStatusBadge('Saving edits...');
+            setStatusBadge('Saving...', 'Saving edits...');
             await adapter.saveDraft();
 
             // Step 6: If Mode B (submit_direct), submit for review
             if (platformSettings.mode === 'submit_direct') {
-              setStatusBadge('Submitting file...');
+              setStatusBadge('Submitting...', 'Submitting file for review...');
               await adapter.submitForReview(isEditorial);
             }
 
@@ -1246,7 +1253,10 @@ export class OverlayHUD {
           const thumb = adapter.getThumbnailUrl(card);
 
           // Step 4: AI Metadata Generation
-          setStatusBadge(this.isStopping ? 'Stopping (saving card)...' : 'Generating AI...');
+          setStatusBadge(
+            this.isStopping ? 'Stopping...' : 'Generating...',
+            this.isStopping ? 'Stopping automation (saving work)...' : 'Generating AI metadata...'
+          );
 
           let keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 50;
           const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
@@ -1280,7 +1290,10 @@ export class OverlayHUD {
           await sleep(500);
 
           // Step 5: Inject sanitized metadata
-          setStatusBadge(this.isStopping ? 'Stopping (saving card)...' : 'Injecting metadata...');
+          setStatusBadge(
+            this.isStopping ? 'Stopping...' : 'Injecting...',
+            this.isStopping ? 'Stopping automation (saving work)...' : 'Injecting metadata...'
+          );
 
           const platformSettings = this.currentConfig?.platformSettings?.[this.platformId] || {};
           const platformOptions = {
@@ -1306,7 +1319,7 @@ export class OverlayHUD {
             throw assetErr;
           }
           logger.warn(`Error processing asset ${i + 1}/${total}:`, assetErr);
-          setStatusBadge(`Asset ${i + 1} skipped`);
+          setStatusBadge('Skipped', `Asset ${i + 1} skipped`);
           await randomDelay(1000, 2000, signal);
           continue;
         } finally {
@@ -1333,11 +1346,12 @@ export class OverlayHUD {
       // End of Loop / Bulk Save (Triggers on completion or graceful stop)
       const bulkSavePlatforms = ['adobestock', 'shutterstock', 'vecteezy', 'depositphotos', 'miricanvas'];
       if (bulkSavePlatforms.includes(this.platformId) && processedCount > 0 && !signal.aborted) {
-        const saveLabel = this.isStopping ? 'Saving work...' : 'Saving all...';
+        const saveLabel = 'Saving...';
+        const saveTooltip = this.isStopping ? 'Stopping automation (saving work)...' : `Saving all assets (${processedCount} processed)...`;
         logger.banner(
           `${this.isStopping ? 'Stop requested. Triggering bulk save' : 'All assets processed. Triggering bulk save'} for ${this.platformId} (${processedCount} processed assets)...`
         );
-        setStatusBadge(saveLabel);
+        setStatusBadge(saveLabel, saveTooltip);
         await sleep(1000);
         await adapter.bulkSave();
         await sleep(1000);
@@ -1411,7 +1425,9 @@ export class OverlayHUD {
         setStatusBadge('Stopped');
       } else {
         logger.error('Automation error:', err);
-        setStatusBadge('Error: ' + (err.message || 'Failed'));
+        const fullErr = 'Error: ' + (err.message || 'Failed');
+        const conciseErr = (err.message && err.message.toLowerCase().includes('api')) ? 'API Error' : 'Failed';
+        setStatusBadge(conciseErr, fullErr);
       }
     } finally {
       this.isStopping = false;
