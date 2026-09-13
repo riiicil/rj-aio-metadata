@@ -5,29 +5,31 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Sub-phase 5.5: Popup Modularization Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Sub-phase 5.6: Overlay Modularization Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: `refactor(popup): extract platform dynamic form generators into platform_forms.js`
+- **Latest Commit**: `refactor(overlay): extract automation batch orchestrator into AutomationOrchestrator.js`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (77/77 passed on Sub-phase 5.5 suite, 73/73 passed on Sub-phase 5.4 suite, 34/34 passed on Sub-phase 5.3 suite, 69/69 passed on Sub-phase 5.2 suite, 35/35 passed on Sub-phase 5.1 suite, 65/65 passed on base adapter suite, zero native emoji clean)
+- **Build / Test State**: Verified healthy (45/45 passed on Sub-phase 5.6 suite, 77/77 passed on Sub-phase 5.5 suite, 73/73 passed on Sub-phase 5.4 suite, 34/34 passed on Sub-phase 5.3 suite, 69/69 passed on Sub-phase 5.2 suite, 35/35 passed on Sub-phase 5.1 suite, 65/65 passed on base adapter suite, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Sub-phase 5.5 has completed the modularization of the toolbar popup by extracting all platform-dynamic HTML form generation logic out of `src/popup/popup.js` and into a dedicated ES module: `src/popup/platform_forms.js`:
-1. **Extracted ES Module (`src/popup/platform_forms.js`)**:
-   - Contains pure HTML dynamic form template generators for all 7 microstock platforms: `getAdobeStockFormHtml`, `getShutterstockFormHtml`, `getFreepikFormHtml`, `getVecteezyFormHtml`, `getDreamstimeFormHtml`, `getDepositphotosFormHtml`, and `getMiriCanvasFormHtml`.
-   - Contains universal controls fragment generator `getUniversalControlsHtml` (Target Keyword Count stepper control and Add Specific Keywords text input).
-   - Contains master generator `generatePlatformFormHtml(platformId, settings)` assembling universal controls + platform-specific form markup.
-   - Houses `PLATFORM_LIMITS` dictionary (keyword count bounds and hints for each platform) and robust character escaping utility `escapeHtml` (sanitizing `&`, `<`, `>`, `"`, `'`).
-   - Imports platform-specific catalogs (`FREEPIK_BASE_MODELS`, `VECTEEZY_AI_SOFTWARE`, `DEPOSITPHOTOS_COUNTRIES`) directly into `platform_forms.js`, removing unnecessary dependencies from `popup.js`.
-2. **Streamlined Popup Controller (`src/popup/popup.js`)**:
-   - Reduced `popup.js` from 1,386 lines to 1,129 lines (257-line reduction), isolating presentation markup from reactive controller logic.
-   - `renderPlatformDynamicForm(platformId)` now delegates template generation to `generatePlatformFormHtml(platformId, settings)`, followed cleanly by stepper wiring, conditional show/hide listeners, CustomSelect instantiations, and auto-save event bindings.
-   - Preserves 100% of popup public exports and reactive behaviors without adapter regression risk.
-3. **Preceding Sub-phase 5.4 Achievements (Assets, Theme Alignment, Pill Spinner & Badge Clamping)**:
-   - Replaced oversized 1.66 MB logo with optimized 500x500px asset (`bahan/logo_rj.png`, 60.3 KB), reducing size by 96.4%.
+Sub-phase 5.6 has modularized the in-page overlay controller by extracting the microstock automation batch execution loop, card iteration, Dreamstime carousel workflows, bulk saving, and graceful stop coordination out of `src/overlay/overlay.js` and into a dedicated ES module: `src/overlay/AutomationOrchestrator.js`:
+1. **Extracted ES Module (`src/overlay/AutomationOrchestrator.js`)**:
+   - Encapsulates multi-platform batch automation logic in `AutomationOrchestrator` class (596 lines).
+   - Manages provider validation, platform adapter resolution via `getAdapterForUrl` / `getAdapterForPlatform`, `AbortController` cancellation lifecycle, and granular `rj_automation_state` storage schema updates.
+   - Houses Section 6A Dreamstime continuous in-page carousel loop (editor wait -> thumbnail extraction -> AI metadata generation -> fillMetadata -> draft save -> direct review submission -> carousel advance).
+   - Houses Section 6B standard microstock grid loop (card selection -> editor wait -> thumbnail extraction -> AI metadata generation -> fillMetadata -> Freepik per-item draft save -> cooldown pacing).
+   - Houses post-loop bulk saving execution (`bulkSave()`) triggered on full completion or graceful stop.
+   - Implements two-click graceful stop and force abort mechanics (`stop(force)`), properly maintaining `isStopping` status, disabling buttons, and displaying active pill spinners.
+2. **Streamlined Overlay HUD Controller (`src/overlay/overlay.js`)**:
+   - Reduced `overlay.js` from 2,044 lines to 1,472 lines (572-line reduction), isolating floating HUD UI presentation, viewport-clamped drag mechanics, and Quick Form bindings from automation orchestration.
+   - Instantiates `this.orchestrator = new AutomationOrchestrator(this)` in constructor.
+   - `startAutomation()` and `stopAutomation(force)` delegate cleanly to `this.orchestrator.start()` and `this.orchestrator.stop(force)`.
+   - Preserves 100% of public HUD properties (`isAutomationRunning`, `isStopping`, `isCardProcessing`, `abortController`, `shadow`, etc.) and reactive methods without adapter regression risk.
+3. **Preceding Sub-phase 5.5 Achievements (Popup Modularization)**:
+   - Extracted all 7 platform HTML template generators into dedicated ES module `src/popup/platform_forms.js`, reducing `popup.js` by 257 lines.
 2. **Active HUD Button Theme Alignment (`src/styles/components.css`)**:
    - Replaced hardcoded cyan/blue (`#57c1ff`, `rgba(87, 193, 255, ...)`) in `.rj-btn.rj-btn-active` and `.rj-btn-secondary.rj-btn-active` with the extension's canonical Emerald Teal palette (`#079183` border, `#59d499` text and icon stroke, `rgba(7, 145, 131, 0.12)` background, `rgba(7, 145, 131, 0.35)` focus ring).
 3. **Minimized Floating Pill Activity Spinner (`src/overlay/overlay.css`, `src/overlay/overlay.js`)**:
@@ -154,12 +156,12 @@ Sub-phase 5.5 has completed the modularization of the toolbar popup by extractin
 
 ## 3. Actionable Next Steps for Incoming Agent
 
-1. **Step 1 (Sub-phase 5.6: Overlay Modularization — Extract `AutomationOrchestrator.js`)**:
-   - Extract the ~400-line automation execution engine from `src/overlay/overlay.js` into a dedicated ES module `src/overlay/AutomationOrchestrator.js` to decouple the UI HUD controller from automation scheduling and batch execution loops.
-2. **Step 2 (Sub-phase 5.7: Keyboard Accessibility & Focus Traps)**:
-   - Ensure complete keyboard navigability across both Popup and HUD modals, verifying Tab orders and Escape handlers.
-3. **Step 3 (Sub-phase 5.8: Performance Audit & Memory Profiling)**:
-   - Validate memory footprint, DOM garbage collection, and event listener detachment during long batch runs.
+1. **Step 1 (Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync)**:
+   - Perform end-to-end live testing across all 7 supported microstock contributor portals (Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos, MiriCanvas).
+   - Verify keyboard navigability and focus traps across popup and overlay HUD interfaces.
+   - Reconcile and synchronize all release documentation, architecture diagrams, and ROADMAP milestones.
+2. **Step 2 (Phase 5 Completion & dev Branch Merge)**:
+   - Final clean code audit, pre-release packaging verification, and user approval for merge to `dev`.
 
 ---
 
@@ -207,6 +209,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 47 | 2026-09-13 | `task/e2e-hardening-polish` | `refactor(overlay)` | Extracted automation execution loop and graceful stop into AutomationOrchestrator.js, reducing overlay.js by 572 lines (45/45 tests passed) | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
 | 46 | 2026-09-13 | `task/e2e-hardening-polish` | `refactor(popup)` | Extracted all 7 platform dynamic form generators into dedicated ES module platform_forms.js, reducing popup.js by 257 lines (77/77 tests passed) | Sub-phase 5.6: Overlay Modularization (Extract AutomationOrchestrator.js) |
 | 45 | 2026-09-13 | `task/e2e-hardening-polish` | `style(ui)` | Optimized logo asset (~60 KB), aligned active button theme to Emerald Teal, added pill spinner, and clamped badge text with tooltips (66/66 tests passed) | Sub-phase 5.5: Popup Modularization (Extract `platform_forms.js`) |
 | 44 | 2026-09-13 | `task/e2e-hardening-polish` | `feat(popup)` | Implemented real-time auto-save engine for all popup fields, debounced text inputs, anti-loop guards, bidirectional HUD <-> Popup sync, 34/34 tests passed | Sub-phase 5.4: Assets, Theme Alignment, Pill Spinner & Status Badge Clamping |
