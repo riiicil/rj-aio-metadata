@@ -5,11 +5,11 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Sub-phase 5.6: Overlay Modularization Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Adobe Stock Dropdown ID & Scroll Fix Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: `refactor(overlay): extract automation batch orchestrator into AutomationOrchestrator.js`
+- **Latest Commit**: `fix(adobestock): resolve dropdown language selection by strict ID matching and scrollbar centering`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (45/45 passed on Sub-phase 5.6 suite, 77/77 passed on Sub-phase 5.5 suite, 73/73 passed on Sub-phase 5.4 suite, 34/34 passed on Sub-phase 5.3 suite, 69/69 passed on Sub-phase 5.2 suite, 35/35 passed on Sub-phase 5.1 suite, 65/65 passed on base adapter suite, zero native emoji clean)
+- **Build / Test State**: Verified healthy (87/87 passed on Tier 1 adapter suite, 45/45 passed on Sub-phase 5.6 suite, zero native emoji clean)
 
 ---
 

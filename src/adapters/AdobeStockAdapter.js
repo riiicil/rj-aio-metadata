@@ -81,13 +81,13 @@ export const ADOBE_LANGUAGE_MAP = {
   en: '1',
   english: '1',
   '1': '1',
-  de: '2',
-  german: '2',
-  deutsch: '2',
+  fr: '2',
+  french: '2',
+  français: '2',
   '2': '2',
-  fr: '4',
-  french: '4',
-  français: '4',
+  de: '4',
+  german: '4',
+  deutsch: '4',
   '4': '4',
   es: '5',
   spanish: '5',
@@ -113,9 +113,7 @@ export const ADOBE_LANGUAGE_MAP = {
   korean: '14',
   '한국': '14',
   '한국어': '14',
-  '14': '14',
-  zh: '14',
-  chinese: '14'
+  '14': '14'
 };
 
 export class AdobeStockAdapter extends BaseAdapter {
@@ -273,24 +271,23 @@ export class AdobeStockAdapter extends BaseAdapter {
 
   /**
    * Helper to set either Adobe React Spectrum custom dropdown button or fallback native select.
+   * Operates strictly by invariant numeric ID (data-key/value) without relying on UI labels,
+   * and manages scrollbar container positioning to prevent zoom/overflow clipping.
+   *
    * @private
    */
-  async _setSpectrumOrNativeDropdown({ buttonSelector, selectSelector, targetKey, targetText, altKeys = [] }) {
+  async _setSpectrumOrNativeDropdown({ buttonSelector, selectSelector, targetKey }) {
     if (typeof document === 'undefined') return false;
 
-    // 1. Check and set native select first if present
+    const stringTargetKey = String(targetKey);
+
+    // 1. Check and set native select strictly by target option value ID
     const nativeSelect = document.querySelector(selectSelector);
     if (nativeSelect) {
-      const keysToMatch = [String(targetKey), ...altKeys.map(String)];
       let matchedOpt = null;
-
       if (nativeSelect.options && Array.isArray(Array.from(nativeSelect.options))) {
         for (const opt of Array.from(nativeSelect.options)) {
-          if (keysToMatch.includes(String(opt.value))) {
-            matchedOpt = opt;
-            break;
-          }
-          if (targetText && (opt.text?.trim().toLowerCase() === targetText.toLowerCase() || opt.text?.trim().toLowerCase().includes(targetText.toLowerCase()))) {
+          if (String(opt.value) === stringTargetKey) {
             matchedOpt = opt;
             break;
           }
@@ -301,50 +298,81 @@ export class AdobeStockAdapter extends BaseAdapter {
         nativeSelect.selectedIndex = matchedOpt.index;
         setNativeValue(nativeSelect, matchedOpt.value);
       } else {
-        setNativeValue(nativeSelect, String(targetKey));
+        setNativeValue(nativeSelect, stringTargetKey);
       }
     }
 
     // 2. React Spectrum Button Dropdown
     const triggerBtn = document.querySelector(buttonSelector);
     if (triggerBtn) {
-      const btnText = (triggerBtn.textContent || '').trim();
-      if (targetText && btnText.toLowerCase().includes(targetText.toLowerCase())) {
-        return true; // Already selected
-      }
-
       for (let attempt = 1; attempt <= 3; attempt++) {
         const isExpanded = triggerBtn.getAttribute?.('aria-expanded') === 'true';
         if (!isExpanded) {
           simulateClick(triggerBtn);
-          await new Promise(r => setTimeout(r, 250));
+          await sleep(250);
         }
 
-        const keysToMatch = [String(targetKey), ...altKeys.map(String)];
-        let optionEl = null;
+        // Find listbox container
+        const listbox = document.querySelector('div[role="listbox"], .spectrum-Menu, [role="listbox"]');
+        let optionEl = listbox
+          ? listbox.querySelector(`[role="option"][data-key="${stringTargetKey}"], [data-key="${stringTargetKey}"], [id$="-option-${stringTargetKey}"]`)
+          : document.querySelector(`div[role="option"][data-key="${stringTargetKey}"], [role="option"][data-key="${stringTargetKey}"]`);
 
-        for (const k of keysToMatch) {
-          optionEl = document.querySelector(`div[role="option"][data-key="${k}"], li[role="option"][data-key="${k}"], [role="option"][data-key="${k}"]`);
-          if (optionEl) break;
-        }
-
-        if (!optionEl && targetText) {
-          const allOptions = Array.from(document.querySelectorAll('div[role="option"], li[role="option"], .spectrum-Menu-item'));
-          optionEl = allOptions.find(el => {
-            const t = (el.textContent || '').trim().toLowerCase();
-            return t === targetText.toLowerCase() || t.includes(targetText.toLowerCase());
-          });
+        // If listbox has scrollbar and optionEl is not immediately in DOM (e.g. virtualized), scan by scrolling
+        if (listbox && !optionEl && listbox.scrollHeight > listbox.clientHeight) {
+          const maxScroll = listbox.scrollHeight - listbox.clientHeight;
+          const step = Math.max(50, Math.floor(listbox.clientHeight * 0.7));
+          for (let pos = 0; pos <= maxScroll && !optionEl; pos += step) {
+            listbox.scrollTop = pos;
+            await sleep(100);
+            optionEl = listbox.querySelector(`[role="option"][data-key="${stringTargetKey}"], [data-key="${stringTargetKey}"], [id$="-option-${stringTargetKey}"]`);
+          }
         }
 
         if (optionEl) {
-          simulateClick(optionEl);
-          await new Promise(r => setTimeout(r, 350));
+          // Scroll listbox container to vertically center the target option (prevents boundary clipping across zoom levels)
+          if (listbox && listbox.scrollHeight > listbox.clientHeight) {
+            const optionTop = optionEl.offsetTop;
+            const optionHeight = optionEl.offsetHeight || 32;
+            const listboxHeight = listbox.clientHeight;
+            listbox.scrollTop = Math.max(0, optionTop - (listboxHeight / 2) + (optionHeight / 2));
+            await sleep(100);
+          }
+
+          if (typeof optionEl.scrollIntoView === 'function') {
+            try {
+              optionEl.scrollIntoView({ block: 'center', behavior: 'instant' });
+            } catch {
+              // Ignore scroll errors in mock environments
+            }
+          }
+          await sleep(150);
+
+          // Click target: prefer inner item label/grid if present, fallback to optionEl
+          const clickTarget = optionEl.querySelector?.('.spectrum-Menu-itemLabel, .spectrum-Menu-itemGrid, span') || optionEl;
+          simulateClick(clickTarget);
+          if (clickTarget !== optionEl) {
+            simulateClick(optionEl);
+          }
+
+          // Keyboard Enter navigation fallback
+          if (typeof optionEl.focus === 'function') {
+            try {
+              optionEl.focus();
+              simulateEnterKey(optionEl);
+            } catch {
+              // Ignore focus errors
+            }
+          }
+
+          await sleep(350);
           return true;
         }
 
+        // Close dropdown before retry attempt if still expanded
         if (triggerBtn.getAttribute?.('aria-expanded') === 'true') {
           simulateClick(triggerBtn);
-          await new Promise(r => setTimeout(r, 150));
+          await sleep(150);
         }
       }
     }
@@ -372,8 +400,7 @@ export class AdobeStockAdapter extends BaseAdapter {
       await this._setSpectrumOrNativeDropdown({
         buttonSelector: 'button[data-t="content-tagger-category-select"], div[data-t="content-tagger-category-wrapper"] button',
         selectSelector: 'select[name="category"], select[data-t="content-tagger-category-select"]',
-        targetKey: resolvedCat.id,
-        targetText: resolvedCat.name
+        targetKey: resolvedCat.id
       });
       await sleep(800);
     }
@@ -460,17 +487,12 @@ export class AdobeStockAdapter extends BaseAdapter {
     if (rawLang !== undefined && rawLang !== null) {
       const normalizedLangKey = String(rawLang).toLowerCase().trim();
       const mappedLangId = ADOBE_LANGUAGE_MAP[normalizedLangKey] || String(rawLang);
-      const isKorean = normalizedLangKey === 'ko' || normalizedLangKey === 'korean';
-      const targetText = isKorean ? '한국' : (mappedLangId === '1' ? 'English' : null);
-      const altKeys = isKorean ? ['14', '10'] : [];
 
-      (this.logger || logger).step('language dropdown', targetText || mappedLangId);
+      (this.logger || logger).step('language dropdown', mappedLangId);
       await this._setSpectrumOrNativeDropdown({
         buttonSelector: 'button[data-t="content-tagger-keywords-language-select"], div[data-t="content-tagger-keywords-language-wrapper"] button',
         selectSelector: 'select[name="language"], select[data-t="content-tagger-keywords-language-select"]',
-        targetKey: mappedLangId,
-        targetText,
-        altKeys
+        targetKey: mappedLangId
       });
       await sleep(500);
     }
