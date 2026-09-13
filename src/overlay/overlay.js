@@ -43,6 +43,8 @@ export class OverlayHUD {
     this.platformName = this.detectPlatform();
     this.assetCount = 0;
     this.isAutomationRunning = false;
+    this.isStopping = false;
+    this.isCardProcessing = false;
     this.abortController = null;
     this.scanInterval = null;
     this.mutationObserver = null;
@@ -713,7 +715,7 @@ export class OverlayHUD {
       btnAutomation.addEventListener('click', (e) => {
         e.stopPropagation();
         if (this.isStopping) {
-          this.stopAutomation(true);
+          return; // Already in graceful stopping process; button is disabled to prevent double-clicks
         } else if (this.isAutomationRunning) {
           this.stopAutomation();
         } else {
@@ -755,7 +757,7 @@ export class OverlayHUD {
    * Updates start button disabled status based on active provider readiness.
    */
   updateStartButtonReadiness() {
-    if (this.isAutomationRunning) return;
+    if (this.isAutomationRunning || this.isStopping) return;
     const btn = this.shadow?.querySelector('#rjBtnToggleAutomation');
     if (btn) {
       if (this.platformId === 'unknown') {
@@ -809,12 +811,16 @@ export class OverlayHUD {
       const state = changes.rj_automation_state.newValue;
       if (state) {
         const isRunning = Boolean(state.isRunning);
-        if (this.isAutomationRunning !== isRunning) {
-          if (!isRunning && this.isAutomationRunning) {
-            this.stopAutomation();
-          } else if (isRunning && !this.isAutomationRunning) {
-            this.startAutomation();
-          }
+        const isStopping = Boolean(state.isStopping || state.status === 'stopping');
+        if (isStopping && !this.isStopping && this.isAutomationRunning) {
+          // External graceful stop triggered from popup
+          this.stopAutomation();
+        } else if (!isRunning && !isStopping && (this.isAutomationRunning || this.isStopping)) {
+          // External stop triggered
+          this.stopAutomation(true);
+        } else if (isRunning && !isStopping && !this.isAutomationRunning && !this.isStopping) {
+          // External start triggered from popup
+          this.startAutomation();
         }
       }
     }
@@ -836,9 +842,26 @@ export class OverlayHUD {
     const progressTrack = this.shadow.querySelector('#rjProgressTrack');
     const pillStatus = this.shadow.querySelector('#rjPillStatus');
 
+    if (this.isStopping) {
+      if (btn) {
+        btn.classList.remove('rj-btn-start', 'rj-btn-stop', 'rj-btn-accent');
+        btn.classList.add('rj-btn-stopping', 'rj-btn-disabled');
+        btn.disabled = true;
+        btn.title = 'Stopping automation (saving work)...';
+      }
+      if (btnText) btnText.textContent = 'Stopping...';
+      if (icon) icon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
+      if (badge) badge.classList.add('rj-running');
+      if (statusText) statusText.textContent = 'Stopping...';
+      if (progressTrack) progressTrack.style.display = 'block';
+      if (pillStatus) pillStatus.textContent = 'Stopping...';
+      this.setFormControlsDisabled(true);
+      return;
+    }
+
     if (isRunning) {
       if (btn) {
-        btn.classList.remove('rj-btn-start');
+        btn.classList.remove('rj-btn-start', 'rj-btn-stopping', 'rj-btn-disabled');
         btn.classList.add('rj-btn-stop');
         btn.disabled = false;
         btn.title = 'Stop Automation';
@@ -851,7 +874,7 @@ export class OverlayHUD {
       if (pillStatus) pillStatus.textContent = 'Running...';
     } else {
       if (btn) {
-        btn.classList.remove('rj-btn-stop');
+        btn.classList.remove('rj-btn-stop', 'rj-btn-stopping', 'rj-btn-disabled');
         btn.classList.add('rj-btn-start');
         if (this.platformId === 'unknown') {
           btn.disabled = true;
@@ -913,11 +936,15 @@ export class OverlayHUD {
     const signal = this.abortController.signal;
 
     // 4. Update HUD UI state to Running
+    this.isAutomationRunning = true;
+    this.isStopping = false;
     this.updateAutomationUI(true);
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       chrome.storage.local.set({
         rj_automation_state: {
           isRunning: true,
+          isStopping: false,
+          status: 'running',
           platformId: this.platformId,
           timestamp: Date.now()
         }
@@ -937,6 +964,8 @@ export class OverlayHUD {
       const total = cards.length;
 
       if (total === 0) {
+        this.isStopping = false;
+        this.isAutomationRunning = false;
         this.updateAutomationUI(false);
         if (countText) countText.textContent = '0 Assets Detected';
         if (statusText) statusText.textContent = '0 Assets Detected';
@@ -944,6 +973,8 @@ export class OverlayHUD {
           chrome.storage.local.set({
             rj_automation_state: {
               isRunning: false,
+              isStopping: false,
+              status: 'idle',
               platformId: this.platformId,
               timestamp: Date.now()
             }
@@ -1080,6 +1111,17 @@ export class OverlayHUD {
           this.isAutomationRunning = false;
           this.updateAutomationUI(false);
           if (statusText) statusText.textContent = 'Stopped';
+          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            chrome.storage.local.set({
+              rj_automation_state: {
+                isRunning: false,
+                isStopping: false,
+                status: 'idle',
+                platformId: this.platformId,
+                timestamp: Date.now()
+              }
+            });
+          }
         } else {
           logger.success(`Dreamstime automation finished ${processedCount} assets.`);
           if (progressFill) progressFill.style.width = '100%';
@@ -1091,7 +1133,20 @@ export class OverlayHUD {
 
           const finishWait = this._completionWait ?? 3000;
           await sleep(finishWait);
+          this.isStopping = false;
+          this.isAutomationRunning = false;
           this.updateAutomationUI(false);
+          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+            chrome.storage.local.set({
+              rj_automation_state: {
+                isRunning: false,
+                isStopping: false,
+                status: 'idle',
+                platformId: this.platformId,
+                timestamp: Date.now()
+              }
+            });
+          }
         }
         return;
       }
@@ -1235,6 +1290,17 @@ export class OverlayHUD {
         this.isAutomationRunning = false;
         this.updateAutomationUI(false);
         if (statusText) statusText.textContent = 'Stopped';
+        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+          chrome.storage.local.set({
+            rj_automation_state: {
+              isRunning: false,
+              isStopping: false,
+              status: 'idle',
+              platformId: this.platformId,
+              timestamp: Date.now()
+            }
+          });
+        }
       } else {
         logger.success('Automation completed successfully!');
 
@@ -1248,20 +1314,41 @@ export class OverlayHUD {
 
         const finishWait = this._completionWait ?? 3000;
         await sleep(finishWait);
-        this.updateAutomationUI(false);
-      }
-    } catch (err) {
-      if (err.message === 'ABORTED' || signal.aborted) {
-        logger.info('Automation stopped.');
         this.isStopping = false;
         this.isAutomationRunning = false;
         this.updateAutomationUI(false);
+        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+          chrome.storage.local.set({
+            rj_automation_state: {
+              isRunning: false,
+              isStopping: false,
+              status: 'idle',
+              platformId: this.platformId,
+              timestamp: Date.now()
+            }
+          });
+        }
+      }
+    } catch (err) {
+      this.isStopping = false;
+      this.isAutomationRunning = false;
+      this.updateAutomationUI(false);
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.set({
+          rj_automation_state: {
+            isRunning: false,
+            isStopping: false,
+            status: 'idle',
+            platformId: this.platformId,
+            timestamp: Date.now()
+          }
+        });
+      }
+      if (err.message === 'ABORTED' || signal.aborted) {
+        logger.info('Automation stopped.');
         if (statusText) statusText.textContent = 'Stopped';
       } else {
         logger.error('Automation error:', err);
-        this.isStopping = false;
-        this.isAutomationRunning = false;
-        this.updateAutomationUI(false);
         if (statusText) statusText.textContent = 'Error: ' + (err.message || 'Failed');
       }
     } finally {
@@ -1273,6 +1360,8 @@ export class OverlayHUD {
         chrome.storage.local.set({
           rj_automation_state: {
             isRunning: false,
+            isStopping: false,
+            status: 'idle',
             platformId: this.platformId,
             timestamp: Date.now()
           }
@@ -1291,10 +1380,14 @@ export class OverlayHUD {
       return;
     }
 
+    if (this.isStopping && !force) {
+      return; // Already in graceful stopping process; button is disabled to prevent double-clicks
+    }
+
     const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
 
-    if (this.isStopping || force) {
-      // Second click or forced stop: immediate hard abort
+    if (force) {
+      // Forced stop: immediate hard abort
       logger.warn('Force stop requested. Aborting immediately...');
       if (this.abortController) {
         this.abortController.abort();
@@ -1305,26 +1398,51 @@ export class OverlayHUD {
       this.isAutomationRunning = false;
       this.updateAutomationUI(false);
       if (statusText) statusText.textContent = 'Stopped';
+
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.set({
+          rj_automation_state: {
+            isRunning: false,
+            isStopping: false,
+            status: 'idle',
+            platformId: this.platformId,
+            timestamp: Date.now()
+          }
+        });
+      }
     } else {
-      // First click: graceful stop after active card finishes and saves
+      // Graceful stop after active card finishes and saves
       this.isStopping = true;
-      this.isAutomationRunning = false;
+      // Do NOT set this.isAutomationRunning = false yet! Keep true because active card is still processing and bulk save is pending
       const btn = this.shadow?.querySelector('#rjBtnToggleAutomation');
       const btnText = this.shadow?.querySelector('#rjAutomationBtnText');
-      if (btn) btn.title = 'Stopping automation (saving work)...';
+      if (btn) {
+        btn.classList.remove('rj-btn-start', 'rj-btn-stop', 'rj-btn-accent');
+        btn.classList.add('rj-btn-stopping', 'rj-btn-disabled');
+        btn.disabled = true;
+        btn.title = 'Stopping automation (saving work)...';
+      }
       if (btnText) btnText.textContent = 'Stopping...';
       if (statusText) statusText.textContent = 'Stopping...';
+      const badge = this.shadow?.querySelector('#rjAutomationBadge');
+      if (badge) {
+        badge.classList.add('rj-running');
+      }
+      const pillStatus = this.shadow?.querySelector('#rjPillStatus');
+      if (pillStatus) pillStatus.textContent = 'Stopping...';
       logger.warn('Stop requested. Waiting for active card to finish then saving work...');
-    }
 
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      chrome.storage.local.set({
-        rj_automation_state: {
-          isRunning: false,
-          platformId: this.platformId,
-          timestamp: Date.now()
-        }
-      });
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.set({
+          rj_automation_state: {
+            isRunning: true,
+            isStopping: true,
+            status: 'stopping',
+            platformId: this.platformId,
+            timestamp: Date.now()
+          }
+        });
+      }
     }
   }
 
@@ -1479,8 +1597,27 @@ export class OverlayHUD {
       }
       chrome.storage.local.get(['rj_automation_state'], (res) => {
         if (res && res.rj_automation_state) {
-          const isRunning = Boolean(res.rj_automation_state.isRunning);
-          this.updateAutomationUI(isRunning);
+          const state = res.rj_automation_state;
+          const isRunning = Boolean(state.isRunning);
+          const isStopping = Boolean(state.isStopping || state.status === 'stopping');
+          this.isAutomationRunning = isRunning;
+          this.isStopping = isStopping;
+          if (isStopping) {
+            this.updateAutomationUI(true);
+            const btn = this.shadow?.querySelector('#rjBtnToggleAutomation');
+            const btnText = this.shadow?.querySelector('#rjAutomationBtnText');
+            const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
+            if (btn) {
+              btn.classList.remove('rj-btn-start', 'rj-btn-stop', 'rj-btn-accent');
+              btn.classList.add('rj-btn-stopping', 'rj-btn-disabled');
+              btn.disabled = true;
+              btn.title = 'Stopping automation (saving work)...';
+            }
+            if (btnText) btnText.textContent = 'Stopping...';
+            if (statusText) statusText.textContent = 'Stopping...';
+          } else {
+            this.updateAutomationUI(isRunning);
+          }
         }
         resolve();
       });

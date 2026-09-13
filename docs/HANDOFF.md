@@ -5,31 +5,36 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Sub-phase 5.1: Overlay Persistence, Dead Code Removal & Duplication Fixing Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Sub-phase 5.2: HUD ↔ Popup Automation State Synchronization & Graceful Stop Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: `fix(overlay): persist overlay visibility across navigations, remove dead code and unify platform detection`
+- **Latest Commit**: `fix(sync): resolve hud and popup automation state synchronization during graceful stop`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (35/35 passed on Sub-phase 5.1 suite, 57/57 passed on orchestrator suite, 113/113 passed on Tier 3, zero native emoji clean)
+- **Build / Test State**: Verified healthy (69/69 passed on Sub-phase 5.2 suite, 35/35 passed on Sub-phase 5.1 suite, 60/60 passed on orchestrator suite, 82/82 Tier 1, 108/108 Tier 2, 113/113 Tier 3, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Sub-phase 5.1 has resolved overlay auto-mount persistence, eliminated obsolete stub files and unreachable code, and unified platform detection:
-1. **Overlay Visibility & Navigation Persistence Bugfix (`src/overlay/overlay.js`, `src/content/content_main.js`)**:
-   - Resolved the cross-page auto-mount bug where closing the HUD on one site (e.g. Google) caused it to pop up again upon navigating to another domain (e.g. YouTube).
-   - In `content_main.js`, page auto-mount reads `chrome.storage.local.get(['rj_overlay_visible'])` before mounting. If `false`, the HUD initializes and mounts immediately in hidden state (`.rj-hidden`) without visual flashing.
-   - In `OverlayHUD.restorePositionAndState()`, reads `['rj_hud_pos', 'rj_overlay_visible']`. If `rj_overlay_visible === false`, sets `this.isVisible = false`, adds `.rj-hidden` to `wrapper` and `pillEl`. If `true`, removes `.rj-hidden` and sets `this.isVisible = true`.
-   - In `show()` and `hide(animate = true)`, updates `chrome.storage.local.set({ rj_overlay_visible: true / false })` and toggles `.rj-hidden` accordingly.
-   - In `content_main.js` message listener, `PING_HUD`, `GET_OVERLAY_STATE`, and `TOGGLE_OVERLAY` accurately report and toggle `isVisible: Boolean(hud && hud.isVisible)`.
-2. **Dead Code & Scaffolding Files Removal**:
-   - Deleted obsolete Phase 0/1 stub files never imported in `src/`: `src/services/AiVisionService.js` and `src/services/PromptBuilder.js` (both superseded by `AiService.js` and `AiPrompt.js`).
-   - Cleaned `src/overlay/overlay.js`: removed commented-out `clearMetadata` block (lines 1175–1181), simplified Section 6B per-item save to Freepik only (`if (this.platformId === 'freepik')`), and eliminated unreachable Dreamstime Section 6B carousel navigation (lines 1234–1239) which is already completely handled in Section 6A.
-3. **Unified Platform Detection in `overlay.js`**:
-   - Eliminated hardcoded domain string checks in `detectPlatformId()` and `detectPlatform()`.
-   - Leverages central adapter registry `getAdapterForUrl(window.location.href)` directly. Returns `adapter.platformId` (or `'unknown'`) and `adapter.platformName` (or `'Unknown Page'`).
-4. **Previous Phase 4 Achievements**:
-   - Phase 4 platform adapters (Adobe Stock, Shutterstock, Freepik / Magnific, Vecteezy, Dreamstime, Depositphotos, MiriCanvas) fully merged to `dev`.
+Sub-phase 5.2 has resolved the desynchronization and race condition between the in-page HUD and Toolbar Popup during automation execution and graceful stop:
+1. **Granular `rj_automation_state` Schema Across HUD & Popup**:
+   - Expanded state object: `{ isRunning: boolean, isStopping: boolean, status: 'idle' | 'running' | 'stopping', platformId: string, timestamp: number }`.
+   - Maintained full backwards compatibility with legacy boolean states (`true` -> running, `false` -> idle).
+2. **Graceful Stop Lifecycle & Disabled Button State in `OverlayHUD` (`src/overlay/overlay.js`)**:
+   - *Graceful Stop Trigger*: Sets `this.isStopping = true` while keeping `this.isAutomationRunning = true`. Updates HUD button to disabled "Stopping..." with `.rj-btn-stopping` and `.rj-btn-disabled` (`btn.disabled = true`, `btn.title = 'Stopping automation (saving work)...'`), updates status badge to "Stopping...", and persists `{ isRunning: true, isStopping: true, status: 'stopping' }` to `chrome.storage.local`. The active card finishes AI metadata generation and injection, and `bulkSave()` executes cleanly before teardown.
+   - *Repeated Click Guard*: Clicks while stopping are ignored to prevent user interruption or double-clicks during active card save.
+   - *Completion Lifecycle*: When processing naturally finishes or graceful stop completes (after active card finishes and bulk save resolves in both Dreamstime Section 6A and Grid Section 6B, as well as in `catch`/`finally` error handlers), `isStopping` and `isAutomationRunning` are reset to `false`, button re-enables as "Start Automation" (`btn.disabled = false`), and persisted with `status: 'idle'`.
+3. **Popup Synchronization & Form Locking (`src/popup/popup.js`)**:
+   - Refactored `updateAutomationButtonUI(state)` to parse both boolean and object states.
+   - During `isStopping: true`: Button displays "Stopping..." with `.rj-btn-stopping` and `.rj-btn-disabled`, disabled from further clicks, and all form controls remain locked via `setFormDisabledState(true)`.
+   - During `isRunning: true`: Button displays "Stop Automation" with `.rj-btn-danger` and `.rj-btn-running`, form controls locked.
+   - During idle: Button displays "Start Automation" with `.rj-btn-accent`, form controls unlocked.
+   - Dynamic Form Re-renders: In `DOMContentLoaded` and whenever `renderPlatformDynamicForm` injects new HTML, immediately re-applies `if (isAutomationRunning) { setFormDisabledState(true); }` to guarantee form locking persistence.
+   - Button click listener: Disallows actions while `isStopping`, triggers graceful stop storage update when running, and triggers start storage update when idle.
+4. **Stopping Button Styles (`src/styles/components.css`)**:
+   - Added `.rj-btn.rj-btn-stopping, .rj-btn-danger.rj-btn-stopping, .rj-hud-btn-action.rj-btn-stopping` with warning red background, disabled cursor, and 0.85 opacity.
+5. **Preceding Sub-phase 5.1 Achievements**:
+   - Persisted overlay visibility across navigations via `rj_overlay_visible`, deleted obsolete stub files (`AiVisionService.js`, `PromptBuilder.js`), and unified platform detection via central adapter registry `getAdapterForUrl`.
+6. **Previous Platform Adapter Achievements**:
 1. **MiriCanvas Live Alignment (`designhub.miricanvas.com/en/element/to-do`)**:
    - **Keyword Bulk Trash Elimination & Reactive Verified Per-Chip Removal Engine (`clearKeywords()`)**: Eliminated the keyword bulk trash button completely as requested. Replaced with a reactive, verified per-chip removal engine:
      1. *Dynamic Querying*: Re-evaluates `getExistingChips()` on each iteration rather than operating on a stale array.
@@ -132,44 +137,17 @@ Sub-phase 5.1 has resolved overlay auto-mount persistence, eliminated obsolete s
    - Added active asynchronous polling to `approveSpellingWarnings()` (up to 3.5s) to allow asynchronous chip error rendering and spellcheck latency before clicking mark all correct.
    - Usage toggle: Material-UI toggle buttons `button[data-testid="button-editorial"]` vs `button[data-testid="button-commercial"]` inside `div[data-testid="usage-toggle"]`.
    - Sequential keyword clearing via 3-dots menu (`button[data-testid="more-keyword-actions-button"]` -> `[data-testid="clear-action"]`).
-   - Bulk save: Target first card checkbox, toolbar `button[data-testid="select-page-button"]`, sidebar `button[data-testid="edit-dialog-save-button"]`, waits for save spinner to resolve and button to normalize, clicks toolbar "Deselect page", and closes drawer.
-   - Verified auto-saving on graceful stop mid-batch, with 100ms responsive stop checking during cooldown in `overlay.js`.
-   - Video (19 categories) vs Image (26 categories) shared workflow supported.
-7. **Centralized LoggerService Integration**:
-   - `ShutterstockAdapter.js` and `FreepikAdapter.js` now use `logger.step()`, `.info()`, and `.success()` across every single interaction step.
-8. **Adobe Stock Live Fixes Round 1-5 Verified**:
-   - Strict element sequence, non-AI releases switch to "No", and strict Save work button selector.
 
 ---
 
 ## 3. Actionable Next Steps for Incoming Agent
 
-1. **Step 1 (Sub-phase 5.2: State Schema & Background Relay)**:
-   - Expand `rj_automation_state` schema in `StorageService.js` / storage helpers: `{ isRunning, isStopping, status, platformId, timestamp }`.
-   - Ensure `startAutomation()`, `stopAutomation()`, and status updates in `src/overlay/overlay.js` sync state changes to `chrome.storage.local`.
-2. **Step 2 (Sub-phase 5.2: Popup UI State Sync & Stop Trigger)**:
-   - Update `src/popup/popup.js` `chrome.storage.onChanged` listener to reflect active automation status dynamically (disabling/enabling form controls, updating status indicator, and wiring Stop button).
-3. **Step 3 (Sub-phase 5.2: Verification)**:
-   - Write unit test in `scratch/test_subphase_5_2.mjs` validating bi-directional state synchronization between in-page HUD and popup UI during idle, running, stopping, and completed states.
-
----
-
-## 6. Recent Session Handoff Log
-
-| Session | Date | Branch | Commit | Summary | Next Focus |
-| :---: | :---: | :--- | :--- | :--- | :--- |
-| 42 | 2026-09-13 | `task/e2e-hardening-polish` | `fix(overlay)` | Persisted overlay visibility across navigations via rj_overlay_visible, deleted obsolete stub files (AiVisionService, PromptBuilder), and unified platform detection via central adapter registry getAdapterForUrl | Sub-phase 5.2: HUD <-> Popup Automation State Synchronization & Graceful Stop |
-| 41 | 2026-09-12 | `task/platform-adapters` | `fix(depositphotos)` | Align .itemslist > div.itemeditor card selectors, progressive scroll & stub waiting, card-scoped form filling, condition-checked clearing, to-top bulkSave | Live browser verification on Depositphotos |
-| 40 | 2026-09-11 | `task/platform-adapters` | `fix(dreamstime)` | Subcategory polling, condition-checked clear buttons, single-word keywords, toast lifecycle waiting, and in-page carousel loop | Live browser verification on Dreamstime |
-| 39 | 2026-09-10 | `task/platform-adapters` | `fix(vecteezy)` | Scope metadata editor to right panel, add prepareAutomation, clear buttons, software dropdown, and fix bulkSave selector | Live browser verification on Vecteezy |
-| 38 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Prioritize custom dropdown for AI model, add 500ms interaction pacing, check & toggle off AI in non-AI mode, and add pre-start deselect hook | Live browser verification on Magnific / Freepik |
-| 37 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Target button[data-cy="savePreitems"] (icon--save) for saving item, clamp AI keywords to 49, skip keyword clear when no chips exist | Live browser verification on Magnific / Freepik |
-| 36 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Eliminate card double-click, deduplicate simulateClick in browser, poll active asset selection in waitForEditorReady | Live browser verification on Magnific / Freepik |
-| 35 | 2026-09-10 | `task/platform-adapters` | `feat(freepik)` | Add support for contributor.magnific.com rebranding in manifest, overlay, background worker, popup UI, and integrate LoggerService | Live browser verification on Magnific / Freepik |
-| 34 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Auto-clear editorial prefix on toggle off, tighten Shutterstock chip detection on empty assets, prioritize local storage to fix model saving quota | Live browser verification on Shutterstock |
-| 33 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Async spelling auto-correct polling, save button spinner resolution wait, post-save deselect page, responsive cooldown stop | Live browser testing on Shutterstock |
-| 32 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Background CORS image proxy, deepest MUI selectors, sequential clearing, tightened delays, LoggerService wired, 666/666 tests pass | Live browser testing on Shutterstock |
-| 31 | 2026-09-10 | `task/platform-adapters` | `feat(logging)` | Implemented LoggerService.js, wired into AdobeStockAdapter, disabled global clearMetadata in overlay, verified 336/336 tests | Phase 5: End-to-End Live Browser Testing & Polish |
+1. **Step 1 (Sub-phase 5.3: Debounced Config Auto-Save Engine)**:
+   - Implement debounced real-time synchronization in `src/popup/popup.js` to automatically persist settings changes (inputs, selects, toggles) to `chrome.storage.local` without requiring manual save.
+2. **Step 2 (Sub-phase 5.3: Clean Obsolete Save Elements)**:
+   - Remove obsolete manual save button and associated handlers from `popup.html` and `popup.js`.
+3. **Step 3 (Sub-phase 5.3: Verification Suite)**:
+   - Add automated verification test for real-time config persistence and verify zero regression across existing test suites.
 
 ---
 
@@ -217,6 +195,8 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 43 | 2026-09-13 | `task/e2e-hardening-polish` | `fix(sync)` | Resolved HUD <-> Popup automation state synchronization during graceful stop, expanded rj_automation_state schema, two-click stop lifecycle, disabled Stopping... state, 65/65 tests passed | Sub-phase 5.3: Popup Real-Time Auto-Save Engine |
+| 42 | 2026-09-13 | `task/e2e-hardening-polish` | `59c9935` | Persisted overlay visibility across navigations via rj_overlay_visible, deleted obsolete stub files (AiVisionService, PromptBuilder), unified platform detection, 35/35 tests passed | Sub-phase 5.2: HUD <-> Popup Automation State Synchronization & Graceful Stop |
 | 36 | 2026-09-13 | `task/platform-adapters` | `fix(miricanvas)` | Eliminated keyword bulk trash logic and implemented reactive verified per-chip removal engine with bottom-up scroll & disappearance polling in MiriCanvas, verified 113/113 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 35 | 2026-09-13 | `task/platform-adapters` | `6fc3650` | Implemented dual-strategy keyword chip clearing (bulk trash button + per-chip 'x' remove icon fallback with 50ms pacing) and sequential form ordering in MiriCanvas, verified 112/112 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 34 | 2026-09-13 | `task/platform-adapters` | `8879594` | Resolved MiriCanvas keyword chip conversion via non-blur setter + insertFromPaste InputEvent + Enter/comma fallback, trash button discrimination (`DD-04b4`), and bulk save 8000ms disabled/toast wait with 2000ms sync buffer & fresh navbar uncheck, verified 112/112 tests | Phase 5: End-to-End Live Browser Testing & Polish |

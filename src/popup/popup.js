@@ -12,6 +12,7 @@ let currentConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 let activeTabInfo = null;
 let currentActivePlatformId = null;
 let isAutomationRunning = false;
+let isStopping = false;
 
 // Platform Keyword Count Constraints & Hints
 const PLATFORM_LIMITS = {
@@ -886,27 +887,54 @@ function updateHudButtonState(isActive) {
 
 /**
  * Updates the Start / Stop Automation button UI and toggles input field disabling in the toolbar popup.
- * @param {boolean} running
+ * Supports both boolean (legacy/test compatibility) and granular state object.
+ * @param {boolean|object} state
  */
-function updateAutomationButtonUI(running) {
-  isAutomationRunning = Boolean(running);
-  if (isAutomationRunning) {
-    btnToggleAutomation.className = 'rj-btn rj-btn-danger';
-    automationBtnText.textContent = 'Stop Automation';
-    automationIcon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
-    btnToggleAutomation.disabled = false;
-    btnToggleAutomation.title = 'Stop Automation';
-  } else {
-    btnToggleAutomation.className = 'rj-btn rj-btn-accent';
-    automationBtnText.textContent = 'Start Automation';
-    automationIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+function updateAutomationButtonUI(state) {
+  let isRunning = false;
+  let stopping = false;
 
-    const ready = isCurrentProviderReady();
-    btnToggleAutomation.disabled = !ready;
-    btnToggleAutomation.title = ready ? 'Start Automation' : 'Please input API key and select an AI model first';
+  if (typeof state === 'boolean') {
+    isRunning = state;
+  } else if (state && typeof state === 'object') {
+    isRunning = Boolean(state.isRunning);
+    stopping = Boolean(state.isStopping || state.status === 'stopping');
   }
 
-  // Disable all fields when processing, enable when idle
+  isStopping = stopping;
+  isAutomationRunning = isRunning || isStopping;
+
+  if (!btnToggleAutomation) return;
+
+  if (isStopping) {
+    btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-running', 'rj-btn-danger');
+    btnToggleAutomation.classList.add('rj-btn-stopping', 'rj-btn-disabled');
+    btnToggleAutomation.disabled = true;
+    btnToggleAutomation.title = 'Stopping automation...';
+    if (automationBtnText) automationBtnText.textContent = 'Stopping...';
+    if (automationIcon) {
+      automationIcon.innerHTML = `<rect x="6" y="6" width="12" height="12" rx="1.5"></rect>`;
+    }
+  } else if (isRunning) {
+    btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-stopping', 'rj-btn-disabled');
+    btnToggleAutomation.classList.add('rj-btn-danger', 'rj-btn-running');
+    btnToggleAutomation.disabled = false;
+    btnToggleAutomation.title = 'Stop Automation';
+    if (automationBtnText) automationBtnText.textContent = 'Stop Automation';
+    if (automationIcon) {
+      automationIcon.innerHTML = `<rect x="6" y="6" width="12" height="12" rx="1.5"></rect>`;
+    }
+  } else {
+    btnToggleAutomation.classList.remove('rj-btn-danger', 'rj-btn-running', 'rj-btn-stopping', 'rj-btn-disabled');
+    btnToggleAutomation.classList.add('rj-btn-accent');
+    btnToggleAutomation.disabled = false;
+    btnToggleAutomation.title = 'Start Automation';
+    if (automationBtnText) automationBtnText.textContent = 'Start Automation';
+    if (automationIcon) {
+      automationIcon.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"></polygon>`;
+    }
+  }
+
   setFormDisabledState(isAutomationRunning);
 }
 
@@ -916,10 +944,13 @@ function updateAutomationButtonUI(running) {
 document.addEventListener('DOMContentLoaded', async () => {
   // Restore running automation state if active in overlay
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-    chrome.storage.local.get(['rj_automation_state'], (res) => {
-      if (res && res.rj_automation_state) {
-        updateAutomationButtonUI(Boolean(res.rj_automation_state.isRunning));
-      }
+    await new Promise((resolve) => {
+      chrome.storage.local.get(['rj_automation_state'], (res) => {
+        if (res && res.rj_automation_state) {
+          updateAutomationButtonUI(res.rj_automation_state);
+        }
+        resolve();
+      });
     });
   }
   // 1. Load Stored Config
@@ -929,6 +960,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   currentActivePlatformId = currentConfig.activePlatform || 'adobestock';
   platformSelect.value = currentActivePlatformId;
   renderPlatformDynamicForm(currentActivePlatformId);
+  if (isAutomationRunning) {
+    setFormDisabledState(true);
+  }
 
   // 3. Query Background for Active Tab Info
   chrome.runtime.sendMessage({ action: 'GET_ACTIVE_TAB_INFO' }, response => {
@@ -940,6 +974,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentActivePlatformId = activeTabInfo.detectedPlatform;
         platformSelect.value = currentActivePlatformId;
         renderPlatformDynamicForm(currentActivePlatformId);
+        if (isAutomationRunning) {
+          setFormDisabledState(true);
+        }
       }
     }
     updateTabMatchStatus();
@@ -963,6 +1000,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentActivePlatformId = platformSelect.value;
     updateTabMatchStatus();
     renderPlatformDynamicForm(currentActivePlatformId);
+    if (isAutomationRunning) {
+      setFormDisabledState(true);
+    }
   });
 
   // Event: Navigate helper clicked
@@ -1088,18 +1128,37 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Event: Start / Stop Automation Toggle
   btnToggleAutomation.addEventListener('click', () => {
-    const nextRunningState = !isAutomationRunning;
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      chrome.storage.local.set({
-        rj_automation_state: {
-          isRunning: nextRunningState,
-          platformId: currentActivePlatformId,
-          timestamp: Date.now()
-        }
-      });
+    if (isStopping) return;
+
+    if (isAutomationRunning) {
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.set({
+          rj_automation_state: {
+            isRunning: true,
+            isStopping: true,
+            status: 'stopping',
+            platformId: currentActivePlatformId,
+            timestamp: Date.now()
+          }
+        });
+      }
+      updateAutomationButtonUI({ isRunning: true, isStopping: true, status: 'stopping' });
+      showToast('Stopping automation (saving work)...');
+    } else {
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.set({
+          rj_automation_state: {
+            isRunning: true,
+            isStopping: false,
+            status: 'running',
+            platformId: currentActivePlatformId,
+            timestamp: Date.now()
+          }
+        });
+      }
+      updateAutomationButtonUI({ isRunning: true, isStopping: false, status: 'running' });
+      showToast('Automation started');
     }
-    updateAutomationButtonUI(nextRunningState);
-    showToast(nextRunningState ? 'Automation started' : 'Automation stopped');
   });
 
   // Listen to chrome.storage.onChanged for bidirectional sync
@@ -1109,7 +1168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (changes.rj_automation_state) {
         const state = changes.rj_automation_state.newValue;
         if (state) {
-          updateAutomationButtonUI(Boolean(state.isRunning));
+          updateAutomationButtonUI(state);
         }
       }
       // 2. Sync platformSettings changes from overlay HUD
@@ -1159,3 +1218,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 });
+
+export {
+  updateAutomationButtonUI,
+  setFormDisabledState,
+  renderPlatformDynamicForm,
+  isAutomationRunning,
+  isStopping
+};

@@ -460,6 +460,15 @@
   background-color: #ff7575;
 }
 
+.rj-hud-btn-action.rj-btn-stopping {
+  background-color: #ef4444 !important;
+  color: #ffffff !important;
+  cursor: not-allowed !important;
+  opacity: 0.85 !important;
+  pointer-events: none !important;
+  filter: none !important;
+}
+
 .rj-hud-btn-action:disabled,
 .rj-hud-btn-action[disabled] {
   opacity: 0.45 !important;

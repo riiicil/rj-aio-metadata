@@ -2,7 +2,7 @@
 
 *Last Updated: 2026-09-13*<br>
 *Active Branch: `task/e2e-hardening-polish`*<br>
-*Current Milestone: Phase 5: E2E Hardening & Polish (Sub-phase 5.1: Overlay Persistence, Dead Code Removal & Duplication Fixing Complete)*
+*Current Milestone: Phase 5: E2E Hardening & Polish (Sub-phase 5.2: HUD ↔ Popup Automation State Synchronization & Graceful Stop Complete)*
 
 ---
 
@@ -13,7 +13,7 @@
 - **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, multi-platform media detection, popup toggle, bidirectional sync merged to dev)
 - **Phase 3 — Universal Vision Service**: [COMPLETE] (Step 3.1 Prompt Engine, Step 3.2 Sanitizer Engine, Step 3.3 Universal Vision Client & Background Proxy Worker complete, merged to dev)
 - **Phase 4 — Platform Adapters**: [COMPLETE] (Platform adapters and live alignment verified across all 7 platforms: Adobe Stock, Shutterstock, Freepik / Magnific, Vecteezy, Dreamstime, Depositphotos, and MiriCanvas merged to dev)
-- **Phase 5 — End-to-End Testing & Polish**: [IN_PROGRESS] (Sub-phase 5.1 Complete: Overlay persistence across navigations via `rj_overlay_visible` in `overlay.js` & `content_main.js`, dead scaffolding files `AiVisionService.js` and `PromptBuilder.js` removed, commented-out and unreachable code in `overlay.js` removed, and platform detection in `overlay.js` unified via central adapter registry `getAdapterForUrl`)
+- **Phase 5 — End-to-End Testing & Polish**: [IN_PROGRESS] (Sub-phase 5.1 & 5.2 Complete: Granular `rj_automation_state` schema `{ isRunning, isStopping, status, platformId, timestamp }` implemented across `overlay.js` and `popup.js`, graceful stop race conditions eliminated so HUD and Toolbar Popup both reflect `Stopping...` with disabled controls while current card finishes and bulk save executes, legacy boolean compatibility retained, dynamic form re-render form locking enforced, overlay visibility persistence verified, dead code removed, and platform detection unified via central adapter registry)
 
 ---
 
@@ -77,13 +77,13 @@
   - `src/services/StorageService.js` — Storage engine with multi-provider config, schema version 4 migration, official Freepik 47 base models catalog, Vecteezy software generator options, multi-key round-robin, keyword priority, and loadConfig alias with non-extension environment fallback.
   - `src/background/service_worker.js` — ES module background worker with dynamic `/v1/models` fetcher, active tab evaluator, platform navigator, overlay relay, and `GENERATE_VISION_METADATA` proxy router with multi-key round-robin rotation, provider authentication mapping (Gemini, OpenRouter, OpenAI, Mistral, Custom), 400 Bad Request parameter self-healing retry (temperature removal, completion token swapping, response_format stripping), exponential backoff retry handler (429/5xx), multi-part content extraction, and diagnostic error reporting.
   - `src/styles/variables.css` — Raycast Dark Precision design tokens with deep emerald teal (`#079183`) primary accent palette.
-  - `src/styles/components.css` — Raycast Dark Precision form components, emerald teal accent interactive states, custom stepper control, floating custom select styles, transparent warning banner, active HUD button outline style (`.rj-btn-active`), top-right stacked toast notification system (`.rj-toast-container`, `.rj-toast-item`, `.rj-toast-text`, `.rj-toast-close`), and disabled states for buttons, inputs, steppers, and switches.
+  - `src/styles/components.css` — Raycast Dark Precision form components, emerald teal accent interactive states, custom stepper control, floating custom select styles, transparent warning banner, active HUD button outline style (`.rj-btn-active`), graceful stop button styling (`.rj-btn-stopping`), top-right stacked toast notification system (`.rj-toast-container`, `.rj-toast-item`, `.rj-toast-text`, `.rj-toast-close`), and disabled states for buttons, inputs, steppers, and switches.
   - `src/popup/popup.html` — Platform-adaptive toolbar popup interface with brand logo image integration, modular dynamic platform settings container, and top-right stacked toast container adhering to `DESIGN.md`.
   - `src/popup/popup.css` — 380px dark canvas popup styling with brand logo image styling and sticky header/footer.
-  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, 100% modular platform-dynamic form rendering with official Vecteezy software dropdown & conditional custom software input, verified 47 Freepik official base models catalog, bidirectional storage synchronization (`chrome.storage.onChanged`), model selection guard for Start Automation button, full form disabling during active processing, interactive in-place HUD toggle button with active outline state, and 3-item FIFO stacked toast notification queue with 2-line clamping, auto-dismiss (4500ms), and manual close button.
+  - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, 100% modular platform-dynamic form rendering with official Vecteezy software dropdown & conditional custom software input, verified 47 Freepik official base models catalog, bidirectional storage synchronization (`chrome.storage.onChanged`), model selection guard for Start Automation button, full form disabling during active processing and graceful stop (`Stopping...` disabled button state), dynamic form re-render form locking preservation, interactive in-place HUD toggle button with active outline state, and 3-item FIFO stacked toast notification queue with 2-line clamping, auto-dismiss (4500ms), and manual close button.
   - `src/popup/depositphotos_countries.js` — Complete 237 ISO countries catalog extracted for Depositphotos editorial location settings (omitting commercial option).
   - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed, streamlined pill styling with SVG status icons (`.rj-status-icon-ready`, `.rj-status-icon-layers`, `.rj-status-icon-not-ready`), warning banner styles, spring transition animations (`cubic-bezier(0.16, 1, 0.3, 1)`), adaptive quick form controls, live asset counter bar, and disabled control styles.
-  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, live asset scanner with media subtab detection across platforms, unified platform detection via central adapter registry (`getAdapterForUrl`), persistent visibility state in `chrome.storage.local` (`rj_overlay_visible`), adaptive quick form controls (stepper, specific keywords, adaptive AI declaration), model selection guard for automation toggle, processing state field disabling, bidirectional synchronization via `chrome.storage.onChanged`, platform language resolution propagation, error-isolated batch progression loop, clean Section 6B per-item save for Freepik without dead/commented code, and End-to-End Automation Orchestrator (`startAutomation`, `stopAutomation`, `AbortController` cancellation, progress bar updates, human-pacing cooldown, Section 6A in-page carousel loop for Dreamstime, and bulk save for other platforms).
+  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, live asset scanner with media subtab detection across platforms, unified platform detection via central adapter registry (`getAdapterForUrl`), persistent visibility state in `chrome.storage.local` (`rj_overlay_visible`), adaptive quick form controls (stepper, specific keywords, adaptive AI declaration), model selection guard for automation toggle, processing state field disabling, bidirectional synchronization via `chrome.storage.onChanged`, platform language resolution propagation, error-isolated batch progression loop, clean Section 6B per-item save for Freepik without dead/commented code, and End-to-End Automation Orchestrator (`startAutomation`, two-click graceful stop and force abort lifecycle in `stopAutomation`, granular `rj_automation_state` storage schema `{ isRunning, isStopping, status, platformId, timestamp }`, `AbortController` cancellation, progress bar updates, human-pacing cooldown, Section 6A in-page carousel loop for Dreamstime, and bulk save for other platforms).
   - `src/content/content_main.js` — Content script router importing OverlayHUD via dynamic import, auto-mounting HUD with persistent visibility check (`rj_overlay_visible: false` mounts in hidden state without visual flash), and handling background/popup toggle, ping, and status messages with accurate `isVisible` boolean reporting.
   - `src/adapters/utils/dom_helpers.js` — Reusable DOM utility functions: single-string instant text injection (`setNativeValue` with React prototype setter and synthetic `input`/`change`/`blur` events), element appearance and disappearance async polling (`waitForElement`, `waitForElementToDisappear` via `MutationObserver`), universal cooldown delay generators (`sleep`, `randomDelay` with `AbortSignal` cancellation support), keyboard Enter simulation (`simulateEnterKey`), full pointer and mouse event dispatching sequence (`simulateClick`), and defensive thumbnail URL extractor (`extractThumbnailUrl` with fallback hierarchy).
   - `src/adapters/BaseAdapter.js` — Abstract base contract class establishing uniform platform interface across 7 platforms (`isMatch`, `getAssetCards`, `getThumbnailUrl`, `selectCard`, `fillMetadata`), virtual lifecycle defaults (`prepareAutomation`, `waitForEditorReady`, `clearMetadata`, `clearKeywords`, `saveDraft`, `bulkSave`, `submitForReview`), and built-in cooldown generator (`executeCooldown`) with immediate `AbortSignal` cancellation support.
@@ -103,24 +103,25 @@
 
 ## 5. What Does NOT Exist Yet
 
-- Phase 5: Sub-phases 5.2 through 5.7 (State sync, model extraction, keyboard accessibility, performance, orchestrator modularization, final packaging).
+- Phase 5: Sub-phases 5.3 through 5.7 (Popup real-time auto-save engine, model extraction, keyboard accessibility, performance, orchestrator modularization, final packaging).
 
 ---
 
 ## 6. Testing & Build Verification Status
 
 - Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `overlay/`, `styles/`, `services/`, `adapters/*`).
+- Sub-phase 5.2 suite verified with `scratch/test_subphase_5_2.mjs` (69/69 assertions passed: granular `rj_automation_state` schema parsing, legacy boolean compatibility, form locking preservation across re-renders, HUD disabled stopping state, and graceful stop repeated click ignore in `OverlayHUD`).
 - Sub-phase 5.1 suite verified with `scratch/test_subphase_5_1.mjs` (35/35 assertions passed: unified platform detection across all 7 sites + unknown URLs, overlay visibility storage persistence, and stub file deletion).
-- `src/adapters/index.js` registry, `src/overlay/overlay.js` automation orchestrator, and abort mechanics tested with `scratch/test_subphase_4_6.mjs` (57/57 assertions passed).
+- `src/adapters/index.js` registry, `src/overlay/overlay.js` automation orchestrator, and abort mechanics tested with `scratch/test_subphase_4_6.mjs` (60/60 assertions passed).
 - `src/adapters/DepositphotosAdapter.js`, `src/adapters/DreamstimeAdapter.js`, and `src/adapters/MiriCanvasAdapter.js` syntax verified with `node --check` and tested with `scratch/test_tier3_adapters.mjs` (113/113 assertions passed).
 - `src/adapters/FreepikAdapter.js` and `src/adapters/VecteezyAdapter.js` syntax verified with `node --check` and tested with `scratch/test_tier2_adapters.mjs` (108/108 assertions passed).
 - `src/adapters/AdobeStockAdapter.js` and `src/adapters/ShutterstockAdapter.js` syntax verified with `node --check` and tested with `scratch/test_tier1_adapters.mjs` (82/82 assertions passed).
 - `src/adapters/utils/dom_helpers.js` and `src/adapters/BaseAdapter.js` syntax verified with `node --check` and tested with `scratch/test_base_adapter.mjs` (65/65 assertions passed).
-- Syntax validation passed for `src/overlay/overlay.js`, `src/content/content_main.js`, and `src/adapters/index.js` via `node --check`.
+- Syntax validation passed for `src/overlay/overlay.js`, `src/popup/popup.js`, `src/content/content_main.js`, and `src/adapters/index.js` via `node --check`.
 - Zero Native Emoji Policy strictly enforced across all files, code, and documentation.
 
 ---
 
 ## 7. Immediate Next Step
 
-Proceed to Sub-phase 5.2: HUD <-> Popup Automation State Synchronization & Graceful Stop (`rj_automation_state` schema expansion, status badge synchronization, and popup stop button wiring).
+Proceed to Sub-phase 5.3: Popup Real-Time Auto-Save Engine (debounced config synchronization and removal of obsolete manual save button).

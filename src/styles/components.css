@@ -463,6 +463,16 @@ input[type="number"] {
   background-color: #ff7575;
 }
 
+.rj-btn.rj-btn-stopping,
+.rj-btn-danger.rj-btn-stopping,
+.rj-hud-btn-action.rj-btn-stopping {
+  background-color: #ef4444 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+  cursor: not-allowed !important;
+  opacity: 0.85;
+}
+
 .rj-btn:disabled,
 .rj-btn[disabled] {
   opacity: 0.45 !important;
