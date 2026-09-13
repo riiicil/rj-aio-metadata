@@ -13,6 +13,9 @@ let activeTabInfo = null;
 let currentActivePlatformId = null;
 let isAutomationRunning = false;
 let isStopping = false;
+let autoSaveTimer = null;
+let isSyncingFromStorage = false;
+let isSavingLocally = false;
 
 // Platform Keyword Count Constraints & Hints
 const PLATFORM_LIMITS = {
@@ -270,6 +273,9 @@ function renderProviderFields(providerId) {
  */
 function saveActiveFormStateToMemory(platformId) {
   if (!platformId || !platformDynamicForm) return;
+  if (!currentConfig.platformSettings) {
+    currentConfig.platformSettings = {};
+  }
   if (!currentConfig.platformSettings[platformId]) {
     currentConfig.platformSettings[platformId] = {};
   }
@@ -284,26 +290,26 @@ function saveActiveFormStateToMemory(platformId) {
   }
 
   // 2. Universal Specific Keywords
-  const specificInput = platformDynamicForm.querySelector('#specificKeywordsInput');
+  const specificInput = platformDynamicForm.querySelector('#specificKeywordsInput, #inputSpecificKeywords');
   if (specificInput) {
     settings.specificKeywords = specificInput.value.trim();
   }
 
   // 3. Platform-Specific Controls
   if (platformId === 'adobestock') {
-    const lang = platformDynamicForm.querySelector('#adobestock_language');
-    const ai = platformDynamicForm.querySelector('#adobestock_isAiGenerated');
+    const lang = platformDynamicForm.querySelector('#adobestock_language, #selectAdobeLanguage');
+    const ai = platformDynamicForm.querySelector('#adobestock_isAiGenerated, #toggleAdobeIllustrative');
     if (lang) settings.language = lang.value;
     if (ai) settings.isAiGenerated = ai.checked;
   } else if (platformId === 'shutterstock') {
-    const isEd = platformDynamicForm.querySelector('#shutterstock_isEditorial');
-    const ep = platformDynamicForm.querySelector('#shutterstock_editorialPrefix');
+    const isEd = platformDynamicForm.querySelector('#shutterstock_isEditorial, #toggleShutterstockEditorial');
+    const ep = platformDynamicForm.querySelector('#shutterstock_editorialPrefix, #inputEditorialPrefix');
     const isChecked = Boolean(isEd && isEd.checked);
     settings.isEditorial = isChecked;
     settings.editorialPrefix = (isChecked && ep) ? ep.value.trim() : '';
   } else if (platformId === 'freepik') {
-    const ai = platformDynamicForm.querySelector('#freepik_isAiGenerated');
-    const model = platformDynamicForm.querySelector('#freepik_aiModel');
+    const ai = platformDynamicForm.querySelector('#freepik_isAiGenerated, #toggleFreepikAi');
+    const model = platformDynamicForm.querySelector('#freepik_aiModel, #selectFreepikAiModel');
     if (ai) {
       settings.isAiGenerated = ai.checked;
       if (ai.checked && settings.keywordCount > 49) {
@@ -314,34 +320,114 @@ function saveActiveFormStateToMemory(platformId) {
     delete settings.customAiModel;
   } else if (platformId === 'vecteezy') {
     const lt = platformDynamicForm.querySelector('#vecteezy_licenseType');
-    const ai = platformDynamicForm.querySelector('#vecteezy_isAiGenerated');
-    const sw = platformDynamicForm.querySelector('#vecteezy_aiSoftware');
-    const customSw = platformDynamicForm.querySelector('#vecteezy_customAiSoftware');
-    if (lt) settings.licenseType = lt.value;
+    const radioFree = platformDynamicForm.querySelector('#radioVecteezyFree');
+    const radioPro = platformDynamicForm.querySelector('#radioVecteezyPro');
+    const radioEd = platformDynamicForm.querySelector('#radioVecteezyEditorial');
+    const ai = platformDynamicForm.querySelector('#vecteezy_isAiGenerated, #toggleVecteezyAi');
+    const sw = platformDynamicForm.querySelector('#vecteezy_aiSoftware, #selectVecteezyAiSoftware');
+    const customSw = platformDynamicForm.querySelector('#vecteezy_customAiSoftware, #inputCustomAiSoftware');
+    if (radioPro?.checked) settings.licenseType = 'pro';
+    else if (radioEd?.checked) settings.licenseType = 'editorial';
+    else if (radioFree?.checked) settings.licenseType = 'free';
+    else if (lt) settings.licenseType = lt.value;
+
     if (ai) settings.isAiGenerated = ai.checked;
     if (sw) settings.aiSoftware = sw.value;
     if (customSw) settings.customAiSoftware = customSw.value.trim();
     delete settings.aiToolName;
   } else if (platformId === 'dreamstime') {
-    const mode = platformDynamicForm.querySelector('#dreamstime_mode');
-    const isEd = platformDynamicForm.querySelector('#dreamstime_isEditorial');
-    const ai = platformDynamicForm.querySelector('#dreamstime_isAiGenerated');
+    const mode = platformDynamicForm.querySelector('#dreamstime_mode, #selectDreamstimeMode');
+    const isEd = platformDynamicForm.querySelector('#dreamstime_isEditorial, #toggleDreamstimeEditorial');
+    const ai = platformDynamicForm.querySelector('#dreamstime_isAiGenerated, #toggleDreamstimeAi');
     if (mode) settings.mode = mode.value;
     if (isEd) settings.isEditorial = isEd.checked;
     if (ai) settings.isAiGenerated = ai.checked;
   } else if (platformId === 'depositphotos') {
     const isEd = platformDynamicForm.querySelector('#depositphotos_isEditorial');
-    const cc = platformDynamicForm.querySelector('#depositphotos_countryCode');
-    if (isEd) settings.isEditorial = isEd.checked;
+    const radioEd = platformDynamicForm.querySelector('#radioDepositphotosEditorial');
+    const radioComm = platformDynamicForm.querySelector('#radioDepositphotosCommercial');
+    const cc = platformDynamicForm.querySelector('#depositphotos_countryCode, #selectDepositphotosCountry');
+    if (radioEd?.checked) settings.isEditorial = true;
+    else if (radioComm?.checked) settings.isEditorial = false;
+    else if (isEd) settings.isEditorial = isEd.checked;
     if (cc) settings.countryCode = cc.value;
   } else if (platformId === 'miricanvas') {
     const tier = platformDynamicForm.querySelector('#miricanvas_contentTier');
-    const ai = platformDynamicForm.querySelector('#miricanvas_isAiGenerated');
-    if (tier) settings.contentTier = tier.value;
+    const radioPrem = platformDynamicForm.querySelector('#radioMiriPremium');
+    const radioStd = platformDynamicForm.querySelector('#radioMiriStandard');
+    const ai = platformDynamicForm.querySelector('#miricanvas_isAiGenerated, #toggleMiriAi');
+    if (radioPrem?.checked) settings.contentTier = 'PREMIUM';
+    else if (radioStd?.checked) settings.contentTier = 'STANDARD';
+    else if (tier) settings.contentTier = tier.value;
     if (ai) settings.isAiGenerated = ai.checked;
   }
 }
 const collectActiveFormValues = saveActiveFormStateToMemory;
+
+/**
+ * Persists the current active popup form and provider state to StorageService.
+ * @param {boolean} [immediate=false] - If true, saves immediately; otherwise debounces by 300ms.
+ * @returns {Promise<void>}
+ */
+async function autoSaveConfig(immediate = false) {
+  // Guard: do not auto-save back while actively receiving an external storage sync
+  if (isSyncingFromStorage) return;
+
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+
+  const performSave = async () => {
+    try {
+      if (!currentConfig) return;
+
+      // 1. Collect active provider state
+      const providerId = providerSelect?.value;
+      if (providerId && currentConfig.providers && currentConfig.providers[providerId]) {
+        currentConfig.activeProvider = providerId;
+        if (baseUrlInput) {
+          currentConfig.providers[providerId].baseUrl = baseUrlInput.value.trim();
+        }
+        if (apiKeyInput) {
+          currentConfig.providers[providerId].apiKey = apiKeyInput.value.trim();
+        }
+        if (modelSelect) {
+          currentConfig.providers[providerId].selectedModel = modelSelect.value || '';
+        }
+      }
+
+      // 2. Collect active platform dynamic form state into memory
+      if (typeof saveActiveFormStateToMemory === 'function') {
+        saveActiveFormStateToMemory(currentActivePlatformId);
+      }
+      currentConfig.activePlatform = currentActivePlatformId;
+
+      // 3. Persist to storage via StorageService
+      isSavingLocally = true;
+      try {
+        await StorageService.saveConfig(currentConfig);
+      } finally {
+        setTimeout(() => {
+          isSavingLocally = false;
+        }, 20);
+      }
+    } catch (err) {
+      console.error('[RJ AIO Metadata] Auto-save error:', err);
+    }
+  };
+
+  if (immediate) {
+    await performSave();
+  } else {
+    return new Promise((resolve) => {
+      autoSaveTimer = setTimeout(async () => {
+        await performSave();
+        resolve();
+      }, 300);
+    });
+  }
+}
 
 /**
  * 100% Modular Platform-Dynamic Form Renderer
@@ -611,6 +697,7 @@ function renderPlatformDynamicForm(platformId) {
       let val = Number(countInput.value) || limits.min;
       if (val > limits.min) {
         countInput.value = val - 1;
+        autoSaveConfig(true);
       }
     });
   }
@@ -620,6 +707,7 @@ function renderPlatformDynamicForm(platformId) {
       let val = Number(countInput.value) || limits.max;
       if (val < limits.max) {
         countInput.value = val + 1;
+        autoSaveConfig(true);
       }
     });
   }
@@ -630,6 +718,7 @@ function renderPlatformDynamicForm(platformId) {
       if (val < limits.min) val = limits.min;
       if (val > limits.max) val = limits.max;
       countInput.value = val;
+      autoSaveConfig(true);
     });
   }
 
@@ -649,6 +738,7 @@ function renderPlatformDynamicForm(platformId) {
             currentConfig.platformSettings.shutterstock.editorialPrefix = '';
           }
         }
+        autoSaveConfig(true);
       });
     }
   } else if (platformId === 'freepik') {
@@ -688,6 +778,7 @@ function renderPlatformDynamicForm(platformId) {
             }
           }
         }
+        autoSaveConfig(true);
       });
     }
   } else if (platformId === 'vecteezy') {
@@ -711,6 +802,7 @@ function renderPlatformDynamicForm(platformId) {
           softwareGroup.classList.remove('rj-visible');
           customGroup.classList.remove('rj-visible');
         }
+        autoSaveConfig(true);
       });
 
       softwareSelect.addEventListener('change', () => {
@@ -721,6 +813,7 @@ function renderPlatformDynamicForm(platformId) {
             customGroup.classList.remove('rj-visible');
           }
         }
+        autoSaveConfig(true);
       });
     }
   } else if (platformId === 'depositphotos') {
@@ -736,9 +829,45 @@ function renderPlatformDynamicForm(platformId) {
         } else {
           countryGroup.classList.remove('rj-visible');
         }
+        autoSaveConfig(true);
       });
     }
   }
+
+  // Universal listeners for all interactive elements in platformDynamicForm
+  // 1. Steppers (additional selector support)
+  const altStepperDec = platformDynamicForm.querySelectorAll('#btnDecKeywords');
+  altStepperDec.forEach(btn => {
+    btn.addEventListener('click', () => autoSaveConfig(true));
+  });
+  const altStepperInc = platformDynamicForm.querySelectorAll('#btnIncKeywords');
+  altStepperInc.forEach(btn => {
+    btn.addEventListener('click', () => autoSaveConfig(true));
+  });
+
+  // 2. Text inputs: debounced auto-save (300ms)
+  const textInputs = platformDynamicForm.querySelectorAll('input[type="text"], input:not([type])');
+  textInputs.forEach(input => {
+    input.addEventListener('input', () => {
+      autoSaveConfig(false);
+    });
+  });
+
+  // 3. Dropdowns & Selects: immediate auto-save
+  const selectInputs = platformDynamicForm.querySelectorAll('select');
+  selectInputs.forEach(select => {
+    select.addEventListener('change', () => {
+      autoSaveConfig(true);
+    });
+  });
+
+  // 4. Radios & Checkboxes: immediate auto-save
+  const toggleInputs = platformDynamicForm.querySelectorAll('input[type="checkbox"], input[type="radio"]');
+  toggleInputs.forEach(toggle => {
+    toggle.addEventListener('change', () => {
+      autoSaveConfig(true);
+    });
+  });
 
   // Initialize Custom Selects for Newly Rendered Elements
   CustomSelect.initAll(platformDynamicForm);
@@ -752,28 +881,8 @@ function renderPlatformDynamicForm(platformId) {
  * Saves current UI states to StorageService.
  */
 async function saveCurrentSettings() {
-  const activeProvId = providerSelect.value;
-  const activePlatId = platformSelect.value;
-
-  // 1. Update Provider info
-  if (!currentConfig.providers[activeProvId]) {
-    currentConfig.providers[activeProvId] = {};
-  }
-  currentConfig.activeProvider = activeProvId;
-  if (activeProvId === 'custom') {
-    currentConfig.providers[activeProvId].baseUrl = baseUrlInput.value.trim();
-  }
-  const keys = StorageService.parseApiKeys(apiKeyInput.value.trim());
-  currentConfig.providers[activeProvId].apiKey = keys.join(', ');
-  currentConfig.providers[activeProvId].selectedModel = modelSelect.value || '';
-
-  // 2. Collect current dynamic form values into config
-  currentConfig.activePlatform = activePlatId;
-  collectActiveFormValues(activePlatId);
-
-  // 3. Persist to storage
-  await StorageService.saveConfig(currentConfig);
-  showToast('Settings saved successfully');
+  await autoSaveConfig(true);
+  showToast('Settings saved automatically');
   updateAutomationButtonUI(isAutomationRunning);
 }
 
@@ -1003,6 +1112,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isAutomationRunning) {
       setFormDisabledState(true);
     }
+    autoSaveConfig(true);
   });
 
   // Event: Navigate helper clicked
@@ -1017,8 +1127,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   providerSelect.addEventListener('change', () => {
     currentConfig.activeProvider = providerSelect.value;
     renderProviderFields(providerSelect.value);
-    StorageService.saveConfig(currentConfig);
+    autoSaveConfig(true);
     updateAutomationButtonUI(isAutomationRunning);
+  });
+
+  // Event: Base URL typing listener
+  baseUrlInput.addEventListener('input', () => {
+    const activeProvId = providerSelect.value;
+    const provider = currentConfig.providers[activeProvId] || {};
+    if (activeProvId === 'custom') {
+      provider.baseUrl = baseUrlInput.value.trim();
+    }
+    autoSaveConfig(false);
   });
 
   // Event: API Key typing listener
@@ -1028,6 +1148,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     provider.apiKey = apiKeyInput.value;
     updateModelDropdownState(provider);
     updateAutomationButtonUI(isAutomationRunning);
+    autoSaveConfig(false);
   });
 
   // Event: Model selection changed
@@ -1036,7 +1157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentConfig.providers[activeProvId]) {
       currentConfig.providers[activeProvId].selectedModel = modelSelect.value || '';
     }
-    saveCurrentSettings();
+    autoSaveConfig(true);
     updateAutomationButtonUI(isAutomationRunning);
   });
 
@@ -1078,7 +1199,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateModelDropdownState(provider);
         const parsed = StorageService.parseApiKeys(rawKeys);
         showToast(`Imported ${parsed.length} API key(s) from file`);
-        saveCurrentSettings();
+        await autoSaveConfig(true);
       } catch (err) {
         showToast(`Failed to read key: ${err.message}`, true);
       }
@@ -1114,7 +1235,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Re-render select
         updateModelDropdownState(currentConfig.providers[activeProvId]);
         showToast(`Fetched ${response.models.length} models successfully`);
-        saveCurrentSettings();
+        autoSaveConfig(true);
       } else {
         showToast(response?.error || 'Failed to fetch models', true);
       }
@@ -1122,8 +1243,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Event: Save Settings
-  btnSaveSettings.addEventListener('click', () => {
-    saveCurrentSettings();
+  btnSaveSettings.addEventListener('click', async () => {
+    await autoSaveConfig(true);
+    showToast('Settings saved automatically');
+    updateAutomationButtonUI(isAutomationRunning);
   });
 
   // Event: Start / Stop Automation Toggle
@@ -1164,6 +1287,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Listen to chrome.storage.onChanged for bidirectional sync
   if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, areaName) => {
+      // Guard: Ignore changes originating from this popup's own autoSaveConfig
+      if (isSavingLocally) return;
+
       // 1. Sync automation state from overlay HUD
       if (changes.rj_automation_state) {
         const state = changes.rj_automation_state.newValue;
@@ -1171,26 +1297,54 @@ document.addEventListener('DOMContentLoaded', async () => {
           updateAutomationButtonUI(state);
         }
       }
-      // 2. Sync platformSettings changes from overlay HUD
-      if (changes.platformSettings) {
-        const newSettings = changes.platformSettings.newValue;
-        if (newSettings) {
-          currentConfig.platformSettings = newSettings;
-          if (currentActivePlatformId && newSettings[currentActivePlatformId]) {
-            const platSettings = newSettings[currentActivePlatformId];
-            const countInput = platformDynamicForm.querySelector('#keywordCountInput');
-            const specificInput = platformDynamicForm.querySelector('#specificKeywordsInput');
-            if (countInput && countInput !== document.activeElement && typeof platSettings.keywordCount === 'number') {
-              countInput.value = platSettings.keywordCount;
-            }
-            if (specificInput && specificInput !== document.activeElement && platSettings.specificKeywords !== undefined) {
-              specificInput.value = platSettings.specificKeywords;
-            }
-            const aiToggle = platformDynamicForm.querySelector(`#${currentActivePlatformId}_isAiGenerated`);
-            if (aiToggle && platSettings.isAiGenerated !== undefined) {
-              aiToggle.checked = Boolean(platSettings.isAiGenerated);
+      // 2. Sync platformSettings / providers / activeProvider / activePlatform changes from overlay HUD or storage
+      if (changes.platformSettings || changes.providers || changes.activeProvider || changes.activePlatform) {
+        isSyncingFromStorage = true;
+        try {
+          if (changes.activeProvider && changes.activeProvider.newValue) {
+            currentConfig.activeProvider = changes.activeProvider.newValue;
+            if (providerSelect && providerSelect.value !== currentConfig.activeProvider) {
+              providerSelect.value = currentConfig.activeProvider;
+              renderProviderFields(currentConfig.activeProvider);
             }
           }
+          if (changes.providers && changes.providers.newValue) {
+            currentConfig.providers = changes.providers.newValue;
+            const activeProv = currentConfig.activeProvider || providerSelect?.value;
+            if (activeProv && currentConfig.providers[activeProv]) {
+              renderProviderFields(activeProv);
+            }
+          }
+          if (changes.activePlatform && changes.activePlatform.newValue) {
+            const newPlat = changes.activePlatform.newValue;
+            if (newPlat !== currentActivePlatformId) {
+              currentActivePlatformId = newPlat;
+              currentConfig.activePlatform = newPlat;
+              if (platformSelect) platformSelect.value = newPlat;
+              renderPlatformDynamicForm(newPlat);
+            }
+          }
+          if (changes.platformSettings && changes.platformSettings.newValue) {
+            const newSettings = changes.platformSettings.newValue;
+            currentConfig.platformSettings = newSettings;
+            if (currentActivePlatformId && newSettings[currentActivePlatformId]) {
+              const platSettings = newSettings[currentActivePlatformId];
+              const countInput = platformDynamicForm.querySelector('#keywordCountInput');
+              const specificInput = platformDynamicForm.querySelector('#specificKeywordsInput, #inputSpecificKeywords');
+              if (countInput && countInput !== document.activeElement && typeof platSettings.keywordCount === 'number') {
+                countInput.value = platSettings.keywordCount;
+              }
+              if (specificInput && specificInput !== document.activeElement && platSettings.specificKeywords !== undefined) {
+                specificInput.value = platSettings.specificKeywords;
+              }
+              const aiToggle = platformDynamicForm.querySelector(`#${currentActivePlatformId}_isAiGenerated, #toggleAiDeclaration`);
+              if (aiToggle && platSettings.isAiGenerated !== undefined) {
+                aiToggle.checked = Boolean(platSettings.isAiGenerated);
+              }
+            }
+          }
+        } finally {
+          isSyncingFromStorage = false;
         }
       }
       // 3. Sync overlay HUD visibility changes from page
@@ -1224,5 +1378,8 @@ export {
   setFormDisabledState,
   renderPlatformDynamicForm,
   isAutomationRunning,
-  isStopping
+  isStopping,
+  autoSaveConfig,
+  saveCurrentSettings,
+  saveActiveFormStateToMemory
 };

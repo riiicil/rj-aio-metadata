@@ -5,33 +5,29 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Sub-phase 5.2: HUD ↔ Popup Automation State Synchronization & Graceful Stop Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Sub-phase 5.3: Popup Real-Time Auto-Save Engine Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: `fix(sync): resolve hud and popup automation state synchronization during graceful stop`
+- **Latest Commit**: `feat(popup): implement real-time auto-save for all configuration fields`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (69/69 passed on Sub-phase 5.2 suite, 35/35 passed on Sub-phase 5.1 suite, 60/60 passed on orchestrator suite, 82/82 Tier 1, 108/108 Tier 2, 113/113 Tier 3, zero native emoji clean)
+- **Build / Test State**: Verified healthy (34/34 passed on Sub-phase 5.3 suite, 69/69 passed on Sub-phase 5.2 suite, 35/35 passed on Sub-phase 5.1 suite, 60/60 passed on orchestrator suite, 82/82 Tier 1, 108/108 Tier 2, 113/113 Tier 3, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Sub-phase 5.2 has resolved the desynchronization and race condition between the in-page HUD and Toolbar Popup during automation execution and graceful stop:
-1. **Granular `rj_automation_state` Schema Across HUD & Popup**:
-   - Expanded state object: `{ isRunning: boolean, isStopping: boolean, status: 'idle' | 'running' | 'stopping', platformId: string, timestamp: number }`.
-   - Maintained full backwards compatibility with legacy boolean states (`true` -> running, `false` -> idle).
-2. **Graceful Stop Lifecycle & Disabled Button State in `OverlayHUD` (`src/overlay/overlay.js`)**:
-   - *Graceful Stop Trigger*: Sets `this.isStopping = true` while keeping `this.isAutomationRunning = true`. Updates HUD button to disabled "Stopping..." with `.rj-btn-stopping` and `.rj-btn-disabled` (`btn.disabled = true`, `btn.title = 'Stopping automation (saving work)...'`), updates status badge to "Stopping...", and persists `{ isRunning: true, isStopping: true, status: 'stopping' }` to `chrome.storage.local`. The active card finishes AI metadata generation and injection, and `bulkSave()` executes cleanly before teardown.
-   - *Repeated Click Guard*: Clicks while stopping are ignored to prevent user interruption or double-clicks during active card save.
-   - *Completion Lifecycle*: When processing naturally finishes or graceful stop completes (after active card finishes and bulk save resolves in both Dreamstime Section 6A and Grid Section 6B, as well as in `catch`/`finally` error handlers), `isStopping` and `isAutomationRunning` are reset to `false`, button re-enables as "Start Automation" (`btn.disabled = false`), and persisted with `status: 'idle'`.
-3. **Popup Synchronization & Form Locking (`src/popup/popup.js`)**:
-   - Refactored `updateAutomationButtonUI(state)` to parse both boolean and object states.
-   - During `isStopping: true`: Button displays "Stopping..." with `.rj-btn-stopping` and `.rj-btn-disabled`, disabled from further clicks, and all form controls remain locked via `setFormDisabledState(true)`.
-   - During `isRunning: true`: Button displays "Stop Automation" with `.rj-btn-danger` and `.rj-btn-running`, form controls locked.
-   - During idle: Button displays "Start Automation" with `.rj-btn-accent`, form controls unlocked.
-   - Dynamic Form Re-renders: In `DOMContentLoaded` and whenever `renderPlatformDynamicForm` injects new HTML, immediately re-applies `if (isAutomationRunning) { setFormDisabledState(true); }` to guarantee form locking persistence.
-   - Button click listener: Disallows actions while `isStopping`, triggers graceful stop storage update when running, and triggers start storage update when idle.
-4. **Stopping Button Styles (`src/styles/components.css`)**:
-   - Added `.rj-btn.rj-btn-stopping, .rj-btn-danger.rj-btn-stopping, .rj-hud-btn-action.rj-btn-stopping` with warning red background, disabled cursor, and 0.85 opacity.
+Sub-phase 5.3 has implemented a real-time auto-save engine across all Toolbar Popup fields and verified seamless bidirectional synchronization with the in-page Overlay HUD:
+1. **Centralized Debounced & Immediate Auto-Save Engine (`src/popup/popup.js`)**:
+   - Implemented `autoSaveConfig(immediate = false)`: collects active provider credentials (`baseUrl`, `apiKey`, `selectedModel`), active platform ID, and dynamic platform form state via `saveActiveFormStateToMemory()`, then persists directly via `StorageService.saveConfig(currentConfig)`.
+   - Debounced by 300ms for text inputs (`#baseUrlInput`, `#apiKeyInput`, `#specificKeywordsInput`, `#inputSpecificKeywords`, `#inputEditorialPrefix`, `#inputCustomAiSoftware`) to prevent disk I/O thrashing during typing.
+   - Executes immediately (`immediate = true`) for discrete controls (`providerSelect`, `modelSelect`, `platformSelect`, keyword count steppers, selects, radios, checkboxes, API key file import, and fetched model selection).
+2. **Bidirectional Storage Synchronization & Anti-Loop Guards**:
+   - `src/popup/popup.js`: Introduced `isSyncingFromStorage` and `isSavingLocally` guards. In `autoSaveConfig()`, if `isSyncingFromStorage` is true, save is blocked. While `autoSaveConfig()` writes to storage, `isSavingLocally` is set to true so `chrome.storage.onChanged` skips processing its own write event. When external changes arrive (e.g. from HUD quick form), `isSyncingFromStorage = true` prevents the updated inputs from triggering false circular saves.
+   - `src/overlay/overlay.js`: Added `this.isSyncingFromStorage` guard to `saveFormStateToStorage()`. In `syncFromStorage()`, wraps field assignment in `try { ... } finally { this.isSyncingFromStorage = false; }` before resolving, guaranteeing no circular writes back to storage.
+3. **Repurposed "Save Settings" Button**:
+   - Retained `#btnSaveSettings` in footer for UI stability and reassurance, updating its click handler to invoke `await autoSaveConfig(true)` and display the toast notification: `"Settings saved automatically"`.
+4. **Preceding Sub-phase 5.2 Achievements (Automation State Sync & Graceful Stop)**:
+   - Standardized `rj_automation_state` schema `{ isRunning, isStopping, status, platformId, timestamp }`.
+   - Added disabled "Stopping..." state with `.rj-btn-stopping` and repeated-click guards in both HUD and Popup.
 5. **Preceding Sub-phase 5.1 Achievements**:
    - Persisted overlay visibility across navigations via `rj_overlay_visible`, deleted obsolete stub files (`AiVisionService.js`, `PromptBuilder.js`), and unified platform detection via central adapter registry `getAdapterForUrl`.
 6. **Previous Platform Adapter Achievements**:
@@ -142,12 +138,15 @@ Sub-phase 5.2 has resolved the desynchronization and race condition between the 
 
 ## 3. Actionable Next Steps for Incoming Agent
 
-1. **Step 1 (Sub-phase 5.3: Debounced Config Auto-Save Engine)**:
-   - Implement debounced real-time synchronization in `src/popup/popup.js` to automatically persist settings changes (inputs, selects, toggles) to `chrome.storage.local` without requiring manual save.
-2. **Step 2 (Sub-phase 5.3: Clean Obsolete Save Elements)**:
-   - Remove obsolete manual save button and associated handlers from `popup.html` and `popup.js`.
-3. **Step 3 (Sub-phase 5.3: Verification Suite)**:
-   - Add automated verification test for real-time config persistence and verify zero regression across existing test suites.
+## 3. Actionable Next Steps for Incoming Agent
+
+1. **Step 1 (Sub-phase 5.4: Assets, Theme Alignment, Pill Spinner & Status Badge Clamping)**:
+   - Verify all static assets and icons are correctly referenced and aligned with `DESIGN.md`.
+   - Implement pill spinner and text badge clamping for responsive status display across all screen densities.
+2. **Step 2 (Sub-phase 5.5: Keyboard Accessibility & Focus Traps)**:
+   - Ensure complete keyboard navigability across both Popup and HUD modals, verifying Tab orders and Escape handlers.
+3. **Step 3 (Sub-phase 5.6: Performance Audit & Memory Profiling)**:
+   - Validate memory footprint, DOM garbage collection, and event listener detachment during long batch runs.
 
 ---
 
@@ -195,6 +194,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 44 | 2026-09-13 | `task/e2e-hardening-polish` | `feat(popup)` | Implemented real-time auto-save engine for all popup fields, debounced text inputs, anti-loop guards, bidirectional HUD <-> Popup sync, 34/34 tests passed | Sub-phase 5.4: Assets, Theme Alignment, Pill Spinner & Status Badge Clamping |
 | 43 | 2026-09-13 | `task/e2e-hardening-polish` | `fix(sync)` | Resolved HUD <-> Popup automation state synchronization during graceful stop, expanded rj_automation_state schema, two-click stop lifecycle, disabled Stopping... state, 65/65 tests passed | Sub-phase 5.3: Popup Real-Time Auto-Save Engine |
 | 42 | 2026-09-13 | `task/e2e-hardening-polish` | `59c9935` | Persisted overlay visibility across navigations via rj_overlay_visible, deleted obsolete stub files (AiVisionService, PromptBuilder), unified platform detection, 35/35 tests passed | Sub-phase 5.2: HUD <-> Popup Automation State Synchronization & Graceful Stop |
 | 36 | 2026-09-13 | `task/platform-adapters` | `fix(miricanvas)` | Eliminated keyword bulk trash logic and implemented reactive verified per-chip removal engine with bottom-up scroll & disappearance polling in MiriCanvas, verified 113/113 tests | Phase 5: End-to-End Live Browser Testing & Polish |

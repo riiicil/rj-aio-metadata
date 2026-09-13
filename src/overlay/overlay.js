@@ -49,6 +49,7 @@ export class OverlayHUD {
     this.scanInterval = null;
     this.mutationObserver = null;
     this.saveDebounceTimer = null;
+    this.isSyncingFromStorage = false;
 
     // Bind event handlers
     this.onMouseDown = this.onMouseDown.bind(this);
@@ -1452,14 +1453,19 @@ export class OverlayHUD {
   async syncFromStorage() {
     if (!this.shadow || typeof chrome === 'undefined' || !chrome.storage) return;
 
+    this.isSyncingFromStorage = true;
     return new Promise((resolve) => {
       const localStore = chrome.storage.local;
       const syncStore = chrome.storage.sync;
 
       const applyAndResolve = (config) => {
         this.currentConfig = config || {};
-        this._applyConfigToInputs(this.currentConfig);
-        this.updateStartButtonReadiness();
+        try {
+          this._applyConfigToInputs(this.currentConfig);
+          this.updateStartButtonReadiness();
+        } finally {
+          this.isSyncingFromStorage = false;
+        }
         resolve();
       };
 
@@ -1487,6 +1493,7 @@ export class OverlayHUD {
         return;
       }
 
+      this.isSyncingFromStorage = false;
       resolve();
     });
   }
@@ -1532,8 +1539,10 @@ export class OverlayHUD {
    * Debounced persistence of Quick Form inputs into chrome.storage.
    */
   saveFormStateToStorage() {
+    if (this.isSyncingFromStorage) return;
     if (this.saveDebounceTimer) clearTimeout(this.saveDebounceTimer);
     this.saveDebounceTimer = setTimeout(() => {
+      if (this.isSyncingFromStorage) return;
       if (typeof chrome === 'undefined' || !chrome.storage) return;
 
       const limits = PLATFORM_LIMITS[this.platformId] || { min: 8, max: 50 };
