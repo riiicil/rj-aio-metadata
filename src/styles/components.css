@@ -427,15 +427,15 @@ input[type="number"] {
 
 .rj-btn.rj-btn-active,
 .rj-btn-secondary.rj-btn-active {
-  border-color: #57c1ff !important;
-  color: #57c1ff !important;
-  background-color: rgba(87, 193, 255, 0.08) !important;
-  box-shadow: 0 0 0 1px rgba(87, 193, 255, 0.4), 0 0 8px rgba(87, 193, 255, 0.18) !important;
+  border-color: #079183 !important;
+  color: #59d499 !important;
+  background-color: rgba(7, 145, 131, 0.12) !important;
+  box-shadow: 0 0 0 1px rgba(7, 145, 131, 0.35), 0 0 8px rgba(7, 145, 131, 0.18) !important;
 }
 
 .rj-btn.rj-btn-active svg,
 .rj-btn-secondary.rj-btn-active svg {
-  stroke: #57c1ff !important;
+  stroke: #59d499 !important;
 }
 
 .rj-btn-accent {

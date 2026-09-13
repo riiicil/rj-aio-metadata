@@ -5,31 +5,33 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Sub-phase 5.3: Popup Real-Time Auto-Save Engine Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Sub-phase 5.4: Assets, Theme Alignment, Pill Spinner & Status Badge Clamping Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: `feat(popup): implement real-time auto-save for all configuration fields`
+- **Latest Commit**: `style(ui): optimize logo asset, align active button theme, add pill spinner and clamp badge labels`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (34/34 passed on Sub-phase 5.3 suite, 69/69 passed on Sub-phase 5.2 suite, 35/35 passed on Sub-phase 5.1 suite, 60/60 passed on orchestrator suite, 82/82 Tier 1, 108/108 Tier 2, 113/113 Tier 3, zero native emoji clean)
+- **Build / Test State**: Verified healthy (66/66 passed on Sub-phase 5.4 suite, 34/34 passed on Sub-phase 5.3 suite, 69/69 passed on Sub-phase 5.2 suite, 35/35 passed on Sub-phase 5.1 suite, 65/65 passed on base adapter suite, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Sub-phase 5.3 has implemented a real-time auto-save engine across all Toolbar Popup fields and verified seamless bidirectional synchronization with the in-page Overlay HUD:
-1. **Centralized Debounced & Immediate Auto-Save Engine (`src/popup/popup.js`)**:
-   - Implemented `autoSaveConfig(immediate = false)`: collects active provider credentials (`baseUrl`, `apiKey`, `selectedModel`), active platform ID, and dynamic platform form state via `saveActiveFormStateToMemory()`, then persists directly via `StorageService.saveConfig(currentConfig)`.
-   - Debounced by 300ms for text inputs (`#baseUrlInput`, `#apiKeyInput`, `#specificKeywordsInput`, `#inputSpecificKeywords`, `#inputEditorialPrefix`, `#inputCustomAiSoftware`) to prevent disk I/O thrashing during typing.
-   - Executes immediately (`immediate = true`) for discrete controls (`providerSelect`, `modelSelect`, `platformSelect`, keyword count steppers, selects, radios, checkboxes, API key file import, and fetched model selection).
-2. **Bidirectional Storage Synchronization & Anti-Loop Guards**:
-   - `src/popup/popup.js`: Introduced `isSyncingFromStorage` and `isSavingLocally` guards. In `autoSaveConfig()`, if `isSyncingFromStorage` is true, save is blocked. While `autoSaveConfig()` writes to storage, `isSavingLocally` is set to true so `chrome.storage.onChanged` skips processing its own write event. When external changes arrive (e.g. from HUD quick form), `isSyncingFromStorage = true` prevents the updated inputs from triggering false circular saves.
-   - `src/overlay/overlay.js`: Added `this.isSyncingFromStorage` guard to `saveFormStateToStorage()`. In `syncFromStorage()`, wraps field assignment in `try { ... } finally { this.isSyncingFromStorage = false; }` before resolving, guaranteeing no circular writes back to storage.
-3. **Repurposed "Save Settings" Button**:
-   - Retained `#btnSaveSettings` in footer for UI stability and reassurance, updating its click handler to invoke `await autoSaveConfig(true)` and display the toast notification: `"Settings saved automatically"`.
-4. **Preceding Sub-phase 5.2 Achievements (Automation State Sync & Graceful Stop)**:
+Sub-phase 5.4 has completed asset optimization, visual theme alignment, minimized pill activity indicator, and layout resilience:
+1. **Brand Asset Optimization (`src/icons/logo_rj.png`)**:
+   - Replaced the oversized 1.66 MB brand logo with the optimized 500x500px asset (`bahan/logo_rj.png`, 60.3 KB), reducing package size by 96.4% while maintaining crisp fidelity across high-DPI displays.
+2. **Active HUD Button Theme Alignment (`src/styles/components.css`)**:
+   - Replaced hardcoded cyan/blue (`#57c1ff`, `rgba(87, 193, 255, ...)`) in `.rj-btn.rj-btn-active` and `.rj-btn-secondary.rj-btn-active` with the extension's canonical Emerald Teal palette (`#079183` border, `#59d499` text and icon stroke, `rgba(7, 145, 131, 0.12)` background, `rgba(7, 145, 131, 0.35)` focus ring).
+3. **Minimized Floating Pill Activity Spinner (`src/overlay/overlay.css`, `src/overlay/overlay.js`)**:
+   - Defined `@keyframes rj-spin` with continuous 360deg rotation and `.rj-hud-pill-status .rj-status-icon-spinner` (13x13px, stroke `#079183`).
+   - Integrated `pillSpinnerSvg` during active processing (`Running...`, `Asset X of Y`, `Processing...`) and graceful stopping (`Stopping...`), providing a clear dynamic indicator that background tasks are active even when the HUD card is minimized.
+   - Cleanly transitions to `pillReadySvg` checkmark on completion (`Finished`) and restores idle layers/ready status when reset.
+4. **Status Badge & Asset Label Ellipsis Clamping with Tooltips (`src/overlay/overlay.css`, `src/overlay/overlay.js`)**:
+   - Added flexbox truncation rules (`min-width: 0`, `overflow: hidden`, `text-overflow: ellipsis`, `white-space: nowrap`) to `.rj-hud-asset-label` and `span#rjAutomationStatusText`, clamping badge width (`max-width: 140px`) to prevent card distortion on long status strings.
+   - Implemented `setStatusBadge(text)` helper on `OverlayHUD` and inside `startAutomation()`, synchronizing `textContent` and `title` attributes across `#rjAutomationStatusText` and `.rj-hud-status-badge` so the full message is always viewable on hover.
+5. **Preceding Sub-phase 5.3 Achievements (Popup Real-Time Auto-Save)**:
+   - Centralized debounced (300ms) and immediate auto-save engine in Popup with anti-loop guards (`isSyncingFromStorage`, `isSavingLocally`).
+6. **Preceding Sub-phase 5.2 Achievements (Automation State Sync & Graceful Stop)**:
    - Standardized `rj_automation_state` schema `{ isRunning, isStopping, status, platformId, timestamp }`.
    - Added disabled "Stopping..." state with `.rj-btn-stopping` and repeated-click guards in both HUD and Popup.
-5. **Preceding Sub-phase 5.1 Achievements**:
-   - Persisted overlay visibility across navigations via `rj_overlay_visible`, deleted obsolete stub files (`AiVisionService.js`, `PromptBuilder.js`), and unified platform detection via central adapter registry `getAdapterForUrl`.
 6. **Previous Platform Adapter Achievements**:
 1. **MiriCanvas Live Alignment (`designhub.miricanvas.com/en/element/to-do`)**:
    - **Keyword Bulk Trash Elimination & Reactive Verified Per-Chip Removal Engine (`clearKeywords()`)**: Eliminated the keyword bulk trash button completely as requested. Replaced with a reactive, verified per-chip removal engine:
@@ -138,14 +140,11 @@ Sub-phase 5.3 has implemented a real-time auto-save engine across all Toolbar Po
 
 ## 3. Actionable Next Steps for Incoming Agent
 
-## 3. Actionable Next Steps for Incoming Agent
-
-1. **Step 1 (Sub-phase 5.4: Assets, Theme Alignment, Pill Spinner & Status Badge Clamping)**:
-   - Verify all static assets and icons are correctly referenced and aligned with `DESIGN.md`.
-   - Implement pill spinner and text badge clamping for responsive status display across all screen densities.
-2. **Step 2 (Sub-phase 5.5: Keyboard Accessibility & Focus Traps)**:
+1. **Step 1 (Sub-phase 5.5: Popup Modularization — Extract `platform_forms.js`)**:
+   - Refactor `src/popup/popup.js` to extract dynamic platform form builders and dictionaries into `src/popup/platform_forms.js`.
+2. **Step 2 (Sub-phase 5.6: Keyboard Accessibility & Focus Traps)**:
    - Ensure complete keyboard navigability across both Popup and HUD modals, verifying Tab orders and Escape handlers.
-3. **Step 3 (Sub-phase 5.6: Performance Audit & Memory Profiling)**:
+3. **Step 3 (Sub-phase 5.7: Performance Audit & Memory Profiling)**:
    - Validate memory footprint, DOM garbage collection, and event listener detachment during long batch runs.
 
 ---
@@ -194,6 +193,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 45 | 2026-09-13 | `task/e2e-hardening-polish` | `style(ui)` | Optimized logo asset (~60 KB), aligned active button theme to Emerald Teal, added pill spinner, and clamped badge text with tooltips (66/66 tests passed) | Sub-phase 5.5: Popup Modularization (Extract `platform_forms.js`) |
 | 44 | 2026-09-13 | `task/e2e-hardening-polish` | `feat(popup)` | Implemented real-time auto-save engine for all popup fields, debounced text inputs, anti-loop guards, bidirectional HUD <-> Popup sync, 34/34 tests passed | Sub-phase 5.4: Assets, Theme Alignment, Pill Spinner & Status Badge Clamping |
 | 43 | 2026-09-13 | `task/e2e-hardening-polish` | `fix(sync)` | Resolved HUD <-> Popup automation state synchronization during graceful stop, expanded rj_automation_state schema, two-click stop lifecycle, disabled Stopping... state, 65/65 tests passed | Sub-phase 5.3: Popup Real-Time Auto-Save Engine |
 | 42 | 2026-09-13 | `task/e2e-hardening-polish` | `59c9935` | Persisted overlay visibility across navigations via rj_overlay_visible, deleted obsolete stub files (AiVisionService, PromptBuilder), unified platform detection, 35/35 tests passed | Sub-phase 5.2: HUD <-> Popup Automation State Synchronization & Graceful Stop |

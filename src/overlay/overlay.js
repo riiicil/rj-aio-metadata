@@ -20,6 +20,25 @@ const PLATFORM_LIMITS = {
   depositphotos: { min: 8, max: 50, hint: 'Min 8, Max 50' }
 };
 
+export const pillSpinnerSvg = `
+  <svg class="rj-hud-icon-svg rj-status-icon-spinner" viewBox="0 0 24 24" fill="none" stroke="#079183" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="2" x2="12" y2="6"></line>
+    <line x1="12" y1="18" x2="12" y2="22"></line>
+    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+    <line x1="2" y1="12" x2="6" y2="12"></line>
+    <line x1="18" y1="12" x2="22" y2="12"></line>
+    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+  </svg>
+`;
+
+export const pillReadySvg = `
+  <svg class="rj-hud-icon-svg rj-status-icon-ready" viewBox="0 0 24 24" fill="none" stroke="#59d499" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg>
+`;
+
 export class OverlayHUD {
   constructor() {
     this.hostId = 'rj-overlay-host';
@@ -828,6 +847,23 @@ export class OverlayHUD {
   }
 
   /**
+   * Sets text and tooltip title on the automation status badge.
+   * @param {string} text
+   */
+  setStatusBadge(text) {
+    if (!this.shadow) return;
+    const statusText = this.shadow.querySelector('#rjAutomationStatusText');
+    const badge = this.shadow.querySelector('#rjAutomationBadge');
+    if (statusText) {
+      statusText.textContent = text;
+      statusText.title = text;
+    }
+    if (badge) {
+      badge.title = text;
+    }
+  }
+
+  /**
    * Updates automation UI indicators (buttons, badges, progress bar, pill status) and field disabled states.
    * @param {boolean} isRunning
    */
@@ -839,7 +875,6 @@ export class OverlayHUD {
     const btnText = this.shadow.querySelector('#rjAutomationBtnText');
     const icon = this.shadow.querySelector('#rjAutomationIcon');
     const badge = this.shadow.querySelector('#rjAutomationBadge');
-    const statusText = this.shadow.querySelector('#rjAutomationStatusText');
     const progressTrack = this.shadow.querySelector('#rjProgressTrack');
     const pillStatus = this.shadow.querySelector('#rjPillStatus');
 
@@ -853,9 +888,12 @@ export class OverlayHUD {
       if (btnText) btnText.textContent = 'Stopping...';
       if (icon) icon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
       if (badge) badge.classList.add('rj-running');
-      if (statusText) statusText.textContent = 'Stopping...';
+      this.setStatusBadge('Stopping...');
       if (progressTrack) progressTrack.style.display = 'block';
-      if (pillStatus) pillStatus.textContent = 'Stopping...';
+      if (pillStatus) {
+        pillStatus.innerHTML = `${pillSpinnerSvg}<span>Stopping...</span>`;
+        pillStatus.title = 'Stopping automation (saving work)...';
+      }
       this.setFormControlsDisabled(true);
       return;
     }
@@ -870,9 +908,12 @@ export class OverlayHUD {
       if (btnText) btnText.textContent = 'Stop Automation';
       if (icon) icon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
       if (badge) badge.classList.add('rj-running');
-      if (statusText) statusText.textContent = 'Running';
+      this.setStatusBadge('Running');
       if (progressTrack) progressTrack.style.display = 'block';
-      if (pillStatus) pillStatus.textContent = 'Running...';
+      if (pillStatus) {
+        pillStatus.innerHTML = `${pillSpinnerSvg}<span>Running...</span>`;
+        pillStatus.title = 'Automation running...';
+      }
     } else {
       if (btn) {
         btn.classList.remove('rj-btn-stop', 'rj-btn-stopping', 'rj-btn-disabled');
@@ -889,7 +930,7 @@ export class OverlayHUD {
       if (btnText) btnText.textContent = 'Start Automation';
       if (icon) icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
       if (badge) badge.classList.remove('rj-running');
-      if (statusText) statusText.textContent = 'Idle';
+      this.setStatusBadge('Idle');
       if (progressTrack) progressTrack.style.display = 'none';
       this.updateAssetCounter();
     }
@@ -916,8 +957,7 @@ export class OverlayHUD {
 
     if (!adapter) {
       logger.warn('No platform adapter matched for URL:', currentUrl);
-      const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
-      if (statusText) statusText.textContent = 'Unsupported Page';
+      this.setStatusBadge('Unsupported Page');
       return;
     }
 
@@ -927,8 +967,7 @@ export class OverlayHUD {
     }
     if (!this.isProviderReady(this.currentConfig)) {
       logger.warn('AI Provider is not ready. Configure in popup first.');
-      const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
-      if (statusText) statusText.textContent = 'Setup Model';
+      this.setStatusBadge('Setup Model');
       return;
     }
 
@@ -958,6 +997,16 @@ export class OverlayHUD {
     const pillStatus = this.shadow?.querySelector('#rjPillStatus');
     const badge = this.shadow?.querySelector('#rjAutomationBadge');
 
+    const setStatusBadge = (text) => {
+      if (statusText) {
+        statusText.textContent = text;
+        statusText.title = text;
+      }
+      if (badge) {
+        badge.title = text;
+      }
+    };
+
     try {
       // 5. Query asset cards on the page
       const rawCards = adapter.getAssetCards();
@@ -969,7 +1018,7 @@ export class OverlayHUD {
         this.isAutomationRunning = false;
         this.updateAutomationUI(false);
         if (countText) countText.textContent = '0 Assets Detected';
-        if (statusText) statusText.textContent = '0 Assets Detected';
+        setStatusBadge('0 Assets Detected');
         if (typeof chrome !== 'undefined' && chrome.storage?.local) {
           chrome.storage.local.set({
             rj_automation_state: {
@@ -1007,8 +1056,11 @@ export class OverlayHUD {
 
           const currentId = adapter.getCurrentAssetId();
           if (countText) countText.textContent = `Asset ${assetIdx + 1}${currentId ? ` (ID ${currentId})` : ''}`;
-          if (statusText) statusText.textContent = this.isStopping ? 'Stopping...' : 'Processing...';
-          if (pillStatus) pillStatus.textContent = `Asset ${assetIdx + 1}`;
+          setStatusBadge(this.isStopping ? 'Stopping...' : 'Processing...');
+          if (pillStatus) {
+            pillStatus.innerHTML = `${pillSpinnerSvg}<span>Asset ${assetIdx + 1}</span>`;
+            pillStatus.title = `Processing Asset ${assetIdx + 1}`;
+          }
 
           logger.asset(assetIdx + 1, 'Carousel');
 
@@ -1023,7 +1075,7 @@ export class OverlayHUD {
             const thumb = adapter.getThumbnailUrl(card);
 
             // Step 3: AI Metadata Generation
-            if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving)...' : 'Generating AI...';
+            setStatusBadge(this.isStopping ? 'Stopping (saving)...' : 'Generating AI...');
 
             let keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 70;
             const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
@@ -1048,7 +1100,7 @@ export class OverlayHUD {
             await sleep(400);
 
             // Step 4: Inject sanitized metadata
-            if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving)...' : 'Injecting metadata...';
+            setStatusBadge(this.isStopping ? 'Stopping (saving)...' : 'Injecting metadata...');
 
             const platformSettings = this.currentConfig?.platformSettings?.dreamstime || {};
             const isEditorial = Boolean(platformSettings.isEditorial);
@@ -1063,12 +1115,12 @@ export class OverlayHUD {
             processedCount++;
 
             // Step 5: Save edits (waits for toast appear & disappear)
-            if (statusText) statusText.textContent = 'Saving edits...';
+            setStatusBadge('Saving edits...');
             await adapter.saveDraft();
 
             // Step 6: If Mode B (submit_direct), submit for review
             if (platformSettings.mode === 'submit_direct') {
-              if (statusText) statusText.textContent = 'Submitting file...';
+              setStatusBadge('Submitting file...');
               await adapter.submitForReview(isEditorial);
             }
 
@@ -1083,7 +1135,7 @@ export class OverlayHUD {
           if (this.isStopping || signal.aborted) break;
 
           // Step 7: Cooldown Delay
-          if (statusText) statusText.textContent = 'Cooldown...';
+          setStatusBadge('Cooldown...');
           const minWait = this._cooldownMin ?? 1000;
           const maxWait = this._cooldownMax ?? 4000;
           const cooldownTarget = Math.floor(Math.random() * (maxWait - minWait + 1)) + minWait;
@@ -1096,7 +1148,7 @@ export class OverlayHUD {
           if (this.isStopping || signal.aborted) break;
 
           // Step 8: Navigate to next
-          if (statusText) statusText.textContent = 'Next asset...';
+          setStatusBadge('Next asset...');
           const navResult = await adapter.navigateToNext();
           if (navResult?.done) {
             break;
@@ -1111,7 +1163,7 @@ export class OverlayHUD {
           this.isStopping = false;
           this.isAutomationRunning = false;
           this.updateAutomationUI(false);
-          if (statusText) statusText.textContent = 'Stopped';
+          setStatusBadge('Stopped');
           if (typeof chrome !== 'undefined' && chrome.storage?.local) {
             chrome.storage.local.set({
               rj_automation_state: {
@@ -1129,8 +1181,11 @@ export class OverlayHUD {
           if (countText) countText.textContent = `Finished ${processedCount} assets`;
           this.lastCompletedAssetLabel = `Finished ${processedCount} assets`;
           if (badge) badge.classList.remove('rj-running');
-          if (statusText) statusText.textContent = 'Completed';
-          if (pillStatus) pillStatus.textContent = 'Finished';
+          setStatusBadge('Completed');
+          if (pillStatus) {
+            pillStatus.innerHTML = `${pillReadySvg}<span>Finished</span>`;
+            pillStatus.title = 'Automation completed';
+          }
 
           const finishWait = this._completionWait ?? 3000;
           await sleep(finishWait);
@@ -1162,8 +1217,11 @@ export class OverlayHUD {
         const pct = Math.round((i / total) * 100);
         if (progressFill) progressFill.style.width = `${pct}%`;
         if (countText) countText.textContent = `Asset ${i + 1} of ${total}`;
-        if (statusText) statusText.textContent = this.isStopping ? 'Stopping...' : 'Processing...';
-        if (pillStatus) pillStatus.textContent = `${i + 1}/${total} (${pct}%)`;
+        setStatusBadge(this.isStopping ? 'Stopping...' : 'Processing...');
+        if (pillStatus) {
+          pillStatus.innerHTML = `${pillSpinnerSvg}<span>${i + 1}/${total} (${pct}%)</span>`;
+          pillStatus.title = `Processing ${i + 1} of ${total} (${pct}%)`;
+        }
 
         logger.asset(i + 1, total);
 
@@ -1188,7 +1246,7 @@ export class OverlayHUD {
           const thumb = adapter.getThumbnailUrl(card);
 
           // Step 4: AI Metadata Generation
-          if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving card)...' : 'Generating AI...';
+          setStatusBadge(this.isStopping ? 'Stopping (saving card)...' : 'Generating AI...');
 
           let keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 50;
           const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
@@ -1222,7 +1280,7 @@ export class OverlayHUD {
           await sleep(500);
 
           // Step 5: Inject sanitized metadata
-          if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving card)...' : 'Injecting metadata...';
+          setStatusBadge(this.isStopping ? 'Stopping (saving card)...' : 'Injecting metadata...');
 
           const platformSettings = this.currentConfig?.platformSettings?.[this.platformId] || {};
           const platformOptions = {
@@ -1248,7 +1306,7 @@ export class OverlayHUD {
             throw assetErr;
           }
           logger.warn(`Error processing asset ${i + 1}/${total}:`, assetErr);
-          if (statusText) statusText.textContent = `Asset ${i + 1} skipped`;
+          setStatusBadge(`Asset ${i + 1} skipped`);
           await randomDelay(1000, 2000, signal);
           continue;
         } finally {
@@ -1259,7 +1317,7 @@ export class OverlayHUD {
         if (this.isStopping || signal.aborted) break;
 
         // Step 7: Cooldown Delay (Responsive to graceful stop)
-        if (statusText) statusText.textContent = 'Cooldown...';
+        setStatusBadge('Cooldown...');
         const minWait = this._cooldownMin ?? 1000;
         const maxWait = this._cooldownMax ?? 5000;
         const cooldownTarget = Math.floor(Math.random() * (maxWait - minWait + 1)) + minWait;
@@ -1279,7 +1337,7 @@ export class OverlayHUD {
         logger.banner(
           `${this.isStopping ? 'Stop requested. Triggering bulk save' : 'All assets processed. Triggering bulk save'} for ${this.platformId} (${processedCount} processed assets)...`
         );
-        if (statusText) statusText.textContent = saveLabel;
+        setStatusBadge(saveLabel);
         await sleep(1000);
         await adapter.bulkSave();
         await sleep(1000);
@@ -1290,7 +1348,7 @@ export class OverlayHUD {
         this.isStopping = false;
         this.isAutomationRunning = false;
         this.updateAutomationUI(false);
-        if (statusText) statusText.textContent = 'Stopped';
+        setStatusBadge('Stopped');
         if (typeof chrome !== 'undefined' && chrome.storage?.local) {
           chrome.storage.local.set({
             rj_automation_state: {
@@ -1310,8 +1368,11 @@ export class OverlayHUD {
         if (countText) countText.textContent = `Finished ${total} assets`;
         this.lastCompletedAssetLabel = `Finished ${total} assets`;
         if (badge) badge.classList.remove('rj-running');
-        if (statusText) statusText.textContent = 'Completed';
-        if (pillStatus) pillStatus.textContent = 'Finished';
+        setStatusBadge('Completed');
+        if (pillStatus) {
+          pillStatus.innerHTML = `${pillReadySvg}<span>Finished</span>`;
+          pillStatus.title = 'Automation completed';
+        }
 
         const finishWait = this._completionWait ?? 3000;
         await sleep(finishWait);
@@ -1347,10 +1408,10 @@ export class OverlayHUD {
       }
       if (err.message === 'ABORTED' || signal.aborted) {
         logger.info('Automation stopped.');
-        if (statusText) statusText.textContent = 'Stopped';
+        setStatusBadge('Stopped');
       } else {
         logger.error('Automation error:', err);
-        if (statusText) statusText.textContent = 'Error: ' + (err.message || 'Failed');
+        setStatusBadge('Error: ' + (err.message || 'Failed'));
       }
     } finally {
       this.isStopping = false;
@@ -1398,7 +1459,7 @@ export class OverlayHUD {
       this.isCardProcessing = false;
       this.isAutomationRunning = false;
       this.updateAutomationUI(false);
-      if (statusText) statusText.textContent = 'Stopped';
+      this.setStatusBadge('Stopped');
 
       if (typeof chrome !== 'undefined' && chrome.storage?.local) {
         chrome.storage.local.set({
@@ -1424,13 +1485,16 @@ export class OverlayHUD {
         btn.title = 'Stopping automation (saving work)...';
       }
       if (btnText) btnText.textContent = 'Stopping...';
-      if (statusText) statusText.textContent = 'Stopping...';
+      this.setStatusBadge('Stopping...');
       const badge = this.shadow?.querySelector('#rjAutomationBadge');
       if (badge) {
         badge.classList.add('rj-running');
       }
       const pillStatus = this.shadow?.querySelector('#rjPillStatus');
-      if (pillStatus) pillStatus.textContent = 'Stopping...';
+      if (pillStatus) {
+        pillStatus.innerHTML = `${pillSpinnerSvg}<span>Stopping...</span>`;
+        pillStatus.title = 'Stopping automation (saving work)...';
+      }
       logger.warn('Stop requested. Waiting for active card to finish then saving work...');
 
       if (typeof chrome !== 'undefined' && chrome.storage?.local) {
@@ -1615,7 +1679,6 @@ export class OverlayHUD {
             this.updateAutomationUI(true);
             const btn = this.shadow?.querySelector('#rjBtnToggleAutomation');
             const btnText = this.shadow?.querySelector('#rjAutomationBtnText');
-            const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
             if (btn) {
               btn.classList.remove('rj-btn-start', 'rj-btn-stop', 'rj-btn-accent');
               btn.classList.add('rj-btn-stopping', 'rj-btn-disabled');
@@ -1623,7 +1686,7 @@ export class OverlayHUD {
               btn.title = 'Stopping automation (saving work)...';
             }
             if (btnText) btnText.textContent = 'Stopping...';
-            if (statusText) statusText.textContent = 'Stopping...';
+            this.setStatusBadge('Stopping...');
           } else {
             this.updateAutomationUI(isRunning);
           }
