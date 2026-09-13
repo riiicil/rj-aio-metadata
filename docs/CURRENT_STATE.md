@@ -1,8 +1,8 @@
 # Current Project State — RJ AIO Metadata Extension
 
 *Last Updated: 2026-09-13*<br>
-*Active Branch: `task/platform-adapters`*<br>
-*Current Milestone: Phase 4: Platform Adapters (MiriCanvas Keyword Bulk Trash Elimination & Reactive Verified Per-Chip Removal with Disappearance Polling & Bottom-Up Scroll, Sequential Form Ordering, Keyword Chip Creation, Trash Button Discrimination, Bulk Save Button Disabled & Toast Wait with 2000ms Sync Buffer & Fresh Navbar Uncheck, Depositphotos Full-String Native Comma Splitting, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)*
+*Active Branch: `task/e2e-hardening-polish`*<br>
+*Current Milestone: Phase 5: E2E Hardening & Polish (Sub-phase 5.1: Overlay Persistence, Dead Code Removal & Duplication Fixing Complete)*
 
 ---
 
@@ -12,8 +12,8 @@
 - **Phase 1 — Storage & Popup UI**: [COMPLETE] (Storage engine, background worker, modular platform-dynamic popup UI merged to dev)
 - **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, multi-platform media detection, popup toggle, bidirectional sync merged to dev)
 - **Phase 3 — Universal Vision Service**: [COMPLETE] (Step 3.1 Prompt Engine, Step 3.2 Sanitizer Engine, Step 3.3 Universal Vision Client & Background Proxy Worker complete, merged to dev)
-- **Phase 4 — Platform Adapters**: [COMPLETE] (Sub-phase 4.1 Complete: Vecteezy & Freepik popup AI model taxonomies aligned, Schema v4 migrated; Sub-phase 4.2 Complete: Core Adapter Foundation implemented with dom_helpers.js and BaseAdapter.js; Sub-phase 4.3 Complete: Tier 1 Adapters AdobeStockAdapter.js & ShutterstockAdapter.js implemented; Sub-phase 4.4 Complete: Tier 2 Adapters FreepikAdapter.js & VecteezyAdapter.js implemented; Sub-phase 4.5 Complete: Tier 3 Adapters DreamstimeAdapter.js, DepositphotosAdapter.js, and MiriCanvasAdapter.js implemented; Sub-phase 4.6 Complete: Adapter Registry index.js, In-Page HUD Wiring & Automation Orchestrator overlay.js; Adobe Stock Live Fixes Round 1-5 Verified; Shutterstock CORS Bypass via Background Image Proxy, Deep MUI Selectors, Sequential Keyword Clearing, Spelling Warning Polling, Save Spinner Wait & Deselect Page Wired, LoggerService Integrated; Editorial Prefix Auto-Clear on Toggle Off & Overlay Guard, Strict Keyword Chip Detection on Empty Assets, OpenRouter/Multi-Vendor Model Selection Storage Quota Resolution; Freepik/Magnific Rebranding Multi-Domain Detection, Overlay Routing, Manifest Permissions, Logger Integration, Fake Skeleton Card Exclusion, Thumbnail AI-Badge Avoidance, Pre-Injection Auto-Clearing, simulateClick Deduplication, Single-Target Card Selection, and AI Model Custom Dropdown Priority Complete; Vecteezy Right-Panel Form Scoping to MuiGrid-grid-xs-3, Pre-Automation Preparation, Clear Buttons, Software Dropdown, bulkSave Disambiguation, Direct Card Img Selection, False-Positive Ready Guard, Robust AI Checkbox Uncheck State Detection, Sequential Per-Tag Keyword Injection, Direct Input Checkbox Click & Native Prototype Setter Fallback, AI Software Dropdown Mount Polling & Mousedown Open Resolution, Enter Key Simulation, Input Blur, and Defensive Popover Dismissal on Custom AI Software Complete; Dreamstime Granular Condition-Checked Clear Buttons, Subcategory Option Polling, Single-Word Keyword Splitting & Deduplication, Commercial RF vs Editorial ED License Selection, Save Draft & Submit Toast Lifecycle Polling, and Section 6A In-Page Carousel Loop Complete; Depositphotos Modern List Card Extraction, Progressive Scroll & Stub Removal, Pre-Automation Initial Select-All Deselect, Safe Single-Card Selection, Strict Scoped DOM Isolation, Namerow Defocusing, Full-String Comma Splitting & Chip Overwrite Elimination, and Bulk Save Select-All Cleanup Complete; MiriCanvas Keyword Bulk Trash Elimination & Reactive Verified Per-Chip Removal Engine [Dynamic querying, bottom-up scroll into view, multi-target inner path + svg dispatch, active disappearance polling up to 600ms per chip, and 100% clean verification before injection], Sequential Form Ordering [AI toggle -> Content Tier -> clearTitle + inject title -> clearKeywords + inject keywords], Keyword Chip Creation via Non-Blur Native Setter + InputEvent insertFromPaste + Enter/Comma Fallback & Polling Verification, Trash Button Discrimination [`DD-04b4`] vs Copy Button [`CD-7f75`], Ghost Sizer [`ul[data-f="GU-fa4b"]`] Exclusion, Active Card Selection Guard [`.css-1510m7j`], Left Navigation Pre-Collapse, Navbar Selection Reset, Single-Target Thumbnail Selection, and Resilient Bulk Save Lifecycle with 8000ms Disabled/Toast Wait, 2000ms Sync Buffer & Fresh Navbar Uncheck Complete)
-- **Phase 5 — End-to-End Testing & Polish**: [PLANNED] (E2E live verification & packaging)
+- **Phase 4 — Platform Adapters**: [COMPLETE] (Platform adapters and live alignment verified across all 7 platforms: Adobe Stock, Shutterstock, Freepik / Magnific, Vecteezy, Dreamstime, Depositphotos, and MiriCanvas merged to dev)
+- **Phase 5 — End-to-End Testing & Polish**: [IN_PROGRESS] (Sub-phase 5.1 Complete: Overlay persistence across navigations via `rj_overlay_visible` in `overlay.js` & `content_main.js`, dead scaffolding files `AiVisionService.js` and `PromptBuilder.js` removed, commented-out and unreachable code in `overlay.js` removed, and platform detection in `overlay.js` unified via central adapter registry `getAdapterForUrl`)
 
 ---
 
@@ -22,8 +22,8 @@
 | Branch | Status | Purpose |
 | :--- | :--- | :--- |
 | `main` | Clean (1 empty commit) | Stable production releases only |
-| `dev` | Integration (Phase 0, 1, 2, 3 merged) | Active development integration branch |
-| `task/platform-adapters` | Active (MiriCanvas, Depositphotos, Dreamstime, Vecteezy, Freepik, Shutterstock, Adobe Stock Updated) | Phase 4: Platform Adapters & Automation Engine |
+| `dev` | Integration (Phase 0-4 merged) | Active development integration branch |
+| `task/e2e-hardening-polish` | Active | Phase 5: End-to-End Hardening & Polish |
 
 ---
 
@@ -81,11 +81,10 @@
   - `src/popup/popup.html` — Platform-adaptive toolbar popup interface with brand logo image integration, modular dynamic platform settings container, and top-right stacked toast container adhering to `DESIGN.md`.
   - `src/popup/popup.css` — 380px dark canvas popup styling with brand logo image styling and sticky header/footer.
   - `src/popup/popup.js` — Popup controller managing live tab matching, file importer, dynamic models, 100% modular platform-dynamic form rendering with official Vecteezy software dropdown & conditional custom software input, verified 47 Freepik official base models catalog, bidirectional storage synchronization (`chrome.storage.onChanged`), model selection guard for Start Automation button, full form disabling during active processing, interactive in-place HUD toggle button with active outline state, and 3-item FIFO stacked toast notification queue with 2-line clamping, auto-dismiss (4500ms), and manual close button.
-  - `src/popup/custom_select.js` — Zero-dependency progressive dropdown enhancer replacing native OS selects with emerald teal highlights.
   - `src/popup/depositphotos_countries.js` — Complete 237 ISO countries catalog extracted for Depositphotos editorial location settings (omitting commercial option).
   - `src/overlay/overlay.css` — Raycast Dark Precision styling for floating HUD inside Shadow DOM scope with zero host bleed, streamlined pill styling with SVG status icons (`.rj-status-icon-ready`, `.rj-status-icon-layers`, `.rj-status-icon-not-ready`), warning banner styles, spring transition animations (`cubic-bezier(0.16, 1, 0.3, 1)`), adaptive quick form controls, live asset counter bar, and disabled control styles.
-  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, live asset scanner with specific Depositphotos and Shutterstock subtab media detection (`32 Images Detected`, `3 Videos Detected`), Dreamstime single-asset ID detection (`In ID 473814624`), pill Layers icon on detected assets, checkmark on empty ready tab, non-microstock warning state and labels (`Unknown Page`, `Assets Not Detected`), adaptive quick form controls (stepper, specific keywords, adaptive AI declaration), model selection guard for automation toggle, processing state field disabling, bidirectional synchronization via `chrome.storage.onChanged`, platform language resolution propagation, error-isolated batch progression loop, and End-to-End Automation Orchestrator (`startAutomation`, `stopAutomation`, `AbortController` cancellation, progress bar updates, human-pacing cooldown, Section 6A in-page carousel loop for Dreamstime with Save Edits / direct submission Mode A and Mode B handling, per-item draft save for Freepik/Dreamstime, bulk save for other platforms).
-  - `src/content/content_main.js` — Content script router importing OverlayHUD via dynamic import, auto-mounting HUD, and handling background toggle, ping, and status messages.
+  - `src/overlay/overlay.js` — OverlayHUD controller managing Shadow DOM injection, viewport-clamped drag-and-drop physics, fluid minimize/expand animations, live asset scanner with media subtab detection across platforms, unified platform detection via central adapter registry (`getAdapterForUrl`), persistent visibility state in `chrome.storage.local` (`rj_overlay_visible`), adaptive quick form controls (stepper, specific keywords, adaptive AI declaration), model selection guard for automation toggle, processing state field disabling, bidirectional synchronization via `chrome.storage.onChanged`, platform language resolution propagation, error-isolated batch progression loop, clean Section 6B per-item save for Freepik without dead/commented code, and End-to-End Automation Orchestrator (`startAutomation`, `stopAutomation`, `AbortController` cancellation, progress bar updates, human-pacing cooldown, Section 6A in-page carousel loop for Dreamstime, and bulk save for other platforms).
+  - `src/content/content_main.js` — Content script router importing OverlayHUD via dynamic import, auto-mounting HUD with persistent visibility check (`rj_overlay_visible: false` mounts in hidden state without visual flash), and handling background/popup toggle, ping, and status messages with accurate `isVisible` boolean reporting.
   - `src/adapters/utils/dom_helpers.js` — Reusable DOM utility functions: single-string instant text injection (`setNativeValue` with React prototype setter and synthetic `input`/`change`/`blur` events), element appearance and disappearance async polling (`waitForElement`, `waitForElementToDisappear` via `MutationObserver`), universal cooldown delay generators (`sleep`, `randomDelay` with `AbortSignal` cancellation support), keyboard Enter simulation (`simulateEnterKey`), full pointer and mouse event dispatching sequence (`simulateClick`), and defensive thumbnail URL extractor (`extractThumbnailUrl` with fallback hierarchy).
   - `src/adapters/BaseAdapter.js` — Abstract base contract class establishing uniform platform interface across 7 platforms (`isMatch`, `getAssetCards`, `getThumbnailUrl`, `selectCard`, `fillMetadata`), virtual lifecycle defaults (`prepareAutomation`, `waitForEditorReady`, `clearMetadata`, `clearKeywords`, `saveDraft`, `bulkSave`, `submitForReview`), and built-in cooldown generator (`executeCooldown`) with immediate `AbortSignal` cancellation support.
   - `src/adapters/index.js` — Platform adapter auto-registry registering all 7 platform adapters (`AdobeStockAdapter`, `ShutterstockAdapter`, `FreepikAdapter`, `VecteezyAdapter`, `DreamstimeAdapter`, `DepositphotosAdapter`, `MiriCanvasAdapter`), and exporting router utilities `getAdapterForUrl`, `getAdapterForPlatform`, and `getAllAdapters`.
@@ -96,41 +95,32 @@
   - `src/adapters/DreamstimeAdapter.js` — Platform adapter for Dreamstime Contributor (URL matching for dreamstime.com /uploadfile and /upload/edit*, modal vs batch grid card extraction, thumbnail extraction, numeric asset ID tracking, granular condition-checked clearing buttons for title, description, categories, and keywords, subcategory option polling with async AJAX response waiting, hardcoded Category 3 for AI mode ["Illustration & Clipart" / "Generative AI"], single-word keyword tag injection clamped to 70 tags, Commercial RF vs Editorial ED license selection, save draft with noty toast appearance & disappearance polling, navigateToNext with Infinite Carousel Loop Guard detecting return to firstAssetId, submit for review with toast resolution, and full LoggerService integration).
   - `src/adapters/DepositphotosAdapter.js` — Platform adapter for Depositphotos Contributor (URL matching for depositphotos.com/files/unfinished.html, modern `.itemslist > div.itemeditor` card extraction with `tr.unfinished__item` fallback, direct CDN thumbnail extraction via `img.itemeditor__thumb`, numeric asset ID extraction from `span.itemeditor__idbox`, progressive scroll with `.itemeditor_stub` virtualization readiness wait, condition-checked granular clearing [`itemeditor__reset_active`], card-scoped metadata injection [`textarea._itemeditor__value_description`, fast tag paste via `span.paste_editor__tag` clamped to 50 tags, editorial 'yes'/'no' + ISO country select, nudity 'yes'/'no'], 160 items paginator capacity helper, to-top scroll + idempotent header Select All + control panel Save bulk save strategy, and submit for review).
   - `src/adapters/MiriCanvasAdapter.js` — Platform adapter for MiriCanvas DesignHub (URL matching for designhub.miricanvas.com, element cards from batch grid, thumbnail extraction, card selection, title clearing + single-string instant injection clamped to 100 chars, keywords clearing [SVG remove icons] + comma-separated tag injection clamped to 25 tags, pricing tier radio [STANDARD vs PREMIUM], AI generated declaration checkbox toggle, optional content type radio, bulk save strategy [navbar Select All -> Save Metadata], and submit for review).
+- **Deleted Scaffolding & Stub Files:**
+  - `src/services/AiVisionService.js` — Obsolete stub file removed (superseded by `src/services/AiService.js`).
+  - `src/services/PromptBuilder.js` — Obsolete stub file removed (superseded by `src/services/AiPrompt.js`).
 
 ---
 
 ## 5. What Does NOT Exist Yet
 
-- Phase 5: Live browser validation across live contributor portals.
-- Final extension release packaging and store assets.
+- Phase 5: Sub-phases 5.2 through 5.7 (State sync, model extraction, keyboard accessibility, performance, orchestrator modularization, final packaging).
 
 ---
 
 ## 6. Testing & Build Verification Status
 
 - Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `overlay/`, `styles/`, `services/`, `adapters/*`).
+- Sub-phase 5.1 suite verified with `scratch/test_subphase_5_1.mjs` (35/35 assertions passed: unified platform detection across all 7 sites + unknown URLs, overlay visibility storage persistence, and stub file deletion).
 - `src/adapters/index.js` registry, `src/overlay/overlay.js` automation orchestrator, and abort mechanics tested with `scratch/test_subphase_4_6.mjs` (57/57 assertions passed).
-- `src/adapters/DepositphotosAdapter.js` live fixes and alignment tested with `scratch/test_depositphotos_fixes.mjs` (24/24 assertions passed).
-- `src/adapters/DreamstimeAdapter.js` live fixes and alignment tested with `scratch/test_dreamstime_fixes.mjs` (24/24 assertions passed).
-- `src/adapters/DreamstimeAdapter.js`, `src/adapters/DepositphotosAdapter.js`, and `src/adapters/MiriCanvasAdapter.js` syntax verified with `node --check` and tested with `scratch/test_tier3_adapters.mjs` (107/107 assertions passed).
+- `src/adapters/DepositphotosAdapter.js`, `src/adapters/DreamstimeAdapter.js`, and `src/adapters/MiriCanvasAdapter.js` syntax verified with `node --check` and tested with `scratch/test_tier3_adapters.mjs` (113/113 assertions passed).
 - `src/adapters/FreepikAdapter.js` and `src/adapters/VecteezyAdapter.js` syntax verified with `node --check` and tested with `scratch/test_tier2_adapters.mjs` (108/108 assertions passed).
 - `src/adapters/AdobeStockAdapter.js` and `src/adapters/ShutterstockAdapter.js` syntax verified with `node --check` and tested with `scratch/test_tier1_adapters.mjs` (82/82 assertions passed).
 - `src/adapters/utils/dom_helpers.js` and `src/adapters/BaseAdapter.js` syntax verified with `node --check` and tested with `scratch/test_base_adapter.mjs` (65/65 assertions passed).
-- `src/services/AiPrompt.js` syntax verified with `node --check` and tested with `scratch/test_ai_prompt.mjs` (65/65 assertions passed).
-- `src/services/SanitizerService.js` syntax verified with `node --check` and tested with `scratch/test_sanitizer_service.mjs` (86/86 assertions passed).
-- `src/services/AiService.js` and `src/background/service_worker.js` syntax verified with `node --check` and tested with `scratch/test_ai_service.mjs` (76/76 assertions passed).
-- Storage schema version 4 migration and default configuration tested and verified with `scratch/test_storage_v4.mjs` (38/38 assertions passed).
-- Complete test suite verified passing 732/732 assertions across all active repository test suites (`test_depositphotos_fixes.mjs`, `test_dreamstime_fixes.mjs`, `test_subphase_4_6.mjs`, `test_tier3_adapters.mjs`, `test_tier2_adapters.mjs`, `test_tier1_adapters.mjs`, `test_base_adapter.mjs`, `test_storage_v4.mjs`, `test_ai_prompt.mjs`, `test_sanitizer_service.mjs`, and `test_ai_service.mjs`).
-- Syntax validation passed for all adapter modules, `src/overlay/overlay.js`, `src/content/content_main.js`, `src/popup/popup.js`, and `src/services/StorageService.js` via `node --check`.
-- Viewport boundary clamping and storage persistence logic verified.
-- Depositphotos 237 country catalog and custom select progressive enhancement verified.
-- Multi-API key round-robin distribution tested and verified across multi-line inputs.
-- Google Gemini query param (`?key=`) and header (`x-goog-api-key`) authentication verified.
-- Strict flexbox truncation (`min-width: 0; max-width: 100%;`) verified in popup UI.
-- All documentation checked against Zero Native Emoji Policy and standardized under `docs/DOCS_STYLE.md`.
+- Syntax validation passed for `src/overlay/overlay.js`, `src/content/content_main.js`, and `src/adapters/index.js` via `node --check`.
+- Zero Native Emoji Policy strictly enforced across all files, code, and documentation.
 
 ---
 
 ## 7. Immediate Next Step
 
-Review Phase 4 completion, merge `task/platform-adapters` into `dev`, and proceed to Phase 5: End-to-End Testing & Polish.
+Proceed to Sub-phase 5.2: HUD <-> Popup Automation State Synchronization & Graceful Stop (`rj_automation_state` schema expansion, status badge synchronization, and popup stop button wiring).

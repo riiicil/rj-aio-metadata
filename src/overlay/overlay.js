@@ -70,34 +70,24 @@ export class OverlayHUD {
   }
 
   /**
-   * Identifies the platform ID key based on hostname.
+   * Identifies the platform ID key based on active URL adapter.
    * @returns {string} Platform ID
    */
   detectPlatformId() {
-    const host = window.location.hostname.toLowerCase();
-    if (host.includes('stock.adobe.com')) return 'adobestock';
-    if (host.includes('shutterstock.com')) return 'shutterstock';
-    if (host.includes('dreamstime.com')) return 'dreamstime';
-    if (host.includes('vecteezy.com')) return 'vecteezy';
-    if (host.includes('freepik.com') || host.includes('magnific.com')) return 'freepik';
-    if (host.includes('depositphotos.com')) return 'depositphotos';
-    if (host.includes('miricanvas.com')) return 'miricanvas';
+    const url = typeof window !== 'undefined' ? window.location?.href : '';
+    const adapter = getAdapterForUrl(url);
+    if (adapter) return adapter.platformId;
     return 'unknown';
   }
 
   /**
-   * Detects the active microstock contributor platform display name based on hostname.
+   * Detects the active microstock contributor platform display name based on active URL adapter.
    * @returns {string} Platform display name
    */
   detectPlatform() {
-    const host = window.location.hostname.toLowerCase();
-    if (host.includes('stock.adobe.com')) return 'Adobe Stock';
-    if (host.includes('shutterstock.com')) return 'Shutterstock';
-    if (host.includes('dreamstime.com')) return 'Dreamstime';
-    if (host.includes('vecteezy.com')) return 'Vecteezy';
-    if (host.includes('freepik.com') || host.includes('magnific.com')) return 'Freepik (Magnific)';
-    if (host.includes('depositphotos.com')) return 'Depositphotos';
-    if (host.includes('miricanvas.com')) return 'MiriCanvas';
+    const url = typeof window !== 'undefined' ? window.location?.href : '';
+    const adapter = getAdapterForUrl(url);
+    if (adapter) return adapter.platformName;
     return 'Unknown Page';
   }
 
@@ -558,6 +548,10 @@ export class OverlayHUD {
     this.wrapper = this.shadow.querySelector('#rjHudWrapper');
     this.cardEl = this.shadow.querySelector('#rjHudCard');
     this.pillEl = this.shadow.querySelector('#rjHudPill');
+
+    if (!this.isVisible && this.wrapper) {
+      this.wrapper.classList.add('rj-hidden');
+    }
 
     // Attach listeners
     this.attachEventListeners();
@@ -1171,16 +1165,7 @@ export class OverlayHUD {
           if (signal.aborted) break;
           await sleep(500);
 
-          // Step 5: Clear existing metadata (Temporarily disabled/commented out; clearing delegated sequentially inside platform adapters)
-          /*
-          if (this.platformId !== 'adobestock') {
-            await adapter.clearMetadata();
-            if (signal.aborted) break;
-            await sleep(300);
-          }
-          */
-
-          // Step 6: Inject sanitized metadata
+          // Step 5: Inject sanitized metadata
           if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving card)...' : 'Injecting metadata...';
 
           const platformSettings = this.currentConfig?.platformSettings?.[this.platformId] || {};
@@ -1193,8 +1178,8 @@ export class OverlayHUD {
           await adapter.fillMetadata(sanitizedData, platformOptions, card);
           processedCount++;
 
-          // Step 7: Per-item save (for Freepik and Dreamstime)
-          if (this.platformId === 'freepik' || this.platformId === 'dreamstime') {
+          // Step 6: Per-item save (for Freepik)
+          if (this.platformId === 'freepik') {
             await adapter.saveDraft();
           }
 
@@ -1217,7 +1202,7 @@ export class OverlayHUD {
         // If stop was requested while processing this card, finish here and proceed to bulk save
         if (this.isStopping || signal.aborted) break;
 
-        // Step 8: Cooldown Delay (Responsive to graceful stop)
+        // Step 7: Cooldown Delay (Responsive to graceful stop)
         if (statusText) statusText.textContent = 'Cooldown...';
         const minWait = this._cooldownMin ?? 1000;
         const maxWait = this._cooldownMax ?? 5000;
@@ -1229,14 +1214,6 @@ export class OverlayHUD {
         }
 
         if (this.isStopping || signal.aborted) break;
-
-        // Dreamstime special carousel navigation
-        if (this.platformId === 'dreamstime') {
-          const navResult = await adapter.navigateToNext();
-          if (navResult?.done) {
-            break;
-          }
-        }
       }
 
       // End of Loop / Bulk Save (Triggers on completion or graceful stop)
@@ -1678,10 +1655,12 @@ export class OverlayHUD {
 
     // Trigger graceful entry animation based on active state
     if (this.isMinimized && this.pillEl) {
+      this.pillEl.classList.remove('rj-hidden');
       this.pillEl.classList.remove('rj-pill-exiting');
       this.pillEl.classList.add('rj-pill-entering');
       setTimeout(() => this.pillEl.classList.remove('rj-pill-entering'), 220);
     } else if (this.cardEl) {
+      this.cardEl.classList.remove('rj-hidden');
       this.cardEl.classList.remove('rj-anim-minimizing');
       this.cardEl.classList.add('rj-anim-expanding');
       setTimeout(() => this.cardEl.classList.remove('rj-anim-expanding'), 240);
@@ -1695,8 +1674,9 @@ export class OverlayHUD {
 
   /**
    * Hides the overlay HUD with exit animation.
+   * @param {boolean} [animate=true]
    */
-  hide() {
+  hide(animate = true) {
     if (!this.wrapper) return;
     this.isVisible = false;
 
@@ -1704,10 +1684,19 @@ export class OverlayHUD {
       chrome.storage.local.set({ rj_overlay_visible: false });
     }
 
+    if (!animate) {
+      this.wrapper.classList.add('rj-hidden');
+      if (this.isMinimized && this.pillEl) {
+        this.pillEl.classList.add('rj-hidden');
+      }
+      return;
+    }
+
     if (this.isMinimized && this.pillEl) {
       this.pillEl.classList.add('rj-pill-exiting');
       setTimeout(() => {
         this.wrapper.classList.add('rj-hidden');
+        this.pillEl.classList.add('rj-hidden');
         this.pillEl.classList.remove('rj-pill-exiting');
       }, 120);
     } else if (this.cardEl) {
@@ -1742,20 +1731,37 @@ export class OverlayHUD {
         return;
       }
 
-      chrome.storage.local.get(['rj_hud_pos'], (res) => {
+      chrome.storage.local.get(['rj_hud_pos', 'rj_overlay_visible'], (res) => {
         if (chrome.runtime.lastError) {
           logger.warn('Storage load error:', chrome.runtime.lastError);
           resolve();
           return;
         }
 
-        if (res && res.rj_hud_pos) {
-          const { top, left, isMinimized } = res.rj_hud_pos;
-          if (typeof left === 'number' && typeof top === 'number') {
-            this.clampAndSetPosition(left, top);
+        if (res) {
+          if (res.rj_hud_pos) {
+            const { top, left, isMinimized } = res.rj_hud_pos;
+            if (typeof left === 'number' && typeof top === 'number') {
+              this.clampAndSetPosition(left, top);
+            }
+            if (typeof isMinimized === 'boolean' && isMinimized) {
+              this.setMinimized(true, false, false);
+            }
           }
-          if (typeof isMinimized === 'boolean' && isMinimized) {
-            this.setMinimized(true, false, false);
+
+          if (res.rj_overlay_visible === false) {
+            this.isVisible = false;
+            if (this.wrapper) {
+              this.wrapper.classList.add('rj-hidden');
+            }
+            if (this.isMinimized && this.pillEl) {
+              this.pillEl.classList.add('rj-hidden');
+            }
+          } else {
+            this.isVisible = true;
+            if (this.wrapper) {
+              this.wrapper.classList.remove('rj-hidden');
+            }
           }
         }
         resolve();

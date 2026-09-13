@@ -5,17 +5,31 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Keyword Bulk Trash Elimination & Reactive Verified Per-Chip Removal with Disappearance Polling & Bottom-Up Scroll, Sequential Form Ordering, Keyword Chip Creation, Trash Button Discrimination, Bulk Save Button Disabled & Toast Wait with 2000ms Sync Buffer & Fresh Navbar Uncheck, Depositphotos Full-String Native Comma Splitting, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
-- **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(miricanvas): eliminate keyword bulk trash logic and implement reactive verified per-chip removal`
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Sub-phase 5.1: Overlay Persistence, Dead Code Removal & Duplication Fixing Complete)
+- **Active Branch**: `task/e2e-hardening-polish`
+- **Latest Commit**: `fix(overlay): persist overlay visibility across navigations, remove dead code and unify platform detection`
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (113/113 passed on Tier 3, 750+ assertions across all suites, zero emoji clean)
+- **Build / Test State**: Verified healthy (35/35 passed on Sub-phase 5.1 suite, 57/57 passed on orchestrator suite, 113/113 passed on Tier 3, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned MiriCanvas, Depositphotos, Dreamstime, Vecteezy, and Freepik (Magnific):
+Sub-phase 5.1 has resolved overlay auto-mount persistence, eliminated obsolete stub files and unreachable code, and unified platform detection:
+1. **Overlay Visibility & Navigation Persistence Bugfix (`src/overlay/overlay.js`, `src/content/content_main.js`)**:
+   - Resolved the cross-page auto-mount bug where closing the HUD on one site (e.g. Google) caused it to pop up again upon navigating to another domain (e.g. YouTube).
+   - In `content_main.js`, page auto-mount reads `chrome.storage.local.get(['rj_overlay_visible'])` before mounting. If `false`, the HUD initializes and mounts immediately in hidden state (`.rj-hidden`) without visual flashing.
+   - In `OverlayHUD.restorePositionAndState()`, reads `['rj_hud_pos', 'rj_overlay_visible']`. If `rj_overlay_visible === false`, sets `this.isVisible = false`, adds `.rj-hidden` to `wrapper` and `pillEl`. If `true`, removes `.rj-hidden` and sets `this.isVisible = true`.
+   - In `show()` and `hide(animate = true)`, updates `chrome.storage.local.set({ rj_overlay_visible: true / false })` and toggles `.rj-hidden` accordingly.
+   - In `content_main.js` message listener, `PING_HUD`, `GET_OVERLAY_STATE`, and `TOGGLE_OVERLAY` accurately report and toggle `isVisible: Boolean(hud && hud.isVisible)`.
+2. **Dead Code & Scaffolding Files Removal**:
+   - Deleted obsolete Phase 0/1 stub files never imported in `src/`: `src/services/AiVisionService.js` and `src/services/PromptBuilder.js` (both superseded by `AiService.js` and `AiPrompt.js`).
+   - Cleaned `src/overlay/overlay.js`: removed commented-out `clearMetadata` block (lines 1175–1181), simplified Section 6B per-item save to Freepik only (`if (this.platformId === 'freepik')`), and eliminated unreachable Dreamstime Section 6B carousel navigation (lines 1234–1239) which is already completely handled in Section 6A.
+3. **Unified Platform Detection in `overlay.js`**:
+   - Eliminated hardcoded domain string checks in `detectPlatformId()` and `detectPlatform()`.
+   - Leverages central adapter registry `getAdapterForUrl(window.location.href)` directly. Returns `adapter.platformId` (or `'unknown'`) and `adapter.platformName` (or `'Unknown Page'`).
+4. **Previous Phase 4 Achievements**:
+   - Phase 4 platform adapters (Adobe Stock, Shutterstock, Freepik / Magnific, Vecteezy, Dreamstime, Depositphotos, MiriCanvas) fully merged to `dev`.
 1. **MiriCanvas Live Alignment (`designhub.miricanvas.com/en/element/to-do`)**:
    - **Keyword Bulk Trash Elimination & Reactive Verified Per-Chip Removal Engine (`clearKeywords()`)**: Eliminated the keyword bulk trash button completely as requested. Replaced with a reactive, verified per-chip removal engine:
      1. *Dynamic Querying*: Re-evaluates `getExistingChips()` on each iteration rather than operating on a stale array.
@@ -128,14 +142,15 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
 
 ---
 
-## 3. Actionable Next Steps for Incoming Agent (Phase 5)
+## 3. Actionable Next Steps for Incoming Agent
 
-1. **Step 1 (Live Browser Verification on Magnific / Freepik)**:
-   - Contributor reloads unpacked extension (`chrome://extensions`).
-   - Opens `https://contributor.magnific.com/catalog/pending-files/1`.
-   - Confirms Overlay HUD detects `"Freepik (Magnific)"` with correct asset count, popup shows `"Ready on Tab"`, and runs automation with per-item draft save verification.
-2. **Step 2 (Branch Review & Integration)**:
-   - Contributor reviews Phase 4 changes on `task/platform-adapters` and merges into `dev` using `git merge --no-ff`.
+1. **Step 1 (Sub-phase 5.2: State Schema & Background Relay)**:
+   - Expand `rj_automation_state` schema in `StorageService.js` / storage helpers: `{ isRunning, isStopping, status, platformId, timestamp }`.
+   - Ensure `startAutomation()`, `stopAutomation()`, and status updates in `src/overlay/overlay.js` sync state changes to `chrome.storage.local`.
+2. **Step 2 (Sub-phase 5.2: Popup UI State Sync & Stop Trigger)**:
+   - Update `src/popup/popup.js` `chrome.storage.onChanged` listener to reflect active automation status dynamically (disabling/enabling form controls, updating status indicator, and wiring Stop button).
+3. **Step 3 (Sub-phase 5.2: Verification)**:
+   - Write unit test in `scratch/test_subphase_5_2.mjs` validating bi-directional state synchronization between in-page HUD and popup UI during idle, running, stopping, and completed states.
 
 ---
 
@@ -143,6 +158,7 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 42 | 2026-09-13 | `task/e2e-hardening-polish` | `fix(overlay)` | Persisted overlay visibility across navigations via rj_overlay_visible, deleted obsolete stub files (AiVisionService, PromptBuilder), and unified platform detection via central adapter registry getAdapterForUrl | Sub-phase 5.2: HUD <-> Popup Automation State Synchronization & Graceful Stop |
 | 41 | 2026-09-12 | `task/platform-adapters` | `fix(depositphotos)` | Align .itemslist > div.itemeditor card selectors, progressive scroll & stub waiting, card-scoped form filling, condition-checked clearing, to-top bulkSave | Live browser verification on Depositphotos |
 | 40 | 2026-09-11 | `task/platform-adapters` | `fix(dreamstime)` | Subcategory polling, condition-checked clear buttons, single-word keywords, toast lifecycle waiting, and in-page carousel loop | Live browser verification on Dreamstime |
 | 39 | 2026-09-10 | `task/platform-adapters` | `fix(vecteezy)` | Scope metadata editor to right panel, add prepareAutomation, clear buttons, software dropdown, and fix bulkSave selector | Live browser verification on Vecteezy |
@@ -154,12 +170,6 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
 | 33 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Async spelling auto-correct polling, save button spinner resolution wait, post-save deselect page, responsive cooldown stop | Live browser testing on Shutterstock |
 | 32 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Background CORS image proxy, deepest MUI selectors, sequential clearing, tightened delays, LoggerService wired, 666/666 tests pass | Live browser testing on Shutterstock |
 | 31 | 2026-09-10 | `task/platform-adapters` | `feat(logging)` | Implemented LoggerService.js, wired into AdobeStockAdapter, disabled global clearMetadata in overlay, verified 336/336 tests | Phase 5: End-to-End Live Browser Testing & Polish |
-2. **Step 2 (Phase 5: End-to-End Live Browser Testing & Polish)**:
-   - Load unpacked extension into Chromium browser (`chrome://extensions`).
-   - Live browser testing across available contributor dashboards (Adobe Stock, Shutterstock, Freepik, Vecteezy, Dreamstime, Depositphotos, MiriCanvas).
-   - Verify real thumbnail extraction, vision inference, and native input injection.
-3. **Step 3 (Packaging & Release)**:
-   - Build extension package zip and finalize release documentation.
 
 ---
 
