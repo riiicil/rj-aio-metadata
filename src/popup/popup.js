@@ -792,6 +792,27 @@ function updateAutomationButtonUI(state) {
 }
 
 /**
+ * Auto-heals stuck automation state across storage and popup UI.
+ */
+function autoHealAutomationState() {
+  isStopping = false;
+  isAutomationRunning = false;
+  updateAutomationButtonUI({ isRunning: false, isStopping: false, status: 'idle' });
+  setFormDisabledState(false);
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    chrome.storage.local.set({
+      rj_automation_state: {
+        isRunning: false,
+        isStopping: false,
+        status: 'idle',
+        platformId: null,
+        timestamp: Date.now()
+      }
+    });
+  }
+}
+
+/**
  * Event Listeners Initialization
  */
 document.addEventListener('DOMContentLoaded', async () => {
@@ -799,10 +820,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     await new Promise((resolve) => {
       chrome.storage.local.get(['rj_automation_state'], (res) => {
-        if (res && res.rj_automation_state) {
-          updateAutomationButtonUI(res.rj_automation_state);
+        const state = res?.rj_automation_state;
+        const hasActiveState = state && (state.isRunning || state.isStopping || state.status === 'stopping');
+
+        if (hasActiveState && chrome.tabs?.query) {
+          // Verify with active tab whether automation is genuinely running in the page context
+          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            const activeTab = tabs && tabs[0];
+            if (!activeTab || !activeTab.id) {
+              autoHealAutomationState();
+              resolve();
+              return;
+            }
+
+            chrome.tabs.sendMessage(activeTab.id, { action: 'PING_HUD' }, (hudRes) => {
+              if (chrome.runtime?.lastError || !hudRes || (!hudRes.isAutomationRunning && !hudRes.isStopping)) {
+                // Content script not running automation: auto-heal storage and UI
+                autoHealAutomationState();
+              } else {
+                // Truly active automation confirmed in active tab
+                updateAutomationButtonUI(state);
+              }
+              resolve();
+            });
+          });
+        } else {
+          if (state) updateAutomationButtonUI(state);
+          resolve();
         }
-        resolve();
       });
     });
   }
@@ -995,7 +1040,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Event: Start / Stop Automation Toggle
   btnToggleAutomation.addEventListener('click', () => {
-    if (isStopping) return;
+    if (isStopping) {
+      autoHealAutomationState();
+      showToast('Automation reset to idle');
+      return;
+    }
 
     if (isAutomationRunning) {
       if (typeof chrome !== 'undefined' && chrome.storage?.local) {

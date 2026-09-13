@@ -52,7 +52,12 @@ if (typeof chrome !== 'undefined' && chrome.storage?.local) {
 // Listen for runtime messages from background service worker or popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'PING_HUD') {
-    sendResponse({ pong: true, isVisible: Boolean(hud && hud.isVisible) });
+    sendResponse({
+      pong: true,
+      isVisible: Boolean(hud && hud.isVisible),
+      isAutomationRunning: Boolean(hud && hud.isAutomationRunning),
+      isStopping: Boolean(hud && hud.isStopping)
+    });
     return;
   }
 

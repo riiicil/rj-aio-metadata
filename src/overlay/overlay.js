@@ -1117,23 +1117,29 @@ export class OverlayHUD {
           const state = res.rj_automation_state;
           const isRunning = Boolean(state.isRunning);
           const isStopping = Boolean(state.isStopping || state.status === 'stopping');
+
+          // Auto-heal on page mount: A newly mounted overlay instance on page reload is never
+          // actively stopping an old batch from a dead JS execution context.
+          if (isStopping || (isRunning && !this.orchestrator?.isProcessing)) {
+            this.isAutomationRunning = false;
+            this.isStopping = false;
+            this.updateAutomationUI(false);
+            chrome.storage.local.set({
+              rj_automation_state: {
+                isRunning: false,
+                isStopping: false,
+                status: 'idle',
+                platformId: this.platformId || null,
+                timestamp: Date.now()
+              }
+            });
+            resolve();
+            return;
+          }
+
           this.isAutomationRunning = isRunning;
           this.isStopping = isStopping;
-          if (isStopping) {
-            this.updateAutomationUI(true);
-            const btn = this.shadow?.querySelector('#rjBtnToggleAutomation');
-            const btnText = this.shadow?.querySelector('#rjAutomationBtnText');
-            if (btn) {
-              btn.classList.remove('rj-btn-start', 'rj-btn-stop', 'rj-btn-accent');
-              btn.classList.add('rj-btn-stopping', 'rj-btn-disabled');
-              btn.disabled = true;
-              btn.title = 'Stopping automation (saving work)...';
-            }
-            if (btnText) btnText.textContent = 'Stopping...';
-            this.setStatusBadge('Stopping...');
-          } else {
-            this.updateAutomationUI(isRunning);
-          }
+          this.updateAutomationUI(isRunning);
         }
         resolve();
       });

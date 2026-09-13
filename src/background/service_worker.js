@@ -606,5 +606,57 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
       });
       return true;
     }
+
+    if (message.action === 'RESET_AUTOMATION_STATE') {
+      resetAutomationState();
+      sendResponse({ success: true });
+      return true;
+    }
   });
 }
+
+/**
+ * Resets persisted automation state to idle across tabs and storage.
+ */
+export function resetAutomationState() {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    chrome.storage.local.set({
+      rj_automation_state: {
+        isRunning: false,
+        isStopping: false,
+        status: 'idle',
+        platformId: null,
+        timestamp: Date.now()
+      }
+    });
+  }
+}
+
+// Reset automation state on extension startup or install/reload
+if (typeof chrome !== 'undefined') {
+  if (chrome.runtime?.onInstalled) {
+    chrome.runtime.onInstalled.addListener(() => {
+      resetAutomationState();
+    });
+  }
+  if (chrome.runtime?.onStartup) {
+    chrome.runtime.onStartup.addListener(() => {
+      resetAutomationState();
+    });
+  }
+
+  // Auto-heal on tab reload/navigation: if a tab is loading, reset stale automation state
+  if (chrome.tabs?.onUpdated) {
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+      if (changeInfo.status === 'loading') {
+        chrome.storage.local.get(['rj_automation_state'], (res) => {
+          const state = res?.rj_automation_state;
+          if (state && (state.isRunning || state.isStopping || state.status === 'stopping')) {
+            resetAutomationState();
+          }
+        });
+      }
+    });
+  }
+}
+

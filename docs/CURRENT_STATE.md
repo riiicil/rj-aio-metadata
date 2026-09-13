@@ -112,6 +112,8 @@
 ## 6. Testing & Build Verification Status
 
 - Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `overlay/`, `styles/`, `services/`, `adapters/*`).
+- Targeted Adobe Stock dropdown & multi-layer auto-healing suite verified with `scratch/test_adobe_dropdown_and_autoheal.mjs` (16/16 assertions passed: fast-path already-set 0-click bypass, single-attempt interaction with scrollbar centering, OverlayHUD page mount auto-heal, Popup dead tab auto-heal).
+- Tier 1 platform adapters verified with `scratch/test_tier1_adapters.mjs` (87/87 assertions passed).
 - Sub-phase 5.6 suite verified with `scratch/test_subphase_5_6.mjs` (45/45 assertions passed: AutomationOrchestrator class exports, OverlayHUD composition & delegation, multi-card execution loop with mock adapter, graceful/force stop mechanics, and overlay.js 572-line reduction).
 - Sub-phase 5.5 suite verified with `scratch/test_subphase_5_5.mjs` (77/77 assertions passed: module export contracts, individual HTML generators across 7 platforms, Freepik AI limit clamping to 49, XSS escaping, and popup.js integration and export preservation).
 - Sub-phase 5.4 suite verified with `scratch/test_subphase_5_4.mjs` (73/73 assertions passed: asset optimization to 60.3 KB, active button emerald teal theme alignment, overlay spin keyframe and spinner class, pill spinner lifecycle, and status badge tooltip clamping).

@@ -73,11 +73,13 @@ export function setNativeValue(element, value) {
   const safeValue = value ?? '';
 
   try {
-    const prototype = (typeof HTMLTextAreaElement !== 'undefined' && element instanceof HTMLTextAreaElement)
-      ? HTMLTextAreaElement.prototype
-      : (typeof HTMLInputElement !== 'undefined' && element instanceof HTMLInputElement)
-        ? HTMLInputElement.prototype
-        : Object.getPrototypeOf(element);
+    const prototype = (typeof HTMLSelectElement !== 'undefined' && element instanceof HTMLSelectElement)
+      ? HTMLSelectElement.prototype
+      : (typeof HTMLTextAreaElement !== 'undefined' && element instanceof HTMLTextAreaElement)
+        ? HTMLTextAreaElement.prototype
+        : (typeof HTMLInputElement !== 'undefined' && element instanceof HTMLInputElement)
+          ? HTMLInputElement.prototype
+          : Object.getPrototypeOf(element);
 
     const descriptor = prototype ? Object.getOwnPropertyDescriptor(prototype, 'value') : null;
     const nativeSetter = descriptor?.set;

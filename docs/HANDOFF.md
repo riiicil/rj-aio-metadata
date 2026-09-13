@@ -5,11 +5,11 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Adobe Stock Dropdown ID & Scroll Fix Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Adobe Stock Dropdown Direct Inject & State Auto-Healing Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: `fix(adobestock): resolve dropdown language selection by strict ID matching and scrollbar centering`
+- **Latest Commit**: Pending (`fix(adobestock): direct inject select fallback and auto-heal stuck automation state`)
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (87/87 passed on Tier 1 adapter suite, 45/45 passed on Sub-phase 5.6 suite, zero native emoji clean)
+- **Build / Test State**: Verified healthy (16/16 passed on targeted suite, 87/87 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
 
 ---
 
@@ -209,6 +209,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 48 | 2026-09-13 | `task/e2e-hardening-polish` | `fix(adobestock)` | Implemented direct native select fast-path and single-attempt waitForElement interaction in AdobeStockAdapter, eliminating 3x dropdown open/close loops; added 4-layer auto-healing across Service Worker, Router, Overlay, and Popup for stuck automation states, 16/16 and 87/87 tests passed | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
 | 47 | 2026-09-13 | `task/e2e-hardening-polish` | `refactor(overlay)` | Extracted automation execution loop and graceful stop into AutomationOrchestrator.js, reducing overlay.js by 572 lines (45/45 tests passed) | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
 | 46 | 2026-09-13 | `task/e2e-hardening-polish` | `refactor(popup)` | Extracted all 7 platform dynamic form generators into dedicated ES module platform_forms.js, reducing popup.js by 257 lines (77/77 tests passed) | Sub-phase 5.6: Overlay Modularization (Extract AutomationOrchestrator.js) |
 | 45 | 2026-09-13 | `task/e2e-hardening-polish` | `style(ui)` | Optimized logo asset (~60 KB), aligned active button theme to Emerald Teal, added pill spinner, and clamped badge text with tooltips (66/66 tests passed) | Sub-phase 5.5: Popup Modularization (Extract `platform_forms.js`) |

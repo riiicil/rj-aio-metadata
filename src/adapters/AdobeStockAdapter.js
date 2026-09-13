@@ -270,9 +270,9 @@ export class AdobeStockAdapter extends BaseAdapter {
   }
 
   /**
-   * Helper to set either Adobe React Spectrum custom dropdown button or fallback native select.
-   * Operates strictly by invariant numeric ID (data-key/value) without relying on UI labels,
-   * and manages scrollbar container positioning to prevent zoom/overflow clipping.
+   * Sets either native select via Direct Select Injection (primary strategy: fast, 0 UI flicker, immune to zoom/clipping)
+   * or React Spectrum button dropdown as fallback.
+   * Operates strictly by invariant numeric ID without relying on UI labels.
    *
    * @private
    */
@@ -281,98 +281,121 @@ export class AdobeStockAdapter extends BaseAdapter {
 
     const stringTargetKey = String(targetKey);
 
-    // 1. Check and set native select strictly by target option value ID
-    const nativeSelect = document.querySelector(selectSelector);
-    if (nativeSelect) {
-      let matchedOpt = null;
-      if (nativeSelect.options && Array.isArray(Array.from(nativeSelect.options))) {
-        for (const opt of Array.from(nativeSelect.options)) {
-          if (String(opt.value) === stringTargetKey) {
-            matchedOpt = opt;
-            break;
-          }
-        }
-      }
+    // 1. Direct match check on native select (Already set: return immediately without touching UI)
+    let nativeSelect = document.querySelector(selectSelector);
+    if (nativeSelect && String(nativeSelect.value) === stringTargetKey) {
+      (this.logger || logger).info?.(`Dropdown ${selectSelector} already matches ${stringTargetKey}`);
+      return true;
+    }
 
-      if (matchedOpt) {
-        nativeSelect.selectedIndex = matchedOpt.index;
-        setNativeValue(nativeSelect, matchedOpt.value);
-      } else {
-        setNativeValue(nativeSelect, stringTargetKey);
+    // 2. Direct Select Injection (PRIMARY STRATEGY: instant, reliable, zero UI clipping across zoom levels)
+    if (!nativeSelect || (typeof document.contains === 'function' && !document.contains(nativeSelect))) {
+      nativeSelect = document.querySelector(selectSelector);
+    }
+    if (nativeSelect) {
+      setNativeValue(nativeSelect, stringTargetKey);
+      nativeSelect.value = stringTargetKey;
+      nativeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      nativeSelect.dispatchEvent(new Event('input', { bubbles: true }));
+      await sleep(200);
+
+      if (String(nativeSelect.value) === stringTargetKey) {
+        (this.logger || logger).info?.(`Dropdown confirmed via direct select injection: ${stringTargetKey}`);
+        return true;
       }
     }
 
-    // 2. React Spectrum Button Dropdown
+    // 3. Fallback: React Spectrum Button Dropdown interaction (if native select wasn't confirmed)
     const triggerBtn = document.querySelector(buttonSelector);
+    const optionSelectors = [
+      `div[role="option"][id$="-option-${stringTargetKey}"]`,
+      `[role="option"][id$="-option-${stringTargetKey}"]`,
+      `div[role="option"][data-key="${stringTargetKey}"]`,
+      `[role="option"][data-key="${stringTargetKey}"]`,
+      `[data-key="${stringTargetKey}"]`
+    ].join(', ');
+
     if (triggerBtn) {
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        const isExpanded = triggerBtn.getAttribute?.('aria-expanded') === 'true';
-        if (!isExpanded) {
-          simulateClick(triggerBtn);
-          await sleep(250);
-        }
+      const isExpanded = triggerBtn.getAttribute?.('aria-expanded') === 'true';
+      if (!isExpanded) {
+        simulateClick(triggerBtn);
+        await sleep(250);
+      }
 
-        // Find listbox container
+      // Wait up to 3000ms for option element to appear in DOM (handles Spectrum portal mount & animations)
+      let optionEl = null;
+      try {
+        optionEl = await waitForElement(optionSelectors, document, 3000);
+      } catch {
+        optionEl = null;
+      }
+
+      // If not immediately visible, check listbox scroll container to find virtualized/clipped items
+      if (!optionEl) {
         const listbox = document.querySelector('div[role="listbox"], .spectrum-Menu, [role="listbox"]');
-        let optionEl = listbox
-          ? listbox.querySelector(`[role="option"][data-key="${stringTargetKey}"], [data-key="${stringTargetKey}"], [id$="-option-${stringTargetKey}"]`)
-          : document.querySelector(`div[role="option"][data-key="${stringTargetKey}"], [role="option"][data-key="${stringTargetKey}"]`);
-
-        // If listbox has scrollbar and optionEl is not immediately in DOM (e.g. virtualized), scan by scrolling
-        if (listbox && !optionEl && listbox.scrollHeight > listbox.clientHeight) {
+        if (listbox && listbox.scrollHeight > listbox.clientHeight) {
           const maxScroll = listbox.scrollHeight - listbox.clientHeight;
-          const step = Math.max(50, Math.floor(listbox.clientHeight * 0.7));
+          const step = Math.max(80, Math.floor(listbox.clientHeight * 0.8));
           for (let pos = 0; pos <= maxScroll && !optionEl; pos += step) {
             listbox.scrollTop = pos;
             await sleep(100);
-            optionEl = listbox.querySelector(`[role="option"][data-key="${stringTargetKey}"], [data-key="${stringTargetKey}"], [id$="-option-${stringTargetKey}"]`);
+            optionEl = listbox.querySelector(optionSelectors);
           }
         }
+      }
 
-        if (optionEl) {
-          // Scroll listbox container to vertically center the target option (prevents boundary clipping across zoom levels)
-          if (listbox && listbox.scrollHeight > listbox.clientHeight) {
-            const optionTop = optionEl.offsetTop;
-            const optionHeight = optionEl.offsetHeight || 32;
-            const listboxHeight = listbox.clientHeight;
-            listbox.scrollTop = Math.max(0, optionTop - (listboxHeight / 2) + (optionHeight / 2));
-            await sleep(100);
+      if (optionEl) {
+        // Scroll listbox container to vertically center the target option (prevents zoom / boundary clipping)
+        const listbox = optionEl.closest?.('div[role="listbox"], .spectrum-Menu, [role="listbox"]')
+          || document.querySelector('div[role="listbox"], .spectrum-Menu, [role="listbox"]');
+        if (listbox && listbox.scrollHeight > listbox.clientHeight) {
+          const optionTop = optionEl.offsetTop || 0;
+          const optionHeight = optionEl.offsetHeight || 32;
+          const listboxHeight = listbox.clientHeight || 200;
+          listbox.scrollTop = Math.max(0, optionTop - (listboxHeight / 2) + (optionHeight / 2));
+          await sleep(50);
+        }
+
+        // Scroll into view if needed
+        if (typeof optionEl.scrollIntoView === 'function') {
+          try {
+            optionEl.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+          } catch {
+            // Ignore scroll errors in mock environments
           }
+        }
+        await sleep(150);
 
-          if (typeof optionEl.scrollIntoView === 'function') {
-            try {
-              optionEl.scrollIntoView({ block: 'center', behavior: 'instant' });
-            } catch {
-              // Ignore scroll errors in mock environments
-            }
-          }
-          await sleep(150);
+        // Click target: prefer inner item label/grid if present, fallback to optionEl
+        const clickTarget = optionEl.querySelector?.('.spectrum-Menu-itemLabel, .spectrum-Menu-itemGrid, span') || optionEl;
+        simulateClick(clickTarget);
+        if (clickTarget !== optionEl) {
+          simulateClick(optionEl);
+        }
+        if (typeof optionEl.click === 'function') {
+          try { optionEl.click(); } catch {}
+        }
+        await sleep(350);
 
-          // Click target: prefer inner item label/grid if present, fallback to optionEl
-          const clickTarget = optionEl.querySelector?.('.spectrum-Menu-itemLabel, .spectrum-Menu-itemGrid, span') || optionEl;
-          simulateClick(clickTarget);
-          if (clickTarget !== optionEl) {
-            simulateClick(optionEl);
-          }
-
-          // Keyboard Enter navigation fallback
-          if (typeof optionEl.focus === 'function') {
-            try {
-              optionEl.focus();
-              simulateEnterKey(optionEl);
-            } catch {
-              // Ignore focus errors
-            }
-          }
-
-          await sleep(350);
+        // Re-check native select confirmation
+        if (!nativeSelect || (typeof document.contains === 'function' && !document.contains(nativeSelect))) {
+          nativeSelect = document.querySelector(selectSelector);
+        }
+        if (nativeSelect && String(nativeSelect.value) === stringTargetKey) {
+          (this.logger || logger).info?.(`Dropdown confirmed via option click: ${stringTargetKey}`);
           return true;
         }
 
-        // Close dropdown before retry attempt if still expanded
+        // Close dropdown if still expanded after option click
         if (triggerBtn.getAttribute?.('aria-expanded') === 'true') {
           simulateClick(triggerBtn);
-          await sleep(150);
+          await sleep(200);
+        }
+      } else {
+        // Option element not found in DOM, close dropdown cleanly
+        if (triggerBtn.getAttribute?.('aria-expanded') === 'true') {
+          simulateClick(triggerBtn);
+          await sleep(200);
         }
       }
     }
