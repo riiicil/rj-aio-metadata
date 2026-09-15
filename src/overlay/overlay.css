@@ -487,6 +487,20 @@
   filter: none !important;
 }
 
+.rj-hud-btn-action.rj-btn-locked {
+  background-color: #141719 !important;
+  color: #c0c4c7 !important;
+  border: 1px solid #282b2e !important;
+  cursor: not-allowed !important;
+  opacity: 0.95 !important;
+  pointer-events: none !important;
+  filter: none !important;
+}
+
+.rj-hud-btn-action.rj-btn-locked svg {
+  stroke: #8a9096 !important;
+}
+
 .rj-hud-btn-action:disabled,
 .rj-hud-btn-action[disabled] {
   opacity: 0.45 !important;

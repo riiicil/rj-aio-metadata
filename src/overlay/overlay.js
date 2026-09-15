@@ -816,7 +816,7 @@ export class OverlayHUD {
 
     if (btn) {
       btn.classList.remove('rj-btn-start', 'rj-btn-stop', 'rj-btn-stopping', 'rj-btn-accent');
-      btn.classList.add('rj-btn-disabled');
+      btn.classList.add('rj-btn-disabled', 'rj-btn-locked');
       btn.disabled = true;
       btn.title = `Automation is currently running on ${runnerName}. Stop it on that tab or wait until finished.`;
     }
@@ -987,7 +987,7 @@ export class OverlayHUD {
 
     if (isRunning) {
       if (btn) {
-        btn.classList.remove('rj-btn-start', 'rj-btn-stopping', 'rj-btn-disabled');
+        btn.classList.remove('rj-btn-start', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
         btn.classList.add('rj-btn-stop');
         btn.disabled = false;
         btn.title = 'Stop Automation';
@@ -1007,7 +1007,7 @@ export class OverlayHUD {
         return;
       }
       if (btn) {
-        btn.classList.remove('rj-btn-stop', 'rj-btn-stopping', 'rj-btn-disabled');
+        btn.classList.remove('rj-btn-stop', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
         btn.classList.add('rj-btn-start');
         if (this.platformId === 'unknown') {
           btn.disabled = true;

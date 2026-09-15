@@ -5,9 +5,9 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Exclusive Automation Concurrency Lock & Multi-Tab Isolation Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Locked Button Contrast Hardening & Popup Concurrency Sync Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: `6795edc` (`feat(overlay): implement exclusive automation lock across platforms and popup`)
+- **Latest Commit**: `78de78b` (`fix(overlay): improve locked button readability and sync popup lock state`)
 - **Working Tree**: Clean local branch
 - **Build / Test State**: Verified healthy (4/4 on exclusive lock suite, 7/7 on multi-tab isolation suite, 18/18 on Adobe auto-heal suite, 88/88 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
 
@@ -219,7 +219,8 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| 50 | 2026-09-15 | `task/e2e-hardening-polish` | `feat(overlay)` | Implemented exclusive automation concurrency lock (Single Active Runner Policy) across HUD and toolbar popup, disabling start actions on non-runner tabs with Running on [Platform] status and lock SVG icons, 4/4 tests passed | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
+| 51 | 2026-09-16 | `task/e2e-hardening-polish` | `fix(overlay)` | Hardened locked button contrast with .rj-btn-locked styling in HUD and popup, synchronized popup runner lock with active tab and persisted lastAutomationState across boolean updates, 4/4 and 7/7 tests passed | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
+| 50 | 2026-09-15 | `task/e2e-hardening-polish` | `791c639` | Implemented exclusive automation concurrency lock (Single Active Runner Policy) across HUD and toolbar popup, disabling start actions on non-runner tabs with Running on [Platform] status and lock SVG icons, 4/4 tests passed | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
 | 49 | 2026-09-15 | `task/e2e-hardening-polish` | `cdeb90d` | Implemented multi-tab automation state isolation by platformId and tabId scoping across overlay, orchestrator, and service worker, eliminating cross-tab start/stop collision loop and browser freezes (7/7 tests passed) | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
 | 48 | 2026-09-13 | `task/e2e-hardening-polish` | `fix(adobestock)` | Implemented direct native select fast-path and single-attempt waitForElement interaction in AdobeStockAdapter, eliminating 3x dropdown open/close loops; added 4-layer auto-healing across Service Worker, Router, Overlay, and Popup for stuck automation states, 16/16 and 87/87 tests passed | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
 | 47 | 2026-09-13 | `task/e2e-hardening-polish` | `refactor(overlay)` | Extracted automation execution loop and graceful stop into AutomationOrchestrator.js, reducing overlay.js by 572 lines (45/45 tests passed) | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |

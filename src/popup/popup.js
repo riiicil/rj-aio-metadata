@@ -23,6 +23,7 @@ let activeTabInfo = null;
 let currentActivePlatformId = null;
 let isAutomationRunning = false;
 let isStopping = false;
+let lastAutomationState = null;
 let autoSaveTimer = null;
 let isSyncingFromStorage = false;
 let isSavingLocally = false;
@@ -757,12 +758,28 @@ function updateAutomationButtonUI(state) {
   let stopping = false;
   let runnerPlatformId = null;
 
-  if (typeof state === 'boolean') {
-    isRunning = state;
-  } else if (state && typeof state === 'object') {
-    isRunning = Boolean(state.isRunning);
-    stopping = Boolean(state.isStopping || state.status === 'stopping');
-    runnerPlatformId = state.platformId || null;
+  if (state && typeof state === 'object') {
+    lastAutomationState = state;
+  }
+
+  const effectiveState = (state !== undefined && state !== null)
+    ? ((typeof state === 'object') ? state : (lastAutomationState || state))
+    : lastAutomationState;
+
+  if (typeof effectiveState === 'boolean') {
+    isRunning = effectiveState;
+    if (isRunning && lastAutomationState && typeof lastAutomationState === 'object') {
+      runnerPlatformId = lastAutomationState.platformId || null;
+      if (lastAutomationState.isStopping) stopping = true;
+    }
+  } else if (effectiveState && typeof effectiveState === 'object') {
+    isRunning = Boolean(effectiveState.isRunning);
+    stopping = Boolean(effectiveState.isStopping || effectiveState.status === 'stopping');
+    runnerPlatformId = effectiveState.platformId || null;
+  }
+
+  if (!isRunning && !stopping && lastAutomationState) {
+    lastAutomationState = { ...lastAutomationState, isRunning: false, isStopping: false, status: 'idle' };
   }
 
   isStopping = stopping;
@@ -770,18 +787,20 @@ function updateAutomationButtonUI(state) {
 
   if (!btnToggleAutomation) return;
 
+  const activePlat = platformSelect?.value || currentActivePlatformId;
+
   // Exclusive Concurrency Lock: Check if automation is active on a different platform
   const isDifferentPlatform = Boolean(
     isAutomationRunning &&
     runnerPlatformId &&
-    currentActivePlatformId &&
-    runnerPlatformId !== currentActivePlatformId
+    activePlat &&
+    runnerPlatformId !== activePlat
   );
 
   if (isDifferentPlatform) {
     const runnerName = PLATFORM_DISPLAY_NAMES[runnerPlatformId] || runnerPlatformId;
     btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-running', 'rj-btn-danger', 'rj-btn-stopping');
-    btnToggleAutomation.classList.add('rj-btn-disabled');
+    btnToggleAutomation.classList.add('rj-btn-disabled', 'rj-btn-locked');
     btnToggleAutomation.disabled = true;
     btnToggleAutomation.title = `Automation is currently running on ${runnerName}. Stop it on that tab or wait until completion.`;
     if (automationBtnText) automationBtnText.textContent = `Running on ${runnerName}`;
@@ -794,7 +813,7 @@ function updateAutomationButtonUI(state) {
   }
 
   if (isStopping) {
-    btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-running', 'rj-btn-danger');
+    btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-running', 'rj-btn-danger', 'rj-btn-locked');
     btnToggleAutomation.classList.add('rj-btn-stopping', 'rj-btn-disabled');
     btnToggleAutomation.disabled = true;
     btnToggleAutomation.title = 'Stopping automation...';
@@ -803,7 +822,7 @@ function updateAutomationButtonUI(state) {
       automationIcon.innerHTML = `<rect x="6" y="6" width="12" height="12" rx="1.5"></rect>`;
     }
   } else if (isRunning) {
-    btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-stopping', 'rj-btn-disabled');
+    btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
     btnToggleAutomation.classList.add('rj-btn-danger', 'rj-btn-running');
     btnToggleAutomation.disabled = false;
     btnToggleAutomation.title = 'Stop Automation';
@@ -812,7 +831,7 @@ function updateAutomationButtonUI(state) {
       automationIcon.innerHTML = `<rect x="6" y="6" width="12" height="12" rx="1.5"></rect>`;
     }
   } else {
-    btnToggleAutomation.classList.remove('rj-btn-danger', 'rj-btn-running', 'rj-btn-stopping', 'rj-btn-disabled');
+    btnToggleAutomation.classList.remove('rj-btn-danger', 'rj-btn-running', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
     btnToggleAutomation.classList.add('rj-btn-accent');
     btnToggleAutomation.disabled = false;
     btnToggleAutomation.title = 'Start Automation';
@@ -850,7 +869,37 @@ function autoHealAutomationState() {
  * Event Listeners Initialization
  */
 document.addEventListener('DOMContentLoaded', async () => {
-  // Restore running automation state if active in overlay
+  // 1. Load Stored Config
+  currentConfig = await StorageService.getConfig();
+
+  // 2. Set Initial Platform & Dynamic Form
+  currentActivePlatformId = currentConfig.activePlatform || 'adobestock';
+  platformSelect.value = currentActivePlatformId;
+  renderPlatformDynamicForm(currentActivePlatformId);
+
+  // 3. Query Background for Active Tab Info (await before checking runner lock)
+  if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+    await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: 'GET_ACTIVE_TAB_INFO' }, response => {
+        activeTabInfo = response;
+        // Auto-select platform if active tab matches a known microstock platform
+        if (activeTabInfo && activeTabInfo.detectedPlatform) {
+          if (currentActivePlatformId !== activeTabInfo.detectedPlatform) {
+            collectActiveFormValues(currentActivePlatformId);
+            currentActivePlatformId = activeTabInfo.detectedPlatform;
+            platformSelect.value = currentActivePlatformId;
+            renderPlatformDynamicForm(currentActivePlatformId);
+          }
+        }
+        updateTabMatchStatus();
+        CustomSelect.enhance(platformSelect);
+        CustomSelect.refresh(platformSelect);
+        resolve();
+      });
+    });
+  }
+
+  // 4. Restore running automation state if active in overlay
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     await new Promise((resolve) => {
       chrome.storage.local.get(['rj_automation_state'], (res) => {
@@ -886,41 +935,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
   }
-  // 1. Load Stored Config
-  currentConfig = await StorageService.getConfig();
 
-  // 2. Set Initial Platform & Dynamic Form
-  currentActivePlatformId = currentConfig.activePlatform || 'adobestock';
-  platformSelect.value = currentActivePlatformId;
-  renderPlatformDynamicForm(currentActivePlatformId);
-  if (isAutomationRunning) {
-    setFormDisabledState(true);
-  }
-
-  // 3. Query Background for Active Tab Info
-  chrome.runtime.sendMessage({ action: 'GET_ACTIVE_TAB_INFO' }, response => {
-    activeTabInfo = response;
-    // Auto-select platform if active tab matches a known microstock platform
-    if (activeTabInfo && activeTabInfo.detectedPlatform) {
-      if (currentActivePlatformId !== activeTabInfo.detectedPlatform) {
-        collectActiveFormValues(currentActivePlatformId);
-        currentActivePlatformId = activeTabInfo.detectedPlatform;
-        platformSelect.value = currentActivePlatformId;
-        renderPlatformDynamicForm(currentActivePlatformId);
-        if (isAutomationRunning) {
-          setFormDisabledState(true);
-        }
-      }
-    }
-    updateTabMatchStatus();
-    CustomSelect.enhance(platformSelect);
-    CustomSelect.refresh(platformSelect);
-  });
-
-  // 4. Set Initial Provider UI
+  // 5. Set Initial Provider UI
   providerSelect.value = currentConfig.activeProvider || 'gemini';
   renderProviderFields(providerSelect.value);
-  updateAutomationButtonUI(isAutomationRunning);
+  updateAutomationButtonUI(lastAutomationState || isAutomationRunning);
+
+  if (isAutomationRunning && !btnToggleAutomation.classList.contains('rj-btn-locked')) {
+    setFormDisabledState(true);
+  }
 
   // Initialize all custom selects outside dynamic form
   CustomSelect.initAll();
@@ -933,11 +956,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentActivePlatformId = platformSelect.value;
     updateTabMatchStatus();
     renderPlatformDynamicForm(currentActivePlatformId);
-    if (isAutomationRunning) {
+    if (isAutomationRunning && !btnToggleAutomation.classList.contains('rj-btn-locked')) {
       setFormDisabledState(true);
     }
     // Dynamically refresh button lock state against active runner
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    if (lastAutomationState) {
+      updateAutomationButtonUI(lastAutomationState);
+    } else if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       chrome.storage.local.get(['rj_automation_state'], (res) => {
         if (res?.rj_automation_state) {
           updateAutomationButtonUI(res.rj_automation_state);
@@ -1078,12 +1103,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnSaveSettings.addEventListener('click', async () => {
     await autoSaveConfig(true);
     showToast('Settings saved automatically');
-    updateAutomationButtonUI(isAutomationRunning);
+    updateAutomationButtonUI(lastAutomationState || isAutomationRunning);
   });
 
   // Event: Start / Stop Automation Toggle
   btnToggleAutomation.addEventListener('click', () => {
-    if (btnToggleAutomation.disabled) return;
+    if (btnToggleAutomation.disabled || btnToggleAutomation.classList.contains('rj-btn-locked')) return;
     if (isStopping) {
       autoHealAutomationState();
       showToast('Automation reset to idle');
