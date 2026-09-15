@@ -608,8 +608,13 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     }
 
     if (message.action === 'RESET_AUTOMATION_STATE') {
-      resetAutomationState();
+      resetAutomationState(message.platformId || null);
       sendResponse({ success: true });
+      return true;
+    }
+
+    if (message.action === 'GET_SENDER_TAB_ID') {
+      sendResponse({ tabId: sender.tab?.id || null, success: true });
       return true;
     }
   });
@@ -617,15 +622,17 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 
 /**
  * Resets persisted automation state to idle across tabs and storage.
+ * @param {string|null} [platformId=null]
  */
-export function resetAutomationState() {
+export function resetAutomationState(platformId = null) {
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
     chrome.storage.local.set({
       rj_automation_state: {
         isRunning: false,
         isStopping: false,
         status: 'idle',
-        platformId: null,
+        platformId: platformId,
+        tabId: null,
         timestamp: Date.now()
       }
     });
@@ -645,17 +652,37 @@ if (typeof chrome !== 'undefined') {
     });
   }
 
-  // Auto-heal on tab reload/navigation: if a tab is loading, reset stale automation state
+  // Auto-heal on tab reload/navigation: strictly verify that the reloading tab is the runner tab
   if (chrome.tabs?.onUpdated) {
     chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       if (changeInfo.status === 'loading') {
         chrome.storage.local.get(['rj_automation_state'], (res) => {
           const state = res?.rj_automation_state;
           if (state && (state.isRunning || state.isStopping || state.status === 'stopping')) {
-            resetAutomationState();
+            // Only auto-heal if this exact tab was running the automation
+            if (state.tabId && state.tabId === tabId) {
+              resetAutomationState(state.platformId);
+            } else if (!state.tabId && tab?.url && state.platformId && tab.url.toLowerCase().includes(state.platformId)) {
+              // Fallback url check if tabId was not recorded
+              resetAutomationState(state.platformId);
+            }
           }
         });
       }
+    });
+  }
+
+  // Auto-heal on runner tab closed: reset state if the tab running automation is closed
+  if (chrome.tabs?.onRemoved) {
+    chrome.tabs.onRemoved.addListener((closedTabId) => {
+      chrome.storage.local.get(['rj_automation_state'], (res) => {
+        const state = res?.rj_automation_state;
+        if (state && (state.isRunning || state.isStopping || state.status === 'stopping')) {
+          if (state.tabId && state.tabId === closedTabId) {
+            resetAutomationState(state.platformId);
+          }
+        }
+      });
     });
   }
 }

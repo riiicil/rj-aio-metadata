@@ -38,6 +38,33 @@ export class AutomationOrchestrator {
   }
 
   /**
+   * Checks if the orchestrator is processing cards or in active execution.
+   * @returns {boolean}
+   */
+  get isProcessing() {
+    return Boolean(this.hud?.isAutomationRunning || this.isCardProcessing);
+  }
+
+  /**
+   * Updates rj_automation_state in chrome.storage.local with tabId and platformId scoping.
+   * @param {Object} patch
+   */
+  _setAutomationState(patch) {
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.set({
+        rj_automation_state: {
+          isRunning: Boolean(patch.isRunning),
+          isStopping: Boolean(patch.isStopping),
+          status: patch.status || 'idle',
+          platformId: this.hud?.platformId || null,
+          tabId: this.hud?.tabId || null,
+          timestamp: Date.now()
+        }
+      });
+    }
+  }
+
+  /**
    * Main automation entry point.
    * Executes provider verification, card scanning, batch loop iteration, and bulk saving.
    * @returns {Promise<void>}
@@ -81,17 +108,7 @@ export class AutomationOrchestrator {
     this.hud.isStopping = false;
     this.hud.updateAutomationUI(true);
 
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      chrome.storage.local.set({
-        rj_automation_state: {
-          isRunning: true,
-          isStopping: false,
-          status: 'running',
-          platformId: this.hud.platformId,
-          timestamp: Date.now()
-        }
-      });
-    }
+    this._setAutomationState({ isRunning: true, isStopping: false, status: 'running' });
 
     const progressFill = this.hud.shadow?.querySelector('#rjProgressFill');
     const countText = this.hud.shadow?.querySelector('#rjAssetCountText');
@@ -114,17 +131,7 @@ export class AutomationOrchestrator {
         this.hud.updateAutomationUI(false);
         if (countText) countText.textContent = '0 Assets Detected';
         setStatusBadge('0 Assets Detected');
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          chrome.storage.local.set({
-            rj_automation_state: {
-              isRunning: false,
-              isStopping: false,
-              status: 'idle',
-              platformId: this.hud.platformId,
-              timestamp: Date.now()
-            }
-          });
-        }
+        this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
         return;
       }
 
@@ -249,17 +256,7 @@ export class AutomationOrchestrator {
           this.hud.isAutomationRunning = false;
           this.hud.updateAutomationUI(false);
           setStatusBadge('Stopped');
-          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-            chrome.storage.local.set({
-              rj_automation_state: {
-                isRunning: false,
-                isStopping: false,
-                status: 'idle',
-                platformId: this.hud.platformId,
-                timestamp: Date.now()
-              }
-            });
-          }
+          this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
         } else {
           logger.success(`Dreamstime automation finished ${processedCount} assets.`);
           if (progressFill) progressFill.style.width = '100%';
@@ -277,17 +274,7 @@ export class AutomationOrchestrator {
           this.hud.isStopping = false;
           this.hud.isAutomationRunning = false;
           this.hud.updateAutomationUI(false);
-          if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-            chrome.storage.local.set({
-              rj_automation_state: {
-                isRunning: false,
-                isStopping: false,
-                status: 'idle',
-                platformId: this.hud.platformId,
-                timestamp: Date.now()
-              }
-            });
-          }
+          this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
         }
 
         return;
@@ -427,17 +414,7 @@ export class AutomationOrchestrator {
         this.hud.isAutomationRunning = false;
         this.hud.updateAutomationUI(false);
         setStatusBadge('Stopped');
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          chrome.storage.local.set({
-            rj_automation_state: {
-              isRunning: false,
-              isStopping: false,
-              status: 'idle',
-              platformId: this.hud.platformId,
-              timestamp: Date.now()
-            }
-          });
-        }
+        this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
       } else {
         logger.success('Automation completed successfully!');
 
@@ -457,33 +434,13 @@ export class AutomationOrchestrator {
         this.hud.isStopping = false;
         this.hud.isAutomationRunning = false;
         this.hud.updateAutomationUI(false);
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          chrome.storage.local.set({
-            rj_automation_state: {
-              isRunning: false,
-              isStopping: false,
-              status: 'idle',
-              platformId: this.hud.platformId,
-              timestamp: Date.now()
-            }
-          });
-        }
+        this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
       }
     } catch (err) {
       this.hud.isStopping = false;
       this.hud.isAutomationRunning = false;
       this.hud.updateAutomationUI(false);
-      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-        chrome.storage.local.set({
-          rj_automation_state: {
-            isRunning: false,
-            isStopping: false,
-            status: 'idle',
-            platformId: this.hud.platformId,
-            timestamp: Date.now()
-          }
-        });
-      }
+      this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
       if (err.message === 'ABORTED' || signal.aborted) {
         logger.info('Automation stopped.');
         setStatusBadge('Stopped');
@@ -500,17 +457,7 @@ export class AutomationOrchestrator {
       this.abortController = null;
       this.hud.abortController = null;
       this.hud.isAutomationRunning = false;
-      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-        chrome.storage.local.set({
-          rj_automation_state: {
-            isRunning: false,
-            isStopping: false,
-            status: 'idle',
-            platformId: this.hud.platformId,
-            timestamp: Date.now()
-          }
-        });
-      }
+      this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
     }
   }
 
@@ -541,18 +488,7 @@ export class AutomationOrchestrator {
       this.hud.isAutomationRunning = false;
       this.hud.updateAutomationUI(false);
       this.hud.setStatusBadge('Stopped');
-
-      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-        chrome.storage.local.set({
-          rj_automation_state: {
-            isRunning: false,
-            isStopping: false,
-            status: 'idle',
-            platformId: this.hud.platformId,
-            timestamp: Date.now()
-          }
-        });
-      }
+      this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
     } else {
       this.hud.isStopping = true;
       this.hud.isAutomationRunning = true;
@@ -578,18 +514,7 @@ export class AutomationOrchestrator {
         pillStatus.title = 'Stopping automation (saving work)...';
       }
       logger.warn('Stop requested. Waiting for active card to finish then saving work...');
-
-      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-        chrome.storage.local.set({
-          rj_automation_state: {
-            isRunning: true,
-            isStopping: true,
-            status: 'stopping',
-            platformId: this.hud.platformId,
-            timestamp: Date.now()
-          }
-        });
-      }
+      this._setAutomationState({ isRunning: true, isStopping: true, status: 'stopping' });
     }
   }
 }

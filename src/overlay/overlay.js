@@ -59,6 +59,7 @@ export class OverlayHUD {
     // Platform & Asset Detection
     this.platformId = this.detectPlatformId();
     this.platformName = this.detectPlatform();
+    this.tabId = null;
     this.assetCount = 0;
     this.isAutomationRunning = false;
     this.isStopping = false;
@@ -83,6 +84,17 @@ export class OverlayHUD {
    */
   async init() {
     if (this.mounted) return;
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      try {
+        chrome.runtime.sendMessage({ action: 'GET_SENDER_TAB_ID' }, (res) => {
+          if (res && res.tabId) {
+            this.tabId = res.tabId;
+          }
+        });
+      } catch {
+        // Non-fatal if runtime message fails
+      }
+    }
     this.mount();
     this.setupAdaptiveQuickForm();
     await this.restorePositionAndState();
@@ -830,6 +842,11 @@ export class OverlayHUD {
     if (changes.rj_automation_state) {
       const state = changes.rj_automation_state.newValue;
       if (state) {
+        // Multi-tab isolation: Ignore automation state updates belonging to other platforms
+        if (state.platformId && state.platformId !== this.platformId) {
+          return;
+        }
+
         const isRunning = Boolean(state.isRunning);
         const isStopping = Boolean(state.isStopping || state.status === 'stopping');
         if (isStopping && !this.isStopping && this.isAutomationRunning) {
@@ -1115,6 +1132,13 @@ export class OverlayHUD {
       chrome.storage.local.get(['rj_automation_state'], (res) => {
         if (res && res.rj_automation_state) {
           const state = res.rj_automation_state;
+
+          // Multi-tab isolation: If the stored state belongs to another platform, ignore it
+          if (state.platformId && state.platformId !== this.platformId) {
+            resolve();
+            return;
+          }
+
           const isRunning = Boolean(state.isRunning);
           const isStopping = Boolean(state.isStopping || state.status === 'stopping');
 
@@ -1130,6 +1154,7 @@ export class OverlayHUD {
                 isStopping: false,
                 status: 'idle',
                 platformId: this.platformId || null,
+                tabId: this.tabId || null,
                 timestamp: Date.now()
               }
             });

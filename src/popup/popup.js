@@ -833,12 +833,13 @@ document.addEventListener('DOMContentLoaded', async () => {
               return;
             }
 
-            chrome.tabs.sendMessage(activeTab.id, { action: 'PING_HUD' }, (hudRes) => {
+            const targetTabId = state.tabId || activeTab.id;
+            chrome.tabs.sendMessage(targetTabId, { action: 'PING_HUD' }, (hudRes) => {
               if (chrome.runtime?.lastError || !hudRes || (!hudRes.isAutomationRunning && !hudRes.isStopping)) {
                 // Content script not running automation: auto-heal storage and UI
                 autoHealAutomationState();
               } else {
-                // Truly active automation confirmed in active tab
+                // Truly active automation confirmed in runner tab
                 updateAutomationButtonUI(state);
               }
               resolve();

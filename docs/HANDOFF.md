@@ -5,11 +5,11 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Adobe Stock Dropdown Direct Inject & State Auto-Healing Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Multi-Tab Automation State Isolation & Auto-Heal Stabilization Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: Pending (`fix(adobestock): direct inject select fallback and auto-heal stuck automation state`)
+- **Latest Commit**: Pending (`fix(overlay): isolate automation state per platform and scope auto-heal by tab ID`)
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (16/16 passed on targeted suite, 87/87 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
+- **Build / Test State**: Verified healthy (7/7 on multi-tab isolation suite, 18/18 on Adobe auto-heal suite, 88/88 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
 
 ---
 
@@ -189,7 +189,11 @@ Incoming agents must pay close attention to these hard-learned lessons:
    - **Vecteezy**: Banned terms trigger a modal; sanitize keywords prior to injection.
    - **Freepik**: Metadata is transient; you **MUST** trigger `saveDraft()` per asset before switching assets.
    - **Depositphotos**: Selecting a country triggers AJAX to load city options; raw tag paste trigger available.
-   - **MiriCanvas**: Capacity selector supports up to 1,000 items; DOM contains hidden virtualizer sizer list `ul[data-f="GU-fa4b"]` with dummy card that must be filtered out in favor of `ul[data-f="TU-5eb5"]`; card selection toggles off if clicked while already active; trash vs copy buttons in section headers share `data-f="TT-c273"` and require disambiguation via `div[data-f="DD-04b4"]` / `svg[data-f="DD-e725"]`; sequential Enter/Comma events commit keyword tags into chips.
+    - **MiriCanvas**: Capacity selector supports up to 1,000 items; DOM contains hidden virtualizer sizer list `ul[data-f="GU-fa4b"]` with dummy card that must be filtered out in favor of `ul[data-f="TU-5eb5"]`; card selection toggles off if clicked while already active; trash vs copy buttons in section headers share `data-f="TT-c273"` and require disambiguation via `div[data-f="DD-04b4"]` / `svg[data-f="DD-e725"]`; sequential Enter/Comma events commit keyword tags into chips.
+8. **Multi-Tab Cross-Platform Storage Isolation**:
+   - `rj_automation_state` in `chrome.storage.local` is broadcast across all open extension contexts. When multiple contributor platform tabs are open simultaneously (e.g. Adobe Stock and Dreamstime in separate tabs):
+     - `OverlayHUD.onStorageChanged` and `restoreAutomationState` must strictly enforce `if (state.platformId && state.platformId !== this.platformId) return;`. Without this guard, inactive tabs misinterpret start signals from other platforms, invoke `startAutomation()`, find 0 cards, and broadcast idle signals that kill active batches in a continuous ping-pong collision loop.
+     - Background service worker `chrome.tabs.onUpdated` auto-heal must strictly verify `state.tabId === tabId` before resetting state to idle. Unrelated tab navigations or background iframe reloads must never terminate active automation runs.
 
 ---
 
@@ -209,6 +213,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 49 | 2026-09-15 | `task/e2e-hardening-polish` | `fix(overlay)` | Implemented multi-tab automation state isolation by platformId and tabId scoping across overlay, orchestrator, and service worker, eliminating cross-tab start/stop collision loop and browser freezes (7/7 tests passed) | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
 | 48 | 2026-09-13 | `task/e2e-hardening-polish` | `fix(adobestock)` | Implemented direct native select fast-path and single-attempt waitForElement interaction in AdobeStockAdapter, eliminating 3x dropdown open/close loops; added 4-layer auto-healing across Service Worker, Router, Overlay, and Popup for stuck automation states, 16/16 and 87/87 tests passed | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
 | 47 | 2026-09-13 | `task/e2e-hardening-polish` | `refactor(overlay)` | Extracted automation execution loop and graceful stop into AutomationOrchestrator.js, reducing overlay.js by 572 lines (45/45 tests passed) | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
 | 46 | 2026-09-13 | `task/e2e-hardening-polish` | `refactor(popup)` | Extracted all 7 platform dynamic form generators into dedicated ES module platform_forms.js, reducing popup.js by 257 lines (77/77 tests passed) | Sub-phase 5.6: Overlay Modularization (Extract AutomationOrchestrator.js) |
