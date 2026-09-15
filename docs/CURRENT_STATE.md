@@ -2,7 +2,7 @@
 
 *Last Updated: 2026-09-15*<br>
 *Active Branch: `task/e2e-hardening-polish`*<br>
-*Current Milestone: Phase 5: E2E Hardening & Polish (Multi-Tab Automation State Isolation Complete)*
+*Current Milestone: Phase 5: E2E Hardening & Polish (Exclusive Automation Lock & Multi-Tab Isolation Complete)*
 
 ---
 
@@ -13,7 +13,7 @@
 - **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, multi-platform media detection, popup toggle, bidirectional sync merged to dev)
 - **Phase 3 — Universal Vision Service**: [COMPLETE] (Step 3.1 Prompt Engine, Step 3.2 Sanitizer Engine, Step 3.3 Universal Vision Client & Background Proxy Worker complete, merged to dev)
 - **Phase 4 — Platform Adapters**: [COMPLETE] (Platform adapters and live alignment verified across all 7 platforms: Adobe Stock, Shutterstock, Freepik / Magnific, Vecteezy, Dreamstime, Depositphotos, and MiriCanvas merged to dev)
-- **Phase 5 — End-to-End Testing & Polish**: [IN_PROGRESS] (Multi-tab automation state isolation and auto-heal stabilization complete, Sub-phases 5.1-5.6 complete: Overlay modularization extracting batch execution loop, card iteration, Dreamstime carousel workflows, bulk saving, and graceful stop coordination into dedicated ES module `src/overlay/AutomationOrchestrator.js` reducing `overlay.js` by 572 lines, popup modularization extracting all 7 platform HTML template generators into dedicated ES module `src/popup/platform_forms.js` reducing `popup.js` by 257 lines, brand asset optimization reducing `logo_rj.png` from 1.66 MB to ~60 KB, Emerald Teal active theme alignment, pill spinner, and badge tooltip clamping)
+- **Phase 5 — End-to-End Testing & Polish**: [IN_PROGRESS] (Exclusive automation lock across platforms and popup complete, multi-tab automation state isolation and auto-heal stabilization complete, Sub-phases 5.1-5.6 complete: Overlay modularization extracting batch execution loop, card iteration, Dreamstime carousel workflows, bulk saving, and graceful stop coordination into dedicated ES module `src/overlay/AutomationOrchestrator.js` reducing `overlay.js` by 572 lines, popup modularization extracting all 7 platform HTML template generators into dedicated ES module `src/popup/platform_forms.js` reducing `popup.js` by 257 lines, brand asset optimization reducing `logo_rj.png` from 1.66 MB to ~60 KB, Emerald Teal active theme alignment, pill spinner, and badge tooltip clamping)
 
 ---
 
@@ -112,6 +112,7 @@
 ## 6. Testing & Build Verification Status
 
 - Manifest V3 configuration validated against all declared file paths (`icons/`, `service_worker.js`, `popup.html`, `content_main.js`, `overlay/`, `styles/`, `services/`, `adapters/*`).
+- Exclusive automation lock verified with `scratch/test_exclusive_automation_lock.mjs` (4/4 assertions passed: `PLATFORM_NAMES` & `PLATFORM_DISPLAY_NAMES` dictionaries, Overlay HUD lock/unlock methods and classes, `onStorageChanged` reactive lock transitions, Popup `updateAutomationButtonUI` concurrency lock logic).
 - Multi-tab automation state isolation and auto-heal stabilization verified with `scratch/test_multi_tab_isolation.mjs` (7/7 assertions passed: cross-tab start isolation, cross-tab stop isolation, unrelated tab reload isolation, runner tab reload auto-heal, runner tab closed auto-heal, orchestrator `isProcessing` getter, `_setAutomationState` metadata).
 - Targeted Adobe Stock dropdown & multi-layer auto-healing suite verified with `scratch/test_adobe_dropdown_and_autoheal.mjs` (18/18 assertions passed: fast-path already-set 0-click bypass, single-attempt interaction with scrollbar centering, OverlayHUD page mount auto-heal, Popup dead tab auto-heal).
 - Tier 1 platform adapters verified with `scratch/test_tier1_adapters.mjs` (88/88 assertions passed).
@@ -122,7 +123,7 @@
 - Sub-phase 5.2 suite verified with `scratch/test_subphase_5_2.mjs` (69/69 assertions passed: granular `rj_automation_state` schema parsing, legacy boolean compatibility, form locking preservation across re-renders, HUD disabled stopping state, and graceful stop repeated click ignore in `OverlayHUD`).
 - Sub-phase 5.1 suite verified with `scratch/test_subphase_5_1.mjs` (35/35 assertions passed: unified platform detection across all 7 sites + unknown URLs, overlay visibility storage persistence, and stub file deletion).
 - `src/adapters/utils/dom_helpers.js` and `src/adapters/BaseAdapter.js` syntax verified with `node --check` and tested with `scratch/test_base_adapter.mjs` (65/65 assertions passed).
-- Total assertions verified across all active test suites: 407 / 407 passed (100%).
+- Total assertions verified across all active test suites: 411 / 411 passed (100%).
 - Syntax validation passed for `src/overlay/AutomationOrchestrator.js`, `src/overlay/overlay.js`, `src/popup/popup.js`, `src/popup/platform_forms.js`, `src/content/content_main.js`, and `src/adapters/index.js` via `node --check`.
 - Zero Native Emoji Policy strictly enforced across all files, code, and documentation.
 

@@ -38,6 +38,16 @@ export const pillReadySvg = `
   </svg>
 `;
 
+export const PLATFORM_NAMES = {
+  adobestock: 'Adobe Stock',
+  shutterstock: 'Shutterstock',
+  dreamstime: 'Dreamstime',
+  vecteezy: 'Vecteezy',
+  freepik: 'Freepik',
+  depositphotos: 'Depositphotos',
+  miricanvas: 'MiriCanvas'
+};
+
 export class OverlayHUD {
   constructor() {
     this.hostId = 'rj-overlay-host';
@@ -47,6 +57,7 @@ export class OverlayHUD {
     this.cardEl = null;
     this.pillEl = null;
     this.isMinimized = false;
+    this.currentTab = 'general';
     this.isVisible = true;
     this.isDragging = false;
     this.isTransitioning = false;
@@ -60,6 +71,7 @@ export class OverlayHUD {
     this.platformId = this.detectPlatformId();
     this.platformName = this.detectPlatform();
     this.tabId = null;
+    this.isLockedByOtherPlatform = false;
     this.assetCount = 0;
     this.isAutomationRunning = false;
     this.isStopping = false;
@@ -130,7 +142,7 @@ export class OverlayHUD {
    * @returns {{ count: number, mediaType?: string, isSingleAsset?: boolean, assetId?: string, label: string, selector: string }}
    */
   detectAssetCount() {
-    const host = window.location.hostname.toLowerCase();
+    const host = typeof window !== 'undefined' ? (window.location?.hostname?.toLowerCase() || '') : '';
 
     // 1. Adobe Stock
     if (host.includes('stock.adobe.com')) {
@@ -746,6 +758,9 @@ export class OverlayHUD {
     if (btnAutomation) {
       btnAutomation.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (this.isLockedByOtherPlatform || btnAutomation.disabled) {
+          return;
+        }
         if (this.isStopping) {
           return; // Already in graceful stopping process; button is disabled to prevent double-clicks
         } else if (this.isAutomationRunning) {
@@ -770,10 +785,10 @@ export class OverlayHUD {
   /**
    * Checks if the active provider has valid credentials and a selected model.
    * @param {Object} config
-   * @returns {boolean}
+   * @returns {boolean} True if ready
    */
   isProviderReady(config) {
-    if (!config) return false;
+    if (!config || !config.providers) return false;
     const activeProvId = config.activeProvider || 'gemini';
     const provider = config.providers ? config.providers[activeProvId] : null;
     if (!provider) return false;
@@ -786,10 +801,53 @@ export class OverlayHUD {
   }
 
   /**
+   * Locks HUD controls when automation is active on another platform tab.
+   * @param {string} runnerPlatformId
+   */
+  setLockedByOtherPlatformUI(runnerPlatformId) {
+    this.isLockedByOtherPlatform = true;
+    if (!this.shadow) return;
+
+    const runnerName = PLATFORM_NAMES[runnerPlatformId] || runnerPlatformId || 'another platform';
+    const btn = this.shadow.querySelector('#rjBtnToggleAutomation');
+    const btnText = this.shadow.querySelector('#rjAutomationBtnText');
+    const icon = this.shadow.querySelector('#rjAutomationIcon');
+    const badge = this.shadow.querySelector('#rjAutomationBadge');
+
+    if (btn) {
+      btn.classList.remove('rj-btn-start', 'rj-btn-stop', 'rj-btn-stopping', 'rj-btn-accent');
+      btn.classList.add('rj-btn-disabled');
+      btn.disabled = true;
+      btn.title = `Automation is currently running on ${runnerName}. Stop it on that tab or wait until finished.`;
+    }
+    if (btnText) {
+      btnText.textContent = `Running on ${runnerName}`;
+    }
+    if (icon) {
+      // SVG Lock icon (Phosphor / Lucide 14x14)
+      icon.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>';
+    }
+    if (badge) {
+      badge.classList.remove('rj-running');
+    }
+    this.setStatusBadge(`Busy (${runnerName})`, `Automation is currently running on ${runnerName}. Only one platform can run at a time.`);
+  }
+
+  /**
+   * Unlocks HUD controls when automation on another platform stops.
+   */
+  clearLockedByOtherPlatformUI() {
+    this.isLockedByOtherPlatform = false;
+    if (!this.shadow) return;
+    this.updateAutomationUI(false);
+    this.updateStartButtonReadiness();
+  }
+
+  /**
    * Updates start button disabled status based on active provider readiness.
    */
   updateStartButtonReadiness() {
-    if (this.isAutomationRunning || this.isStopping) return;
+    if (this.isAutomationRunning || this.isStopping || this.isLockedByOtherPlatform) return;
     const btn = this.shadow?.querySelector('#rjBtnToggleAutomation');
     if (btn) {
       if (this.platformId === 'unknown') {
@@ -842,13 +900,24 @@ export class OverlayHUD {
     if (changes.rj_automation_state) {
       const state = changes.rj_automation_state.newValue;
       if (state) {
-        // Multi-tab isolation: Ignore automation state updates belonging to other platforms
+        const isRunning = Boolean(state.isRunning);
+        const isStopping = Boolean(state.isStopping || state.status === 'stopping');
+
+        // Exclusive automation lock: check if state belongs to another platform
         if (state.platformId && state.platformId !== this.platformId) {
+          if (isRunning || isStopping) {
+            this.setLockedByOtherPlatformUI(state.platformId);
+          } else if (this.isLockedByOtherPlatform) {
+            this.clearLockedByOtherPlatformUI();
+          }
           return;
         }
 
-        const isRunning = Boolean(state.isRunning);
-        const isStopping = Boolean(state.isStopping || state.status === 'stopping');
+        // State belongs to this platform (or global reset)
+        if (this.isLockedByOtherPlatform) {
+          this.clearLockedByOtherPlatformUI();
+        }
+
         if (isStopping && !this.isStopping && this.isAutomationRunning) {
           // External graceful stop triggered from popup
           this.stopAutomation();
@@ -933,6 +1002,10 @@ export class OverlayHUD {
         pillStatus.title = 'Automation running...';
       }
     } else {
+      if (this.isLockedByOtherPlatform) {
+        this.setFormControlsDisabled(false);
+        return;
+      }
       if (btn) {
         btn.classList.remove('rj-btn-stop', 'rj-btn-stopping', 'rj-btn-disabled');
         btn.classList.add('rj-btn-start');
@@ -1133,8 +1206,11 @@ export class OverlayHUD {
         if (res && res.rj_automation_state) {
           const state = res.rj_automation_state;
 
-          // Multi-tab isolation: If the stored state belongs to another platform, ignore it
+          // Exclusive lock check on page load: If another platform is actively running, lock this HUD
           if (state.platformId && state.platformId !== this.platformId) {
+            if (state.isRunning || state.isStopping) {
+              this.setLockedByOtherPlatformUI(state.platformId);
+            }
             resolve();
             return;
           }

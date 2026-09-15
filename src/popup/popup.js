@@ -8,6 +8,16 @@ import { StorageService, DEFAULT_CONFIG } from '../services/StorageService.js';
 import { CustomSelect } from './custom_select.js';
 import { generatePlatformFormHtml, PLATFORM_LIMITS, escapeHtml } from './platform_forms.js';
 
+export const PLATFORM_DISPLAY_NAMES = {
+  adobestock: 'Adobe Stock',
+  shutterstock: 'Shutterstock',
+  dreamstime: 'Dreamstime',
+  vecteezy: 'Vecteezy',
+  freepik: 'Freepik',
+  depositphotos: 'Depositphotos',
+  miricanvas: 'MiriCanvas'
+};
+
 let currentConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 let activeTabInfo = null;
 let currentActivePlatformId = null;
@@ -16,7 +26,6 @@ let isStopping = false;
 let autoSaveTimer = null;
 let isSyncingFromStorage = false;
 let isSavingLocally = false;
-
 
 // DOM Elements
 const platformSelect = document.getElementById('platformSelect');
@@ -746,18 +755,43 @@ function updateHudButtonState(isActive) {
 function updateAutomationButtonUI(state) {
   let isRunning = false;
   let stopping = false;
+  let runnerPlatformId = null;
 
   if (typeof state === 'boolean') {
     isRunning = state;
   } else if (state && typeof state === 'object') {
     isRunning = Boolean(state.isRunning);
     stopping = Boolean(state.isStopping || state.status === 'stopping');
+    runnerPlatformId = state.platformId || null;
   }
 
   isStopping = stopping;
   isAutomationRunning = isRunning || isStopping;
 
   if (!btnToggleAutomation) return;
+
+  // Exclusive Concurrency Lock: Check if automation is active on a different platform
+  const isDifferentPlatform = Boolean(
+    isAutomationRunning &&
+    runnerPlatformId &&
+    currentActivePlatformId &&
+    runnerPlatformId !== currentActivePlatformId
+  );
+
+  if (isDifferentPlatform) {
+    const runnerName = PLATFORM_DISPLAY_NAMES[runnerPlatformId] || runnerPlatformId;
+    btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-running', 'rj-btn-danger', 'rj-btn-stopping');
+    btnToggleAutomation.classList.add('rj-btn-disabled');
+    btnToggleAutomation.disabled = true;
+    btnToggleAutomation.title = `Automation is currently running on ${runnerName}. Stop it on that tab or wait until completion.`;
+    if (automationBtnText) automationBtnText.textContent = `Running on ${runnerName}`;
+    if (automationIcon) {
+      // SVG Lock icon (Phosphor / Lucide 14x14)
+      automationIcon.innerHTML = `<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>`;
+    }
+    setFormDisabledState(false);
+    return;
+  }
 
   if (isStopping) {
     btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-running', 'rj-btn-danger');
@@ -902,6 +936,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isAutomationRunning) {
       setFormDisabledState(true);
     }
+    // Dynamically refresh button lock state against active runner
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.get(['rj_automation_state'], (res) => {
+        if (res?.rj_automation_state) {
+          updateAutomationButtonUI(res.rj_automation_state);
+        }
+      });
+    }
     autoSaveConfig(true);
   });
 
@@ -1041,6 +1083,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Event: Start / Stop Automation Toggle
   btnToggleAutomation.addEventListener('click', () => {
+    if (btnToggleAutomation.disabled) return;
     if (isStopping) {
       autoHealAutomationState();
       showToast('Automation reset to idle');

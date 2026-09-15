@@ -5,15 +5,21 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Multi-Tab Automation State Isolation & Auto-Heal Stabilization Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Exclusive Automation Concurrency Lock & Multi-Tab Isolation Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: Pending (`fix(overlay): isolate automation state per platform and scope auto-heal by tab ID`)
+- **Latest Commit**: `6795edc` (`feat(overlay): implement exclusive automation lock across platforms and popup`)
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (7/7 on multi-tab isolation suite, 18/18 on Adobe auto-heal suite, 88/88 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
+- **Build / Test State**: Verified healthy (4/4 on exclusive lock suite, 7/7 on multi-tab isolation suite, 18/18 on Adobe auto-heal suite, 88/88 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
+
+0. **Exclusive Automation Lock (Single Active Runner Policy)**:
+   - **Cross-Platform Mutual Exclusivity**: Enforces that only one microstock platform can actively run automated metadata generation at any time across the browser.
+   - **Non-Runner Tab Lock State**: When Platform A (e.g. Adobe Stock) is actively running, other platform tabs (e.g. Dreamstime, Depositphotos) automatically lock their HUD `Start Automation` button (`disabled = true`, class `.rj-btn-disabled`, lock SVG icon, text `Running on [Platform]`, badge `Busy ([Platform])`, and informative hover tooltip). Form controls remain editable for manual preparation.
+   - **Single-Instance Toolbar Popup Synchronization**: Popup dynamically checks the active runner's platform against the currently selected platform. When viewing non-runner platforms, the start button is disabled with `Running on [Platform]` and lock SVG icon. Switching platform views updates the lock state in real-time.
+   - **Reactive Auto-Unlock Lifecycle**: As soon as the runner tab completes its batch run or stops, `chrome.storage.onChanged` fires `isRunning: false`, instantaneously unlocking all open tabs back to active green `Start Automation` state.
 
 Sub-phase 5.6 has modularized the in-page overlay controller by extracting the microstock automation batch execution loop, card iteration, Dreamstime carousel workflows, bulk saving, and graceful stop coordination out of `src/overlay/overlay.js` and into a dedicated ES module: `src/overlay/AutomationOrchestrator.js`:
 1. **Extracted ES Module (`src/overlay/AutomationOrchestrator.js`)**:
@@ -213,7 +219,8 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| 49 | 2026-09-15 | `task/e2e-hardening-polish` | `fix(overlay)` | Implemented multi-tab automation state isolation by platformId and tabId scoping across overlay, orchestrator, and service worker, eliminating cross-tab start/stop collision loop and browser freezes (7/7 tests passed) | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
+| 50 | 2026-09-15 | `task/e2e-hardening-polish` | `feat(overlay)` | Implemented exclusive automation concurrency lock (Single Active Runner Policy) across HUD and toolbar popup, disabling start actions on non-runner tabs with Running on [Platform] status and lock SVG icons, 4/4 tests passed | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
+| 49 | 2026-09-15 | `task/e2e-hardening-polish` | `cdeb90d` | Implemented multi-tab automation state isolation by platformId and tabId scoping across overlay, orchestrator, and service worker, eliminating cross-tab start/stop collision loop and browser freezes (7/7 tests passed) | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
 | 48 | 2026-09-13 | `task/e2e-hardening-polish` | `fix(adobestock)` | Implemented direct native select fast-path and single-attempt waitForElement interaction in AdobeStockAdapter, eliminating 3x dropdown open/close loops; added 4-layer auto-healing across Service Worker, Router, Overlay, and Popup for stuck automation states, 16/16 and 87/87 tests passed | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
 | 47 | 2026-09-13 | `task/e2e-hardening-polish` | `refactor(overlay)` | Extracted automation execution loop and graceful stop into AutomationOrchestrator.js, reducing overlay.js by 572 lines (45/45 tests passed) | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
 | 46 | 2026-09-13 | `task/e2e-hardening-polish` | `refactor(popup)` | Extracted all 7 platform dynamic form generators into dedicated ES module platform_forms.js, reducing popup.js by 257 lines (77/77 tests passed) | Sub-phase 5.6: Overlay Modularization (Extract AutomationOrchestrator.js) |
