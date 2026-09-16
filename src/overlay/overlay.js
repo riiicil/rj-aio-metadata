@@ -19,6 +19,24 @@ const PLATFORM_LIMITS = {
   depositphotos: { min: 8, max: 50, hint: 'Min 8, Max 50' }
 };
 
+export const DONATION_URL = 'https://trakteer.id/yourname'; // Ganti dengan URL donasi Anda (Saweria, Trakteer, Buy Me a Coffee, dll)
+
+export const hudCoffeeSvg = `
+  <svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+    <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+    <line x1="6" y1="1" x2="6" y2="4"></line>
+    <line x1="10" y1="1" x2="10" y2="4"></line>
+    <line x1="14" y1="1" x2="14" y2="4"></line>
+  </svg>
+`;
+
+export const hudSpinnerSvg = `
+  <svg class="rj-hud-icon-svg rj-status-icon-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+  </svg>
+`;
+
 export const pillSpinnerSvg = `
   <svg class="rj-hud-icon-svg rj-status-icon-spinner" viewBox="0 0 24 24" fill="none" stroke="#079183" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <line x1="12" y1="2" x2="12" y2="6"></line>
@@ -82,6 +100,11 @@ export class OverlayHUD {
     this.saveDebounceTimer = null;
     this.isSyncingFromStorage = false;
     this.orchestrator = new AutomationOrchestrator(this);
+
+    // Support & Live Progress Ticker state
+    this.hudSupportTickerInterval = null;
+    this.hudSupportTickerPhase = 'progress';
+    this.hudLatestProgressText = '';
 
     // Bind event handlers
     this.onMouseDown = this.onMouseDown.bind(this);
@@ -562,11 +585,17 @@ export class OverlayHUD {
               </label>
             </div>
 
-            <!-- Row 5: Primary Automation Action Button -->
-            <button type="button" id="rjBtnToggleAutomation" class="rj-hud-btn-action rj-btn-start">
-              <svg id="rjAutomationIcon" class="rj-hud-icon-svg" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-              <span id="rjAutomationBtnText">Start Automation</span>
-            </button>
+            <!-- Row 5: Primary Automation Actions -->
+            <div class="rj-hud-actions-row">
+              <button type="button" id="rjBtnHudSupportProgress" class="rj-hud-btn-action rj-btn-support" style="display: none;" title="Send a coffee to support development">
+                <span id="rjHudSupportProgressIcon"></span>
+                <span id="rjHudSupportProgressText">Send a coffee</span>
+              </button>
+              <button type="button" id="rjBtnToggleAutomation" class="rj-hud-btn-action rj-btn-start">
+                <svg id="rjAutomationIcon" class="rj-hud-icon-svg" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                <span id="rjAutomationBtnText">Start Automation</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -753,6 +782,19 @@ export class OverlayHUD {
       });
     }
 
+    // Support / Donate Button Click Listener
+    const btnHudSupport = this.shadow.querySelector('#rjBtnHudSupportProgress');
+    if (btnHudSupport) {
+      btnHudSupport.addEventListener('click', (e) => {
+        e.stopPropagation();
+        try {
+          window.open(DONATION_URL, '_blank');
+        } catch (err) {
+          console.error('Failed to open donation link:', err);
+        }
+      });
+    }
+
     // Automation Toggle Button
     const btnAutomation = this.shadow.querySelector('#rjBtnToggleAutomation');
     if (btnAutomation) {
@@ -807,6 +849,12 @@ export class OverlayHUD {
   setLockedByOtherPlatformUI(runnerPlatformId) {
     this.isLockedByOtherPlatform = true;
     if (!this.shadow) return;
+
+    this.stopHudSupportTicker();
+    const btnSupport = this.shadow.querySelector('#rjBtnHudSupportProgress');
+    if (btnSupport) {
+      btnSupport.style.display = 'none';
+    }
 
     const runnerName = PLATFORM_NAMES[runnerPlatformId] || runnerPlatformId || 'another platform';
     const btn = this.shadow.querySelector('#rjBtnToggleAutomation');
@@ -918,6 +966,10 @@ export class OverlayHUD {
           this.clearLockedByOtherPlatformUI();
         }
 
+        if (state.progressText) {
+          this.updateHudSupportProgress(state.progressText);
+        }
+
         if (isStopping && !this.isStopping && this.isAutomationRunning) {
           // External graceful stop triggered from popup
           this.stopAutomation();
@@ -959,6 +1011,7 @@ export class OverlayHUD {
     if (!this.shadow) return;
 
     const btn = this.shadow.querySelector('#rjBtnToggleAutomation');
+    const btnSupport = this.shadow.querySelector('#rjBtnHudSupportProgress');
     const btnText = this.shadow.querySelector('#rjAutomationBtnText');
     const icon = this.shadow.querySelector('#rjAutomationIcon');
     const badge = this.shadow.querySelector('#rjAutomationBadge');
@@ -966,6 +1019,10 @@ export class OverlayHUD {
     const pillStatus = this.shadow.querySelector('#rjPillStatus');
 
     if (this.isStopping) {
+      if (btnSupport) {
+        btnSupport.style.display = 'flex';
+        this.startHudSupportTicker();
+      }
       if (btn) {
         btn.classList.remove('rj-btn-start', 'rj-btn-stop', 'rj-btn-accent');
         btn.classList.add('rj-btn-stopping', 'rj-btn-disabled');
@@ -986,6 +1043,10 @@ export class OverlayHUD {
     }
 
     if (isRunning) {
+      if (btnSupport) {
+        btnSupport.style.display = 'flex';
+        this.startHudSupportTicker();
+      }
       if (btn) {
         btn.classList.remove('rj-btn-start', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
         btn.classList.add('rj-btn-stop');
@@ -1002,6 +1063,10 @@ export class OverlayHUD {
         pillStatus.title = 'Automation running...';
       }
     } else {
+      this.stopHudSupportTicker();
+      if (btnSupport) {
+        btnSupport.style.display = 'none';
+      }
       if (this.isLockedByOtherPlatform) {
         this.setFormControlsDisabled(false);
         return;
@@ -1028,6 +1093,65 @@ export class OverlayHUD {
 
     // Disable inputs while running, re-enable when idle
     this.setFormControlsDisabled(isRunning);
+  }
+
+  /**
+   * Renders the current phase (progress or donation) into HUD support button.
+   */
+  renderHudSupportTickerContent() {
+    if (!this.shadow) return;
+    const btn = this.shadow.querySelector('#rjBtnHudSupportProgress');
+    const iconEl = this.shadow.querySelector('#rjHudSupportProgressIcon');
+    const textEl = this.shadow.querySelector('#rjHudSupportProgressText');
+    if (!btn) return;
+
+    if (this.hudSupportTickerPhase === 'progress') {
+      if (iconEl) iconEl.innerHTML = hudSpinnerSvg;
+      if (textEl) textEl.textContent = this.hudLatestProgressText || 'Processing...';
+      btn.title = this.hudLatestProgressText ? `Progress: ${this.hudLatestProgressText} — Click to support development` : 'Processing... Click to support development';
+    } else {
+      if (iconEl) iconEl.innerHTML = hudCoffeeSvg;
+      if (textEl) textEl.textContent = 'Send a coffee';
+      btn.title = 'Send a coffee to support development';
+    }
+  }
+
+  /**
+   * Starts rotating HUD ticker between live progress and coffee support.
+   */
+  startHudSupportTicker() {
+    if (this.hudSupportTickerInterval) return;
+    this.renderHudSupportTickerContent();
+    this.hudSupportTickerInterval = setInterval(() => {
+      this.hudSupportTickerPhase = (this.hudSupportTickerPhase === 'progress') ? 'coffee' : 'progress';
+      this.renderHudSupportTickerContent();
+    }, 3500);
+  }
+
+  /**
+   * Stops HUD ticker and resets to progress phase.
+   */
+  stopHudSupportTicker() {
+    if (this.hudSupportTickerInterval) {
+      clearInterval(this.hudSupportTickerInterval);
+      this.hudSupportTickerInterval = null;
+    }
+    this.hudSupportTickerPhase = 'progress';
+  }
+
+  /**
+   * Updates progress text displayed by HUD support ticker.
+   * @param {string} text
+   */
+  updateHudSupportProgress(text) {
+    if (!text) return;
+    this.hudLatestProgressText = text;
+    if (this.hudSupportTickerPhase === 'progress' && this.shadow) {
+      const textEl = this.shadow.querySelector('#rjHudSupportProgressText');
+      const btn = this.shadow.querySelector('#rjBtnHudSupportProgress');
+      if (textEl) textEl.textContent = text;
+      if (btn) btn.title = `Progress: ${text} — Click to support development`;
+    }
   }
 
   /**

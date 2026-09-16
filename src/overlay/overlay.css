@@ -444,8 +444,17 @@
   transform: translateX(14px);
 }
 
-/* Primary Action Button */
+/* Primary Action Button Row */
+.rj-hud-actions-row {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  margin-top: 3px;
+}
+
 .rj-hud-btn-action {
+  flex: 1;
+  min-width: 0;
   height: 32px;
   border-radius: 6px;
   border: none;
@@ -456,8 +465,35 @@
   justify-content: center;
   gap: 6px;
   cursor: pointer;
-  margin-top: 3px;
+  margin-top: 0;
   transition: background-color 0.15s ease, filter 0.15s ease;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rj-hud-btn-action.rj-btn-support {
+  display: none;
+  background-color: #141719;
+  border: 1px solid #282b2e;
+  color: #c0c4c7;
+  padding: 0 8px;
+}
+
+.rj-hud-btn-action.rj-btn-support:hover {
+  background-color: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+.rj-hud-btn-action.rj-btn-support:hover svg {
+  stroke: #fbbf24;
+}
+
+.rj-hud-btn-action.rj-btn-support svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
 }
 
 .rj-hud-btn-action.rj-btn-start {

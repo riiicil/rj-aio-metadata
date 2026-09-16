@@ -58,6 +58,7 @@ export class AutomationOrchestrator {
           status: patch.status || 'idle',
           platformId: this.hud?.platformId || null,
           tabId: this.hud?.tabId || null,
+          progressText: patch.progressText || '',
           timestamp: Date.now()
         }
       });
@@ -158,12 +159,22 @@ export class AutomationOrchestrator {
           if (!card) break;
 
           const currentId = adapter.getCurrentAssetId();
+          const progressStr = currentId ? `#${currentId}` : `Asset ${assetIdx + 1}`;
           if (countText) countText.textContent = `Asset ${assetIdx + 1}${currentId ? ` (ID ${currentId})` : ''}`;
           setStatusBadge(this.hud.isStopping ? 'Stopping...' : 'Processing...');
           if (pillStatus) {
             pillStatus.innerHTML = `${pillSpinnerSvg}<span>Asset ${assetIdx + 1}</span>`;
             pillStatus.title = `Processing Asset ${assetIdx + 1}`;
           }
+          if (this.hud.updateHudSupportProgress) {
+            this.hud.updateHudSupportProgress(progressStr);
+          }
+          this._setAutomationState({
+            isRunning: true,
+            isStopping: Boolean(this.hud.isStopping),
+            status: this.hud.isStopping ? 'stopping' : 'running',
+            progressText: progressStr
+          });
 
           logger.asset(assetIdx + 1, 'Carousel');
 
@@ -255,8 +266,9 @@ export class AutomationOrchestrator {
           this.hud.isStopping = false;
           this.hud.isAutomationRunning = false;
           this.hud.updateAutomationUI(false);
+          this.hud.updateHudSupportProgress?.('');
           setStatusBadge('Stopped');
-          this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
+          this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '' });
         } else {
           logger.success(`Dreamstime automation finished ${processedCount} assets.`);
           if (progressFill) progressFill.style.width = '100%';
@@ -274,7 +286,8 @@ export class AutomationOrchestrator {
           this.hud.isStopping = false;
           this.hud.isAutomationRunning = false;
           this.hud.updateAutomationUI(false);
-          this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
+          this.hud.updateHudSupportProgress?.('');
+          this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '' });
         }
 
         return;
@@ -288,13 +301,23 @@ export class AutomationOrchestrator {
 
         // Update HUD progress
         const pct = Math.round((i / total) * 100);
+        const progressStr = `${i + 1}/${total} (${pct}%)`;
         if (progressFill) progressFill.style.width = `${pct}%`;
         if (countText) countText.textContent = `Asset ${i + 1} of ${total}`;
         setStatusBadge(this.hud.isStopping ? 'Stopping...' : 'Processing...');
         if (pillStatus) {
-          pillStatus.innerHTML = `${pillSpinnerSvg}<span>${i + 1}/${total} (${pct}%)</span>`;
+          pillStatus.innerHTML = `${pillSpinnerSvg}<span>${progressStr}</span>`;
           pillStatus.title = `Processing ${i + 1} of ${total} (${pct}%)`;
         }
+        if (this.hud.updateHudSupportProgress) {
+          this.hud.updateHudSupportProgress(progressStr);
+        }
+        this._setAutomationState({
+          isRunning: true,
+          isStopping: Boolean(this.hud.isStopping),
+          status: this.hud.isStopping ? 'stopping' : 'running',
+          progressText: progressStr
+        });
 
         logger.asset(i + 1, total);
 
@@ -413,8 +436,9 @@ export class AutomationOrchestrator {
         this.hud.isStopping = false;
         this.hud.isAutomationRunning = false;
         this.hud.updateAutomationUI(false);
+        this.hud.updateHudSupportProgress?.('');
         setStatusBadge('Stopped');
-        this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
+        this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '' });
       } else {
         logger.success('Automation completed successfully!');
 
@@ -434,13 +458,15 @@ export class AutomationOrchestrator {
         this.hud.isStopping = false;
         this.hud.isAutomationRunning = false;
         this.hud.updateAutomationUI(false);
-        this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
+        this.hud.updateHudSupportProgress?.('');
+        this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '' });
       }
     } catch (err) {
       this.hud.isStopping = false;
       this.hud.isAutomationRunning = false;
       this.hud.updateAutomationUI(false);
-      this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
+      this.hud.updateHudSupportProgress?.('');
+      this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '' });
       if (err.message === 'ABORTED' || signal.aborted) {
         logger.info('Automation stopped.');
         setStatusBadge('Stopped');

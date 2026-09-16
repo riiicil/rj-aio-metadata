@@ -18,6 +18,11 @@ export const PLATFORM_DISPLAY_NAMES = {
   miricanvas: 'MiriCanvas'
 };
 
+export const DONATION_URL = 'https://trakteer.id/yourname'; // Ganti dengan URL donasi Anda (Saweria, Trakteer, Buy Me a Coffee, dll)
+
+export const COFFEE_ICON_SVG = `<svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>`;
+export const SPINNER_ICON_SVG = `<svg class="rj-icon rj-rotating" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`;
+
 let currentConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 let activeTabInfo = null;
 let currentActivePlatformId = null;
@@ -27,6 +32,69 @@ let lastAutomationState = null;
 let autoSaveTimer = null;
 let isSyncingFromStorage = false;
 let isSavingLocally = false;
+
+// Dynamic Support & Live Progress Ticker State
+let supportTickerInterval = null;
+let supportTickerPhase = 'progress';
+let latestSupportProgressText = '';
+
+/**
+ * Renders current phase (progress or donation) into the popup support button.
+ */
+function renderSupportTickerContent() {
+  const btn = document.getElementById('btnSupportProgress') || btnSupportProgress;
+  if (!btn) return;
+  const iconEl = document.getElementById('supportProgressIcon') || supportProgressIcon;
+  const textEl = document.getElementById('supportProgressText') || supportProgressText;
+
+  if (supportTickerPhase === 'progress') {
+    if (iconEl) iconEl.innerHTML = SPINNER_ICON_SVG;
+    if (textEl) textEl.textContent = latestSupportProgressText || 'Processing...';
+    btn.title = latestSupportProgressText ? `Progress: ${latestSupportProgressText} — Click to support development` : 'Processing... Click to support development';
+  } else {
+    if (iconEl) iconEl.innerHTML = COFFEE_ICON_SVG;
+    if (textEl) textEl.textContent = 'Send a coffee';
+    btn.title = 'Send a coffee to support development';
+  }
+}
+
+/**
+ * Starts rotating ticker between live progress and coffee support.
+ */
+function startSupportTicker() {
+  if (supportTickerInterval) return;
+  renderSupportTickerContent();
+  supportTickerInterval = setInterval(() => {
+    supportTickerPhase = (supportTickerPhase === 'progress') ? 'coffee' : 'progress';
+    renderSupportTickerContent();
+  }, 3500);
+}
+
+/**
+ * Stops ticker and resets to progress phase.
+ */
+function stopSupportTicker() {
+  if (supportTickerInterval) {
+    clearInterval(supportTickerInterval);
+    supportTickerInterval = null;
+  }
+  supportTickerPhase = 'progress';
+}
+
+/**
+ * Updates progress text displayed by support ticker.
+ * @param {string} text
+ */
+function updateSupportProgressText(text) {
+  if (!text) return;
+  latestSupportProgressText = text;
+  if (supportTickerPhase === 'progress') {
+    const textEl = document.getElementById('supportProgressText') || supportProgressText;
+    const btn = document.getElementById('btnSupportProgress') || btnSupportProgress;
+    if (textEl) textEl.textContent = text;
+    if (btn) btn.title = `Progress: ${text} — Click to support development`;
+  }
+}
 
 // DOM Elements
 const platformSelect = document.getElementById('platformSelect');
@@ -53,7 +121,9 @@ const modelCountLabel = document.getElementById('modelCountLabel');
 const platformSettingsHeaderTitle = document.getElementById('platformSettingsHeaderTitle');
 const platformDynamicForm = document.getElementById('platformDynamicForm');
 
-const btnSaveSettings = document.getElementById('btnSaveSettings');
+const btnSupportProgress = document.getElementById('btnSupportProgress');
+const supportProgressIcon = document.getElementById('supportProgressIcon');
+const supportProgressText = document.getElementById('supportProgressText');
 const btnToggleAutomation = document.getElementById('btnToggleAutomation');
 const automationIcon = document.getElementById('automationIcon');
 const automationBtnText = document.getElementById('automationBtnText');
@@ -722,9 +792,6 @@ function setFormDisabledState(disabled) {
   }
 
   // 4. Action Buttons
-  if (btnSaveSettings) {
-    btnSaveSettings.disabled = disabled;
-  }
   if (btnLaunchOverlay) {
     btnLaunchOverlay.disabled = disabled;
   }
@@ -788,6 +855,7 @@ function updateAutomationButtonUI(state) {
   if (!btnToggleAutomation) return;
 
   const activePlat = platformSelect?.value || currentActivePlatformId;
+  const btnSupport = document.getElementById('btnSupportProgress') || btnSupportProgress;
 
   // Exclusive Concurrency Lock: Check if automation is active on a different platform
   const isDifferentPlatform = Boolean(
@@ -798,6 +866,10 @@ function updateAutomationButtonUI(state) {
   );
 
   if (isDifferentPlatform) {
+    stopSupportTicker();
+    if (btnSupport) {
+      btnSupport.style.display = 'none';
+    }
     const runnerName = PLATFORM_DISPLAY_NAMES[runnerPlatformId] || runnerPlatformId;
     btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-running', 'rj-btn-danger', 'rj-btn-stopping');
     btnToggleAutomation.classList.add('rj-btn-disabled', 'rj-btn-locked');
@@ -813,6 +885,13 @@ function updateAutomationButtonUI(state) {
   }
 
   if (isStopping) {
+    if (btnSupport) {
+      btnSupport.style.display = 'flex';
+      startSupportTicker();
+    }
+    if (effectiveState && typeof effectiveState === 'object' && effectiveState.progressText) {
+      updateSupportProgressText(effectiveState.progressText);
+    }
     btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-running', 'rj-btn-danger', 'rj-btn-locked');
     btnToggleAutomation.classList.add('rj-btn-stopping', 'rj-btn-disabled');
     btnToggleAutomation.disabled = true;
@@ -822,6 +901,13 @@ function updateAutomationButtonUI(state) {
       automationIcon.innerHTML = `<rect x="6" y="6" width="12" height="12" rx="1.5"></rect>`;
     }
   } else if (isRunning) {
+    if (btnSupport) {
+      btnSupport.style.display = 'flex';
+      startSupportTicker();
+    }
+    if (effectiveState && typeof effectiveState === 'object' && effectiveState.progressText) {
+      updateSupportProgressText(effectiveState.progressText);
+    }
     btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
     btnToggleAutomation.classList.add('rj-btn-danger', 'rj-btn-running');
     btnToggleAutomation.disabled = false;
@@ -831,6 +917,10 @@ function updateAutomationButtonUI(state) {
       automationIcon.innerHTML = `<rect x="6" y="6" width="12" height="12" rx="1.5"></rect>`;
     }
   } else {
+    stopSupportTicker();
+    if (btnSupport) {
+      btnSupport.style.display = 'none';
+    }
     btnToggleAutomation.classList.remove('rj-btn-danger', 'rj-btn-running', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
     btnToggleAutomation.classList.add('rj-btn-accent');
     btnToggleAutomation.disabled = false;
@@ -850,6 +940,11 @@ function updateAutomationButtonUI(state) {
 function autoHealAutomationState() {
   isStopping = false;
   isAutomationRunning = false;
+  stopSupportTicker();
+  const btnSupport = document.getElementById('btnSupportProgress') || btnSupportProgress;
+  if (btnSupport) {
+    btnSupport.style.display = 'none';
+  }
   updateAutomationButtonUI({ isRunning: false, isStopping: false, status: 'idle' });
   setFormDisabledState(false);
   if (typeof chrome !== 'undefined' && chrome.storage?.local) {
@@ -859,6 +954,7 @@ function autoHealAutomationState() {
         isStopping: false,
         status: 'idle',
         platformId: null,
+        progressText: '',
         timestamp: Date.now()
       }
     });
@@ -1099,12 +1195,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // Event: Save Settings
-  btnSaveSettings.addEventListener('click', async () => {
-    await autoSaveConfig(true);
-    showToast('Settings saved automatically');
-    updateAutomationButtonUI(lastAutomationState || isAutomationRunning);
-  });
+  // Event: Support / Donate Button Click
+  const btnSupport = document.getElementById('btnSupportProgress') || btnSupportProgress;
+  if (btnSupport) {
+    btnSupport.addEventListener('click', (e) => {
+      e.stopPropagation();
+      try {
+        window.open(DONATION_URL, '_blank');
+      } catch (err) {
+        console.error('Failed to open donation link:', err);
+      }
+    });
+  }
 
   // Event: Start / Stop Automation Toggle
   btnToggleAutomation.addEventListener('click', () => {
@@ -1157,6 +1259,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const state = changes.rj_automation_state.newValue;
         if (state) {
           updateAutomationButtonUI(state);
+          if (state.progressText) {
+            updateSupportProgressText(state.progressText);
+          }
         }
       }
       // 2. Sync platformSettings / providers / activeProvider / activePlatform changes from overlay HUD or storage
@@ -1243,5 +1348,9 @@ export {
   isStopping,
   autoSaveConfig,
   saveCurrentSettings,
-  saveActiveFormStateToMemory
+  saveActiveFormStateToMemory,
+  startSupportTicker,
+  stopSupportTicker,
+  updateSupportProgressText,
+  renderSupportTickerContent
 };

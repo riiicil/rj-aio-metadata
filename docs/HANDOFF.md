@@ -5,17 +5,29 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Locked Button Contrast Hardening & Popup Concurrency Sync Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Dynamic Progress & Support Ticker Button Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: `78de78b` (`fix(overlay): improve locked button readability and sync popup lock state`)
+- **Latest Commit**: `a7cb612` (`feat(ui): implement dynamic progress and support ticker button in popup and hud`)
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (4/4 on exclusive lock suite, 7/7 on multi-tab isolation suite, 18/18 on Adobe auto-heal suite, 88/88 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
+- **Build / Test State**: Verified healthy (7/7 on support ticker suite, 4/4 on exclusive lock suite, 7/7 on multi-tab isolation suite, 18/18 on Adobe auto-heal suite, 88/88 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **Exclusive Automation Lock (Single Active Runner Policy)**:
+0. **Dynamic Progress & Support Ticker Button (Popup & HUD)**:
+   - **Obsolete Save Button Cleanup**: Fully removed legacy `#btnSaveSettings` logic from Toolbar Popup (auto-save was already implemented) and repurposed into an interactive dual-function ticker button `#btnSupportProgress`.
+   - **HUD Parity**: Injected equivalent `#rjBtnHudSupportProgress` in the In-Page Floating HUD wrapped inside `.rj-hud-actions-row`.
+   - **Adaptive Layout Transitions**:
+     - *Idle*: Support button is hidden (`display: none;`), and the `Start Automation` button dynamically expands to **100% full width**.
+     - *Running*: Support button activates (`display: flex;`), splitting the action row into a balanced **50% / 50% flex layout**.
+   - **Rotating Ticker Engine**: Alternates every ~3.5 seconds between:
+     1. *Live Progress*: Rotating SVG spinner + `X/Y (Z%)` counter (e.g. `2/10 (20%)`).
+     2. *Support / Donation*: SVG Coffee cup + `Send a coffee`.
+   - **Interactive Donation Trigger**: Clicking the button opens the user's donation link in a new browser tab (`window.open(DONATION_URL, '_blank')`).
+   - **Configurable `DONATION_URL`**: Declared as a clean constant at the very top of `src/popup/popup.js` and `src/overlay/overlay.js` (`export const DONATION_URL = 'https://trakteer.id/yourname';`).
+
+1. **Exclusive Automation Lock (Single Active Runner Policy)**:
    - **Cross-Platform Mutual Exclusivity**: Enforces that only one microstock platform can actively run automated metadata generation at any time across the browser.
    - **Non-Runner Tab Lock State**: When Platform A (e.g. Adobe Stock) is actively running, other platform tabs (e.g. Dreamstime, Depositphotos) automatically lock their HUD `Start Automation` button (`disabled = true`, class `.rj-btn-disabled`, lock SVG icon, text `Running on [Platform]`, badge `Busy ([Platform])`, and informative hover tooltip). Form controls remain editable for manual preparation.
    - **Single-Instance Toolbar Popup Synchronization**: Popup dynamically checks the active runner's platform against the currently selected platform. When viewing non-runner platforms, the start button is disabled with `Running on [Platform]` and lock SVG icon. Switching platform views updates the lock state in real-time.
