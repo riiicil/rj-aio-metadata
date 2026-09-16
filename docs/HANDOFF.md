@@ -5,23 +5,29 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Production Build & Obfuscation Pipeline via esbuild + javascript-obfuscator Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Shutterstock Precision Spelling Approval Fix Verified)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: `32b0da9` (`build(dist): implement bundle-first obfuscation pipeline and update gitignore`)
-- **Working Tree**: Build pipeline & .gitignore verified
-- **Build / Test State**: Verified healthy (`node build.js` generates `dist/` & `releases/RJ_AIO_Metadata_v0.1.0.zip` (1.21 MB), 11/11 multi-language resilience suite, 88/88 Tier 1 suite, 108/108 Tier 2 suite, 113/113 Tier 3 suite, 24/24 Dreamstime fixes, 18/18 Adobe auto-heal suite, 11/11 support ticker suite, 4/4 exclusive lock suite, 7/7 multi-tab isolation suite, zero native emoji clean)
+- **Latest Commit**: Pending
+- **Working Tree**: ShutterstockAdapter precision fix applied, test suites and build clean
+- **Build / Test State**: Verified healthy (`node build.js` generates `dist/` & `releases/RJ_AIO_Metadata_v0.1.0.zip` (1.21 MB), 11/11 multi-language resilience suite, regression test passed, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **Production Build & Obfuscation Pipeline (`build.js`, `obfuscator.config.js`, `package.json`, `.gitignore`)**:
+0. **Shutterstock Spelling Approval Precision Targeting & Keyword Overflow Prevention (`ShutterstockAdapter.js`)**:
+   - **User Diagnostic Demonstration (`rekaman-shutterstock-20260917_034756.json`)**: User provided a manual recording demonstrating exact click on `"Mark all keywords as correct"` inside `div[data-testid="keyword-input"] > div:nth-of-type(3) > button[data-testid="button"]`.
+   - **Keyword Overflow Bug Diagnosed (`rekaman-shutterstock-20260917_034439.json`)**: An overly broad container query in previous commit matched and clicked `button[data-testid="add-all-button"]` (Shutterstock's suggested keywords block), which added extra suggested tags causing keywords to overflow past 50 (to 64/50 and 65/50).
+   - **Clean Rollback & Precision Fix**: Rolled back working tree to `256fe01`. Updated `approveSpellingWarnings` to specifically target `div[data-testid="keyword-input"]` searching for text `"mark all keywords as correct"` or `"mark all as correct"`, while explicitly excluding `add-all-button`, `more-keyword-actions-button`, and any `role="tab"` or `tab-*`.
+   - **Guaranteed Behavior**: Does NOT click `tab-correction_needed` (no navigation alert), does NOT click `add-all-button` (no keyword overflow), and cleanly clicks the spelling approval button when spelling errors occur.
+
+00. **Production Build & Obfuscation Pipeline (`build.js`, `obfuscator.config.js`, `package.json`, `.gitignore`)**:
    - **Bundle-First Architecture (Option 2)**: Avoids ESM import breakage by running `esbuild` first across the 4 MV3 entry points (`background/service_worker.js`, `popup/popup.js`, `overlay/overlay.js`, `content/content_main.js`). All internal dependencies are bundled into standalone files in 19ms before `javascript-obfuscator` executes.
    - **MV3 Safe Obfuscator Configuration**: Configured with `disableConsoleOutput: false` (all console/activity logs appear 100% intact in DevTools), `debugProtection: false` (no debugger freezes), `renameGlobals: false` (protects `chrome.*`, `window.*`, `document.*`), `selfDefending: false` (service worker isolate stability), and `stringArrayEncoding: ['base64']`.
    - **Automated Distribution Packaging**: Copies static assets, cleans `dist/manifest.json` `web_accessible_resources`, and packages `dist/` into `releases/RJ_AIO_Metadata_v[version].zip` ready for direct upload to Ko-fi, Lynk.id, or GitHub Releases.
    - **Pristine Open Source Git Repository**: `.gitignore` strictly ignores `dist/`, `build/`, `releases/`, `v*/`, `*.zip`, `node_modules/`, `package-lock.json`, `build.js`, `package.json`, and `obfuscator.config.js`. The public GitHub repository remains 100% clean and transparent.
 
-00. **100% Multi-Language Resilience & Zero English Text Dependency (`AdobeStockAdapter`, `ShutterstockAdapter`, `VecteezyAdapter`, `DreamstimeAdapter`, `MiriCanvasAdapter`)**:
+000. **100% Multi-Language Resilience & Zero English Text Dependency (`AdobeStockAdapter`, `ShutterstockAdapter`, `VecteezyAdapter`, `DreamstimeAdapter`, `MiriCanvasAdapter`)**:
    - **Operational Rule (No Submit/Send)**: User explicitly clarified that except for Dreamstime Mode B carousel submission, **NONE of the platforms use submit/send review** (no submit in Vecteezy, MiriCanvas, Freepik, Adobe Stock, Shutterstock, Depositphotos). All workflows strictly save drafts, changes, and metadata.
    - **Zero Text Dependency Architecture**: Instead of bloating codebase with multi-language text dictionaries, all adapters now use structural attributes (`data-testid`, `data-t`, `data-f`, `value`, `name`, `:nth-of-type`, SVG icon signatures):
      - **Adobe Stock**: Releases switch targets `input[data-testid="has-release-no"], input[data-t="has-release-no"], input[name="hasReleases"][value="no"]` and structural second radio in group. Save button prioritizes `button[data-testid="save-work"], button[data-t="save-work"]`. Bulk select prioritizes `input[data-testid="select-all-checkbox"]`.

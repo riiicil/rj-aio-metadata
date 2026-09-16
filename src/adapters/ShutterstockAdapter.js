@@ -481,18 +481,40 @@ export class ShutterstockAdapter extends BaseAdapter {
     if (typeof document === 'undefined') return false;
 
     const findMarkCorrectBtn = () => {
+      // 1. Dedicated testid
       const direct = document.querySelector('button[data-testid="mark-all-correct-button"]');
-      if (direct) return direct;
+      if (direct && !direct.disabled) return direct;
 
+      // 2. Target button inside keyword-input section with text "Mark all keywords as correct"
+      // As shown in recording: div[data-testid="keyword-input"] button[data-testid="button"]
+      const kwContainer = document.querySelector('div[data-testid="keyword-input"]');
+      if (kwContainer) {
+        const btn = Array.from(kwContainer.querySelectorAll('button')).find((b) => {
+          const testId = (b.getAttribute('data-testid') || '').toLowerCase();
+          if (testId === 'add-all-button' || testId === 'more-keyword-actions-button' || b.id === 'more-keyword-actions-button') {
+            return false;
+          }
+          if (b.getAttribute('role') === 'tab') return false;
+
+          const text = (b.textContent || '').trim().toLowerCase();
+          return (text.includes('mark all keywords as correct') || text.includes('mark all as correct')) && !b.disabled;
+        });
+        if (btn) return btn;
+      }
+
+      // 3. Fallback: buttons on page matching exact text, strictly excluding tabs and add-all
       const candidateButtons = Array.from(document.querySelectorAll(
         'button[data-testid="button"], button'
       ));
 
       return candidateButtons.find((btn) => {
+        if (btn.getAttribute('role') === 'tab') return false;
         const testId = (btn.getAttribute('data-testid') || '').toLowerCase();
-        if (testId.includes('correct')) return true;
+        if (testId.startsWith('tab-') || testId === 'add-all-button' || testId === 'more-keyword-actions-button') {
+          return false;
+        }
         const text = btn.textContent?.trim().toLowerCase() || '';
-        return text.includes('mark all keywords as correct') || text.includes('mark all as correct');
+        return (text.includes('mark all keywords as correct') || text.includes('mark all as correct')) && !btn.disabled;
       });
     };
 
