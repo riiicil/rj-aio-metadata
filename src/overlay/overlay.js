@@ -19,7 +19,7 @@ const PLATFORM_LIMITS = {
   depositphotos: { min: 8, max: 50, hint: 'Min 8, Max 50' }
 };
 
-export const DONATION_URL = 'https://trakteer.id/yourname'; // Ganti dengan URL donasi Anda (Saweria, Trakteer, Buy Me a Coffee, dll)
+export const DONATION_URL = 'https://s.id/rjsupport'; // Ganti dengan URL donasi Anda (Saweria, Trakteer, Buy Me a Coffee, dll)
 
 export const HUD_DONATION_VARIANTS = [
   {
@@ -385,10 +385,10 @@ export class OverlayHUD {
       const validArticles = realListArticles.length > 0
         ? realListArticles
         : Array.from(
-            document.querySelectorAll(
-              'article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, article'
-            )
-          ).filter((a) => !a.closest?.('ul[data-f="GU-fa4b"], ul.panda-ecnXzs'));
+          document.querySelectorAll(
+            'article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, article'
+          )
+        ).filter((a) => !a.closest?.('ul[data-f="GU-fa4b"], ul.panda-ecnXzs'));
 
       const count = validArticles.length;
       return {
@@ -1353,8 +1353,8 @@ export class OverlayHUD {
                     }
                   });
                 }
-                syncStore.set(syncConfig, () => {});
-              } catch {}
+                syncStore.set(syncConfig, () => { });
+              } catch { }
             }
           });
         } else if (syncStore) {

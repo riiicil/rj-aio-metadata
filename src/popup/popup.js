@@ -18,7 +18,7 @@ export const PLATFORM_DISPLAY_NAMES = {
   miricanvas: 'MiriCanvas'
 };
 
-export const DONATION_URL = 'https://trakteer.id/yourname'; // Ganti dengan URL donasi Anda (Saweria, Trakteer, Buy Me a Coffee, dll)
+export const DONATION_URL = 'https://s.id/rjsupport'; // Ganti dengan URL donasi Anda (Saweria, Trakteer, Buy Me a Coffee, dll)
 
 export const DONATION_VARIANTS = [
   {
@@ -297,7 +297,7 @@ function updateTabMatchStatus() {
     platformStatusBadge.title = 'Active tab is not on this platform';
     statusText.textContent = 'Not on Tab';
     statusIcon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
-    
+
     warningMessage.textContent = `Active tab is not ${targetPlatform ? targetPlatform.name : 'this platform'}.`;
     platformWarningBanner.style.display = 'flex';
   }
@@ -360,7 +360,7 @@ function updateModelDropdownState(provider) {
  */
 function renderProviderFields(providerId) {
   const provider = currentConfig.providers[providerId] || currentConfig.providers.gemini;
-  
+
   baseUrlInput.value = provider.baseUrl || '';
   // Preset providers have disabled baseUrl; Custom endpoint is editable
   baseUrlInput.disabled = (providerId !== 'custom');
