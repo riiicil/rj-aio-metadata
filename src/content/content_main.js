@@ -31,22 +31,41 @@ async function getOrInitHUD(initialVisible = true) {
   }
 }
 
-// Auto-mount HUD on page load
-if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-  chrome.storage.local.get(['rj_overlay_visible'], (res) => {
-    const isVisible = res ? res.rj_overlay_visible !== false : true;
-    getOrInitHUD(isVisible).then((instance) => {
+const SUPPORTED_HOSTS = [
+  'stock.adobe.com',
+  'shutterstock.com',
+  'dreamstime.com',
+  'vecteezy.com',
+  'freepik.com',
+  'magnific.com',
+  'depositphotos.com',
+  'miricanvas.com'
+];
+
+function isSupportedPlatformPage() {
+  if (typeof window === 'undefined' || !window.location?.hostname) return false;
+  const host = window.location.hostname.toLowerCase();
+  return SUPPORTED_HOSTS.some(domain => host.includes(domain));
+}
+
+// Auto-mount HUD on page load only for supported microstock platforms
+if (isSupportedPlatformPage()) {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    chrome.storage.local.get(['rj_overlay_visible'], (res) => {
+      const isVisible = res ? res.rj_overlay_visible !== false : true;
+      getOrInitHUD(isVisible).then((instance) => {
+        if (instance) {
+          console.log('[RJ AIO Metadata] Overlay HUD successfully mounted on:', window.location.hostname);
+        }
+      });
+    });
+  } else {
+    getOrInitHUD(true).then((instance) => {
       if (instance) {
         console.log('[RJ AIO Metadata] Overlay HUD successfully mounted on:', window.location.hostname);
       }
     });
-  });
-} else {
-  getOrInitHUD(true).then((instance) => {
-    if (instance) {
-      console.log('[RJ AIO Metadata] Overlay HUD successfully mounted on:', window.location.hostname);
-    }
-  });
+  }
 }
 
 // Listen for runtime messages from background service worker or popup

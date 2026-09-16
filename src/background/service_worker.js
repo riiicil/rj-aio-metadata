@@ -660,11 +660,19 @@ if (typeof chrome !== 'undefined') {
           const state = res?.rj_automation_state;
           if (state && (state.isRunning || state.isStopping || state.status === 'stopping')) {
             // Only auto-heal if this exact tab was running the automation
-            if (state.tabId && state.tabId === tabId) {
-              resetAutomationState(state.platformId);
-            } else if (!state.tabId && tab?.url && state.platformId && tab.url.toLowerCase().includes(state.platformId)) {
-              // Fallback url check if tabId was not recorded
-              resetAutomationState(state.platformId);
+            const isRunnerTab = (state.tabId && state.tabId === tabId) ||
+              (!state.tabId && tab?.url && state.platformId && tab.url.toLowerCase().includes(state.platformId));
+
+            if (isRunnerTab) {
+              const url = tab?.url || changeInfo?.url || '';
+              const isDreamstimeContinuation = state.platformId === 'dreamstime' &&
+                !state.isStopping &&
+                state.status !== 'stopping' &&
+                (url === '' || url.toLowerCase().includes('dreamstime.com'));
+
+              if (!isDreamstimeContinuation) {
+                resetAutomationState(state.platformId);
+              }
             }
           }
         });

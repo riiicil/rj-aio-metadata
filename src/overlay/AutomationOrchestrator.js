@@ -11,6 +11,13 @@ import { sleep } from '../adapters/utils/dom_helpers.js';
 import { logger } from '../services/LoggerService.js';
 import { pillSpinnerSvg, pillReadySvg } from './overlay.js';
 
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function' && !window.__rj_unload_listener_attached) {
+  window.__rj_unload_listener_attached = true;
+  window.addEventListener('beforeunload', () => {
+    window.__rj_is_unloading = true;
+  });
+}
+
 export class AutomationOrchestrator {
   /**
    * @param {import('./overlay.js').OverlayHUD} hud
@@ -19,6 +26,8 @@ export class AutomationOrchestrator {
     this.hud = hud;
     this.abortController = null;
     this.isCardProcessing = false;
+    this.isExecutionLoopActive = false;
+    this.processedCount = 0;
   }
 
   /**
@@ -26,7 +35,7 @@ export class AutomationOrchestrator {
    * @returns {boolean}
    */
   get isRunning() {
-    return Boolean(this.hud?.isAutomationRunning);
+    return Boolean(this.isExecutionLoopActive || this.hud?.isAutomationRunning);
   }
 
   /**
@@ -42,7 +51,7 @@ export class AutomationOrchestrator {
    * @returns {boolean}
    */
   get isProcessing() {
-    return Boolean(this.hud?.isAutomationRunning || this.isCardProcessing);
+    return Boolean(this.hud?.isAutomationRunning || this.isExecutionLoopActive || this.isCardProcessing);
   }
 
   /**
@@ -59,6 +68,7 @@ export class AutomationOrchestrator {
           platformId: this.hud?.platformId || null,
           tabId: this.hud?.tabId || null,
           progressText: patch.progressText || '',
+          processedCount: patch.processedCount !== undefined ? patch.processedCount : (patch.isRunning ? (this.processedCount || 0) : 0),
           timestamp: Date.now()
         }
       });
@@ -68,10 +78,11 @@ export class AutomationOrchestrator {
   /**
    * Main automation entry point.
    * Executes provider verification, card scanning, batch loop iteration, and bulk saving.
+   * @param {number} [initialCount=0] - Initial processed asset counter for cross-page continuations.
    * @returns {Promise<void>}
    */
-  async start() {
-    if (this.hud.isAutomationRunning || this.hud.isStopping) return;
+  async start(initialCount = 0) {
+    if (this.isExecutionLoopActive || this.hud.isStopping) return;
 
     // 1. Resolve active platform adapter
     const currentUrl = typeof window !== 'undefined' ? window.location?.href : '';
@@ -105,6 +116,7 @@ export class AutomationOrchestrator {
     const signal = this.abortController.signal;
 
     // 4. Update HUD UI state to Running
+    this.isExecutionLoopActive = true;
     this.hud.isAutomationRunning = true;
     this.hud.isStopping = false;
     this.hud.updateAutomationUI(true);
@@ -127,12 +139,17 @@ export class AutomationOrchestrator {
       const total = cards.length;
 
       if (total === 0) {
+        this.isExecutionLoopActive = false;
         this.hud.isStopping = false;
         this.hud.isAutomationRunning = false;
         this.hud.updateAutomationUI(false);
-        if (countText) countText.textContent = '0 Assets Detected';
-        setStatusBadge('0 Assets Detected');
-        this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
+        const finishMsg = (typeof initialCount === 'number' && initialCount > 0)
+          ? `Finished ${initialCount} assets`
+          : '0 Assets Detected';
+        if (countText) countText.textContent = finishMsg;
+        this.hud.lastCompletedAssetLabel = finishMsg;
+        setStatusBadge(finishMsg);
+        this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '', processedCount: 0 });
         return;
       }
 
@@ -148,11 +165,12 @@ export class AutomationOrchestrator {
       this.hud.isStopping = false;
       this.hud.isCardProcessing = false;
       this.isCardProcessing = false;
-      let processedCount = 0;
+      let processedCount = typeof initialCount === 'number' ? initialCount : 0;
+      this.processedCount = processedCount;
 
       // 6A. Dreamstime In-Page Carousel Loop
       if (this.hud.platformId === 'dreamstime') {
-        let assetIdx = 0;
+        let assetIdx = processedCount;
         while (!signal.aborted && !this.hud.isStopping) {
           const currentCards = adapter.getAssetCards();
           const card = currentCards && currentCards.length > 0 ? currentCards[0] : null;
@@ -173,7 +191,8 @@ export class AutomationOrchestrator {
             isRunning: true,
             isStopping: Boolean(this.hud.isStopping),
             status: this.hud.isStopping ? 'stopping' : 'running',
-            progressText: progressStr
+            progressText: progressStr,
+            processedCount
           });
 
           logger.asset(assetIdx + 1, 'Carousel');
@@ -181,7 +200,11 @@ export class AutomationOrchestrator {
           this.hud.isCardProcessing = true;
           this.isCardProcessing = true;
           try {
-            // Step 1: Wait for Editor Ready
+            // Step 1: Wait for Editor Ready (or open modal if starting from batch grid)
+            if (typeof document !== 'undefined' && !document.querySelector('div.popup-upload.popup-upload--submit, div.popup-upload, input#title')) {
+              adapter.selectCard(card);
+              await sleep(600);
+            }
             await adapter.waitForEditorReady(card, 4000);
             if (signal.aborted) break;
             await sleep(300);
@@ -228,6 +251,14 @@ export class AutomationOrchestrator {
 
             await adapter.fillMetadata(sanitizedData, platformOptions);
             processedCount++;
+            this.processedCount = processedCount;
+            this._setAutomationState({
+              isRunning: true,
+              isStopping: Boolean(this.hud.isStopping),
+              status: this.hud.isStopping ? 'stopping' : 'running',
+              progressText: progressStr,
+              processedCount
+            });
 
             // Step 5: Save edits (waits for toast appear & disappear)
             setStatusBadge('Saving...', 'Saving edits...');
@@ -265,12 +296,15 @@ export class AutomationOrchestrator {
           logger.banner('Dreamstime automation stopped.');
           this.hud.isStopping = false;
           this.hud.isAutomationRunning = false;
+          this.processedCount = 0;
           this.hud.updateAutomationUI(false);
           this.hud.updateHudSupportProgress?.('');
           setStatusBadge('Stopped');
-          this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '' });
+          this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '', processedCount: 0 });
         } else {
           logger.success(`Dreamstime automation finished ${processedCount} assets.`);
+          this.processedCount = 0;
+          this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '', processedCount: 0 });
           if (progressFill) progressFill.style.width = '100%';
           if (countText) countText.textContent = `Finished ${processedCount} assets`;
           this.hud.lastCompletedAssetLabel = `Finished ${processedCount} assets`;
@@ -462,11 +496,15 @@ export class AutomationOrchestrator {
         this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '' });
       }
     } catch (err) {
+      if (typeof window !== 'undefined' && window.__rj_is_unloading && this.hud.platformId === 'dreamstime') {
+        return;
+      }
+      this.isExecutionLoopActive = false;
       this.hud.isStopping = false;
       this.hud.isAutomationRunning = false;
       this.hud.updateAutomationUI(false);
       this.hud.updateHudSupportProgress?.('');
-      this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '' });
+      this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '', processedCount: 0 });
       if (err.message === 'ABORTED' || signal.aborted) {
         logger.info('Automation stopped.');
         setStatusBadge('Stopped');
@@ -477,13 +515,17 @@ export class AutomationOrchestrator {
         setStatusBadge(conciseErr, fullErr);
       }
     } finally {
+      this.isExecutionLoopActive = false;
       this.hud.isStopping = false;
       this.hud.isCardProcessing = false;
       this.isCardProcessing = false;
       this.abortController = null;
       this.hud.abortController = null;
-      this.hud.isAutomationRunning = false;
-      this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
+      const isUnloading = typeof window !== 'undefined' && window.__rj_is_unloading;
+      if (!isUnloading || this.hud.platformId !== 'dreamstime') {
+        this.hud.isAutomationRunning = false;
+        this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '', processedCount: 0 });
+      }
     }
   }
 
@@ -508,13 +550,14 @@ export class AutomationOrchestrator {
         this.abortController = null;
       }
       this.hud.abortController = null;
+      this.isExecutionLoopActive = false;
       this.hud.isStopping = false;
       this.hud.isCardProcessing = false;
       this.isCardProcessing = false;
       this.hud.isAutomationRunning = false;
       this.hud.updateAutomationUI(false);
       this.hud.setStatusBadge('Stopped');
-      this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle' });
+      this._setAutomationState({ isRunning: false, isStopping: false, status: 'idle', progressText: '', processedCount: 0 });
     } else {
       this.hud.isStopping = true;
       this.hud.isAutomationRunning = true;

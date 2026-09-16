@@ -2,7 +2,7 @@
 
 *Last Updated: 2026-09-16*<br>
 *Active Branch: `task/e2e-hardening-polish`*<br>
-*Current Milestone: Phase 5: E2E Hardening & Polish (Support Ticker Polish: Animations, Spinner, Fonts & Multi-Variant Rotation Complete)*
+*Current Milestone: Phase 5: E2E Hardening & Polish (Dreamstime Cross-Page Continuation, Stop Button Shortening, Donate Icon Outline Fix & Content Script Match Restriction Complete)*
 
 ---
 
@@ -13,7 +13,7 @@
 - **Phase 2 — In-Page Draggable Overlay HUD**: [COMPLETE] (Shadow DOM HUD, draggable physics, adaptive quick form, live asset counter, multi-platform media detection, popup toggle, bidirectional sync merged to dev)
 - **Phase 3 — Universal Vision Service**: [COMPLETE] (Step 3.1 Prompt Engine, Step 3.2 Sanitizer Engine, Step 3.3 Universal Vision Client & Background Proxy Worker complete, merged to dev)
 - **Phase 4 — Platform Adapters**: [COMPLETE] (Platform adapters and live alignment verified across all 7 platforms: Adobe Stock, Shutterstock, Freepik / Magnific, Vecteezy, Dreamstime, Depositphotos, and MiriCanvas merged to dev)
-- **Phase 5 — End-to-End Testing & Polish**: [IN_PROGRESS] (Dynamic progress and support ticker button implemented in Popup and HUD with 100% idle / 50% running flex transitions, smooth entrance & ticker swap animations, HUD live spinner rotation fix, typography standardization to 12px font-weight 500 without bold, 5 sequential rotating donation variations with zero native emojis, locked button contrast hardening and popup concurrency lock synchronization complete, exclusive automation lock across platforms and popup complete, multi-tab automation state isolation and auto-heal stabilization complete, Sub-phases 5.1-5.6 complete: Overlay modularization extracting batch execution loop, card iteration, Dreamstime carousel workflows, bulk saving, and graceful stop coordination into dedicated ES module `src/overlay/AutomationOrchestrator.js`, popup modularization extracting all 7 platform HTML template generators into dedicated ES module `src/popup/platform_forms.js`, brand asset optimization reducing `logo_rj.png` from 1.66 MB to ~60 KB, Emerald Teal active theme alignment, pill spinner, and badge tooltip clamping)
+- **Phase 5 — End-to-End Testing & Polish**: [IN_PROGRESS] (Dreamstime cross-page navigation continuation and auto-heal exception complete, Stop button label shortened to 'Stop' in Popup and HUD, support/donation icon outline unboxed, manifest content_scripts matches restricted to 8 stock domains with content_main hostname guard, dynamic progress and support ticker button implemented in Popup and HUD with 100% idle / 50% running flex transitions, smooth entrance & ticker swap animations, HUD live spinner rotation fix, typography standardization to 12px font-weight 500 without bold, 5 sequential rotating donation variations with zero native emojis, locked button contrast hardening and popup concurrency lock synchronization complete, exclusive automation lock across platforms and popup complete, multi-tab automation state isolation and auto-heal stabilization complete, Sub-phases 5.1-5.6 complete: Overlay modularization extracting batch execution loop into `src/overlay/AutomationOrchestrator.js`, popup modularization extracting form generators into `src/popup/platform_forms.js`)
 
 ---
 

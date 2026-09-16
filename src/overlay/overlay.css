@@ -531,6 +531,18 @@
   flex-shrink: 0;
 }
 
+#rjHudSupportProgressIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
+}
+
 .rj-hud-btn-action.rj-btn-start {
   background-color: #079183;
   color: #ffffff;

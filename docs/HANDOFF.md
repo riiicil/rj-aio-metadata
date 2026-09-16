@@ -5,17 +5,28 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Support Ticker Polish: Animations, Spinner, Fonts & Multi-Variant Rotation Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Dreamstime Cross-Page Continuation, Stop Button Shortening, Donate Icon Outline Fix & Content Script Match Restriction Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: Pending (`fix(ui): polish support ticker animations, spinner rotation, font weights, and multi-variant donations`)
+- **Latest Commit**: `f44af1a` (`fix(dreamstime): support cross-page navigation, shorten stop label, unbox donate icon, and restrict manifest matches`)
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (11/11 on support ticker suite, 4/4 on exclusive lock suite, 7/7 on multi-tab isolation suite, 18/18 on Adobe auto-heal suite, 88/88 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
+- **Build / Test State**: Verified healthy (6/6 on Dreamstime continuation suite, 11/11 on support ticker suite, 4/4 on exclusive lock suite, 7/7 on multi-tab isolation suite, 18/18 on Adobe auto-heal suite, 24/24 on Dreamstime fixes suite, 88/88 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **Support Ticker Polish & Animations (Popup & HUD)**:
+0. **Dreamstime Cross-Page Continuation & Auto-Heal Exception (`service_worker.js`, `AutomationOrchestrator.js`, `overlay.js`)**:
+   - **Cross-Page Navigation Gotcha**: Dreamstime redirects / navigates between assets (`/upload/edit?item_id=...`). The service worker's `tabs.onUpdated` auto-heal previously mistook in-domain reloads as cancellation signals, wiping state to idle. Concurrently, newly mounted `OverlayHUD` instances wiped storage because `orchestrator.isProcessing` was initially false on fresh JS execution contexts.
+   - **Service Worker Exception**: Updated `service_worker.js:tabs.onUpdated` to preserve active state during Dreamstime in-domain navigation (`state.platformId === 'dreamstime' && !state.isStopping && (url === '' || url.includes('dreamstime.com'))`). Reloading while stopping or navigating away (e.g. to Google) still safely triggers auto-heal reset.
+   - **Orchestrator State Tracking & Unload Guard**: Updated `AutomationOrchestrator.js` to decouple visual running state from loop execution via `this.isExecutionLoopActive`, pass `initialCount` to resume asset counting (`processedCount`), attach a `beforeunload` listener preventing premature state wipe during page teardown, and cleanly handle zero assets when Dreamstime redirects back to the uploads batch list (`Finished ${initialCount} assets`).
+   - **OverlayHUD Auto-Resume**: In `overlay.js:restoreAutomationState()`, detects `isDreamstimeContinuation`, immediately sets `isAutomationRunning = true` to display "Stop" without flicker, and schedules `startAutomation(state.processedCount || 0)` with a 1000ms delay to let the newly loaded DOM settle before continuing.
+
+00. **UI Polish: Stop Button Shortening, Donate Icon Unboxing & Content Script Match Restriction**:
+   - **Stop Button Shortening**: Shortened running button label from `"Stop Automation"` to `"Stop"` across both Popup (`popup.js`) and HUD (`overlay.js`), maintaining 12px font-weight 500 typography and square stop Lucide SVG.
+   - **Support Icon Unboxing**: Removed `.rj-btn-icon` class from `#supportProgressIcon` in `popup.html` (which previously applied a 34x34px bordered box from `components.css:527`), and set transparent styles in `popup.css` and `overlay.css`.
+   - **Restricted Content Script Matches**: Restricted `content_scripts.matches` in `manifest.json` from wildcards (`http://*/*`, `https://*/*`) to the 8 explicit supported platform domains, and added `isSupportedPlatformPage()` hostname whitelist check in `content_main.js`.
+
+000. **Support Ticker Polish & Animations (Popup & HUD)**:
    - **HUD Spinner Rotation Fix**: Added global `.rj-rotating, .rj-status-icon-spinner { animation: rj-spin 0.8s linear infinite; flex-shrink: 0; }` in `src/overlay/overlay.css` and added `.rj-rotating` class to `hudSpinnerSvg` in `src/overlay/overlay.js`.
    - **Smooth Entrance & Exit Animation**: Applied `@keyframes rj-btn-appear` (`scale(0.92)` to `scale(1)` with cubic-bezier easing) to `#btnSupportProgress` and `#rjBtnHudSupportProgress` via `.rj-visible` class.
    - **Smooth Ticker Content Swap Animation**: Applied `@keyframes rj-ticker-swap` (`translateY(2px)` with fade) to `.rj-ticker-animating > *` re-triggered during every phase transition.

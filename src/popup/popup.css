@@ -192,4 +192,16 @@ body::-webkit-scrollbar-thumb:hover {
   flex-shrink: 0;
 }
 
+#supportProgressIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
+}
+
 

@@ -963,8 +963,8 @@ function updateAutomationButtonUI(state) {
     btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
     btnToggleAutomation.classList.add('rj-btn-danger', 'rj-btn-running');
     btnToggleAutomation.disabled = false;
-    btnToggleAutomation.title = 'Stop Automation';
-    if (automationBtnText) automationBtnText.textContent = 'Stop Automation';
+    btnToggleAutomation.title = 'Stop';
+    if (automationBtnText) automationBtnText.textContent = 'Stop';
     if (automationIcon) {
       automationIcon.innerHTML = `<rect x="6" y="6" width="12" height="12" rx="1.5"></rect>`;
     }

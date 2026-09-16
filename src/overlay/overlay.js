@@ -1074,9 +1074,9 @@ export class OverlayHUD {
         btn.classList.remove('rj-btn-start', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
         btn.classList.add('rj-btn-stop');
         btn.disabled = false;
-        btn.title = 'Stop Automation';
+        btn.title = 'Stop';
       }
-      if (btnText) btnText.textContent = 'Stop Automation';
+      if (btnText) btnText.textContent = 'Stop';
       if (icon) icon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
       if (badge) badge.classList.add('rj-running');
       this.setStatusBadge('Running');
@@ -1202,9 +1202,10 @@ export class OverlayHUD {
 
   /**
    * Starts the batch automation sequence via AutomationOrchestrator.
+   * @param {number} [initialCount=0]
    */
-  async startAutomation() {
-    return this.orchestrator.start();
+  async startAutomation(initialCount = 0) {
+    return this.orchestrator.start(initialCount);
   }
 
   /**
@@ -1388,6 +1389,31 @@ export class OverlayHUD {
           const isRunning = Boolean(state.isRunning);
           const isStopping = Boolean(state.isStopping || state.status === 'stopping');
 
+          // Cross-page continuation for Dreamstime:
+          // Dreamstime redirects/reloads between assets (/upload/edit?item_id=...).
+          // If the batch was running on Dreamstime and not stopping, maintain running UI
+          // and auto-resume orchestrator with the persisted processedCount after DOM settles.
+          const isDreamstimeContinuation = this.platformId === 'dreamstime' &&
+            state.platformId === 'dreamstime' &&
+            isRunning &&
+            !isStopping;
+
+          if (isDreamstimeContinuation) {
+            this.isAutomationRunning = true;
+            this.isStopping = false;
+            this.updateAutomationUI(true);
+            if (state.progressText) {
+              this.updateHudSupportProgress(state.progressText);
+            }
+            setTimeout(() => {
+              if (this.isAutomationRunning && !this.isStopping && !this.orchestrator?.isExecutionLoopActive) {
+                this.startAutomation(state.processedCount || 0);
+              }
+            }, 1000);
+            resolve();
+            return;
+          }
+
           // Auto-heal on page mount: A newly mounted overlay instance on page reload is never
           // actively stopping an old batch from a dead JS execution context.
           if (isStopping || (isRunning && !this.orchestrator?.isProcessing)) {
@@ -1401,6 +1427,8 @@ export class OverlayHUD {
                 status: 'idle',
                 platformId: this.platformId || null,
                 tabId: this.tabId || null,
+                progressText: '',
+                processedCount: 0,
                 timestamp: Date.now()
               }
             });
