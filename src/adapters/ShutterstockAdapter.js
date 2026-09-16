@@ -195,7 +195,8 @@ export class ShutterstockAdapter extends BaseAdapter {
 
       const clearAction = document.querySelector('li[data-testid="clear-action"]') ||
         Array.from(document.querySelectorAll('li.MuiMenuItem-root, li')).find(
-          (li) => li.textContent && li.textContent.includes('Clear keywords')
+          (li) => (li.getAttribute('data-testid') || '').toLowerCase().includes('clear') ||
+            (li.textContent && li.textContent.toLowerCase().includes('clear'))
         );
 
       if (clearAction) {
@@ -480,11 +481,16 @@ export class ShutterstockAdapter extends BaseAdapter {
     if (typeof document === 'undefined') return false;
 
     const findMarkCorrectBtn = () => {
+      const direct = document.querySelector('button[data-testid="mark-all-correct-button"]');
+      if (direct) return direct;
+
       const candidateButtons = Array.from(document.querySelectorAll(
-        'button[data-testid="mark-all-correct-button"], button[data-testid="button"], button'
+        'button[data-testid="button"], button'
       ));
 
       return candidateButtons.find((btn) => {
+        const testId = (btn.getAttribute('data-testid') || '').toLowerCase();
+        if (testId.includes('correct')) return true;
         const text = btn.textContent?.trim().toLowerCase() || '';
         return text.includes('mark all keywords as correct') || text.includes('mark all as correct');
       });
@@ -533,7 +539,7 @@ export class ShutterstockAdapter extends BaseAdapter {
     const saveBtn = document.querySelector(
       'button[data-testid="edit-dialog-save-button"]'
     ) || Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent && b.textContent.trim() === 'Save'
+      (b) => (b.getAttribute('data-testid') || '').includes('save') || (b.textContent && b.textContent.trim() === 'Save')
     );
 
     if (saveBtn && !saveBtn.disabled) {
@@ -579,7 +585,7 @@ export class ShutterstockAdapter extends BaseAdapter {
     const cards = this.getAssetCards();
     if (cards.length > 1 || !lastCardElement) {
       const selectPageBtn = document.querySelector(
-        'button[data-testid="select-page-button"], button[data-testid="select-all-button"]'
+        'button[data-testid="select-page-button"], button[data-testid="select-all-button"], #bulk-editor button[data-testid="button"], #bulk-editor button'
       ) || Array.from(document.querySelectorAll('div.MuiGrid-root button, button')).find(
         (b) => b.textContent && b.textContent.includes('Select page')
       );
@@ -594,7 +600,7 @@ export class ShutterstockAdapter extends BaseAdapter {
     const saveBtn = document.querySelector(
       'button[data-testid="edit-dialog-save-button"]'
     ) || Array.from(document.querySelectorAll('button')).find(
-      (b) => b.textContent && b.textContent.trim() === 'Save'
+      (b) => (b.getAttribute('data-testid') || '').includes('save') || (b.textContent && b.textContent.trim() === 'Save')
     );
 
     if (saveBtn && !saveBtn.disabled) {
@@ -643,6 +649,9 @@ export class ShutterstockAdapter extends BaseAdapter {
           'button[data-testid="deselect-page-button"], button[data-testid="deselect-all-button"]'
         );
         if (direct) return direct;
+
+        const bulkEditorBtn = document.querySelector('#bulk-editor button[data-testid="button"], #bulk-editor button');
+        if (bulkEditorBtn) return bulkEditorBtn;
 
         const allButtons = Array.from(document.querySelectorAll('div.MuiGrid-root button, button'));
         const textMatch = allButtons.find((btn) => {

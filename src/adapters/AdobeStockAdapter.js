@@ -459,7 +459,7 @@ export class AdobeStockAdapter extends BaseAdapter {
     // For Non-AI assets: Set 'Recognizable people or property?' to 'No'
     if (!isAi) {
       const noReleaseRadio = document.querySelector(
-        'input[data-t="has-release-no"], input[name="hasReleases"][value="no"]'
+        'input[data-testid="has-release-no"], input[data-t="has-release-no"], input[name="hasReleases"][value="no"], input[name="hasReleases"][value="false"]'
       );
       if (noReleaseRadio) {
         if (!noReleaseRadio.checked) {
@@ -476,18 +476,23 @@ export class AdobeStockAdapter extends BaseAdapter {
           await sleep(300);
         }
       } else {
-        // Fallback: search within elements mentioning Recognizable people or property
+        // Fallback: search containers with name="hasReleases" or release attributes
         const candidateContainers = Array.from(document.querySelectorAll('div, fieldset, section')).filter(el =>
           el.querySelector?.('input[name="hasReleases"]') ||
-          (el.textContent && el.textContent.includes('Recognizable people or property'))
+          el.querySelector?.('input[data-testid*="release"], input[data-t*="release"]')
         );
         for (const container of candidateContainers) {
-          const noBtn = Array.from(container.querySelectorAll('label, span, button')).find(
-            b => b.textContent?.trim() === 'No'
-          );
-          if (noBtn) {
-            simulateClick(noBtn);
-            (this.logger || logger).step('Recognizable people or property', 'No (container match)');
+          const radios = Array.from(container.querySelectorAll('input[type="radio"]'));
+          const noRadio = radios.find(r => r.value === 'no' || r.value === 'false' || r.getAttribute('data-testid')?.includes('no') || r.getAttribute('data-t')?.includes('no')) || radios[1];
+          if (noRadio) {
+            const clickTarget = noRadio.parentElement?.querySelector?.('label, .switch__body') || noRadio;
+            simulateClick(clickTarget);
+            if (clickTarget !== noRadio) simulateClick(noRadio);
+            try {
+              noRadio.checked = true;
+              noRadio.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch {}
+            (this.logger || logger).step('Recognizable people or property', 'No (structural radio)');
             await sleep(300);
             break;
           }
@@ -567,15 +572,19 @@ export class AdobeStockAdapter extends BaseAdapter {
   _findSaveWorkButton() {
     if (typeof document === 'undefined') return null;
 
-    // 1. Direct attribute match
-    const directSaveBtn = document.querySelector('button[data-t="save-work"]');
+    // 1. Direct attribute match (data-testid, data-t)
+    const directSaveBtn = document.querySelector(
+      'button[data-testid="save-work"], button[data-t="save-work"]'
+    );
     if (directSaveBtn && !directSaveBtn.disabled) return directSaveBtn;
 
-    // 2. Filter buttons strictly matching 'Save work' or 'Save' text, excluding 'submit'
+    // 2. Filter buttons strictly matching data attributes or fallback text, excluding submit
     const candidateButtons = Array.from(document.querySelectorAll('button'));
     return candidateButtons.find((btn) => {
+      const dataTestId = (btn.getAttribute('data-testid') || '').toLowerCase();
       const dataT = (btn.getAttribute('data-t') || '').toLowerCase();
-      if (dataT.includes('submit')) return false;
+      if (dataTestId.includes('submit') || dataT.includes('submit')) return false;
+      if (dataTestId === 'save-work' || dataT === 'save-work') return !btn.disabled;
 
       const txt = (btn.textContent || '').trim().toLowerCase();
       return (txt === 'save work' || txt === 'save') && !btn.disabled;
@@ -608,30 +617,40 @@ export class AdobeStockAdapter extends BaseAdapter {
   async bulkSave(isAiGenerated = false) {
     if (typeof document === 'undefined') return true;
 
-    // 1. Select All
-    const selectAllText = Array.from(document.querySelectorAll('div.text-sregular.margin-left-xsmall.left'))
-      .find(el => el.textContent.trim() === 'Select All');
+    // 1. Select All - check data-testid, data-t, and structural grid selectors first
+    const selectAllCheckbox = document.querySelector(
+      'input[data-testid="select-all-checkbox"], input[data-t="select-all-checkbox"], div[data-testid="assets-content-grid-wrapper"] .content-grid-wrapper input[type="checkbox"], div.upload-tile__select-all input, div.content-tagger__select-all input'
+    );
 
-    if (selectAllText) {
-      const icon = selectAllText.previousElementSibling;
-      if (icon && icon.classList.contains('icon-checkbox-inactive')) {
-        simulateClick(icon);
+    if (selectAllCheckbox) {
+      if (!selectAllCheckbox.checked) {
+        simulateClick(selectAllCheckbox);
         await sleep(500);
       }
     } else {
-      const selectAllCheckbox = document.querySelector(
-        'input[data-t="select-all-checkbox"], div.upload-tile__select-all input, div.content-tagger__select-all input'
-      );
-      if (selectAllCheckbox && !selectAllCheckbox.checked) {
-        simulateClick(selectAllCheckbox);
+      const selectAllIcon = document.querySelector('.icon-checkbox-inactive');
+      if (selectAllIcon) {
+        simulateClick(selectAllIcon);
         await sleep(500);
+      } else {
+        const selectAllText = Array.from(document.querySelectorAll('div.text-sregular.margin-left-xsmall.left'))
+          .find(el => el.textContent.trim().toLowerCase().includes('select all'));
+        if (selectAllText) {
+          const icon = selectAllText.previousElementSibling;
+          if (icon && icon.classList.contains('icon-checkbox-inactive')) {
+            simulateClick(icon);
+            await sleep(500);
+          }
+        }
       }
     }
     await sleep(1000);
 
     // 2. Releases switch to "no" (for non-AI assets)
     if (!isAiGenerated) {
-      const noReleaseRadio = document.querySelector('input[data-t="has-release-no"], input[name="hasReleases"][value="no"]');
+      const noReleaseRadio = document.querySelector(
+        'input[data-testid="has-release-no"], input[data-t="has-release-no"], input[name="hasReleases"][value="no"], input[name="hasReleases"][value="false"]'
+      );
       if (noReleaseRadio) {
         if (!noReleaseRadio.checked) {
           const clickTarget = noReleaseRadio.parentElement?.querySelector?.('label, .switch__body') || noReleaseRadio;

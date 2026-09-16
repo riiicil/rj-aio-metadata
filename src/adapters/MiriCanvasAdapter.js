@@ -738,8 +738,11 @@ export class MiriCanvasAdapter extends BaseAdapter {
     // 2. Click "Save Metadata" button
     const saveBtn =
       document.querySelector('button[data-f="SG-8f01"]') ||
+      Array.from(document.querySelectorAll('button')).find((b) =>
+        b.querySelector('svg path[d^="M7 19v-6h10v6"], svg path[d*="19v-6"]')
+      ) ||
       Array.from(document.querySelectorAll('button')).find(
-        (b) => b.textContent && b.textContent.includes('Save Metadata')
+        (b) => b.textContent && (b.textContent.includes('Save') || b.textContent.includes('저장'))
       ) ||
       document.querySelector('button.panda-YJgQP');
 

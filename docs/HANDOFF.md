@@ -5,17 +5,27 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Dreamstime Cross-Page Continuation, Stop Button Shortening, Donate Icon Outline Fix & Content Script Match Restriction Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (100% Multi-Language Resilience without English Text Dependencies across all Platform Adapters Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: `f44af1a` (`fix(dreamstime): support cross-page navigation, shorten stop label, unbox donate icon, and restrict manifest matches`)
-- **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (6/6 on Dreamstime continuation suite, 11/11 on support ticker suite, 4/4 on exclusive lock suite, 7/7 on multi-tab isolation suite, 18/18 on Adobe auto-heal suite, 24/24 on Dreamstime fixes suite, 88/88 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
+- **Latest Commit**: `668850b` (`fix(adapters): harden DOM selectors for 100% multi-language resilience without text dependencies`)
+- **Working Tree**: Modified adapters & tests verified
+- **Build / Test State**: Verified healthy (11/11 multi-language resilience suite, 88/88 Tier 1 suite, 108/108 Tier 2 suite, 113/113 Tier 3 suite, 24/24 Dreamstime fixes, 18/18 Adobe auto-heal suite, 11/11 support ticker suite, 4/4 exclusive lock suite, 7/7 multi-tab isolation suite, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **Dreamstime Cross-Page Continuation & Auto-Heal Exception (`service_worker.js`, `AutomationOrchestrator.js`, `overlay.js`)**:
+0. **100% Multi-Language Resilience & Zero English Text Dependency (`AdobeStockAdapter`, `ShutterstockAdapter`, `VecteezyAdapter`, `DreamstimeAdapter`, `MiriCanvasAdapter`)**:
+   - **Operational Rule (No Submit/Send)**: User explicitly clarified that except for Dreamstime Mode B carousel submission, **NONE of the platforms use submit/send review** (no submit in Vecteezy, MiriCanvas, Freepik, Adobe Stock, Shutterstock, Depositphotos). All workflows strictly save drafts, changes, and metadata.
+   - **Zero Text Dependency Architecture**: Instead of bloating codebase with multi-language text dictionaries, all adapters now use structural attributes (`data-testid`, `data-t`, `data-f`, `value`, `name`, `:nth-of-type`, SVG icon signatures):
+     - **Adobe Stock**: Releases switch targets `input[data-testid="has-release-no"], input[data-t="has-release-no"], input[name="hasReleases"][value="no"]` and structural second radio in group. Save button prioritizes `button[data-testid="save-work"], button[data-t="save-work"]`. Bulk select prioritizes `input[data-testid="select-all-checkbox"]`.
+     - **Shutterstock**: Keyword clearing targets `li[data-testid="clear-action"]`. Save button targets `button[data-testid="edit-dialog-save-button"]`. Toolbar selection uses `#bulk-editor button[data-testid="button"]`.
+     - **Vecteezy**: License radios target `label[data-testid="radio-input"] input[value="pro"]`, `value="free"`, and `value="editorial"` natively. Selection and save check `div[data-testid="filter-bar"] button[data-testid="button"]` and `div[data-testid="save-changes-icon"]` with progressbar waiting.
+     - **Dreamstime**: License switching uses container `#licensesubmissiontype` links indexing (`links[0]` Commercial, `links[1]` Editorial).
+     - **MiriCanvas**: Save button targets `button[data-f="SG-8f01"]` and diskette SVG path `path[d^="M7 19v-6h10v6"]`.
+     - **Depositphotos & Freepik**: Fully resilient via BEM classes and `button[data-cy="savePreitems"]`.
+
+00. **Dreamstime Cross-Page Continuation & Auto-Heal Exception (`service_worker.js`, `AutomationOrchestrator.js`, `overlay.js`)**:
    - **Cross-Page Navigation Gotcha**: Dreamstime redirects / navigates between assets (`/upload/edit?item_id=...`). The service worker's `tabs.onUpdated` auto-heal previously mistook in-domain reloads as cancellation signals, wiping state to idle. Concurrently, newly mounted `OverlayHUD` instances wiped storage because `orchestrator.isProcessing` was initially false on fresh JS execution contexts.
    - **Service Worker Exception**: Updated `service_worker.js:tabs.onUpdated` to preserve active state during Dreamstime in-domain navigation (`state.platformId === 'dreamstime' && !state.isStopping && (url === '' || url.includes('dreamstime.com'))`). Reloading while stopping or navigating away (e.g. to Google) still safely triggers auto-heal reset.
    - **Orchestrator State Tracking & Unload Guard**: Updated `AutomationOrchestrator.js` to decouple visual running state from loop execution via `this.isExecutionLoopActive`, pass `initialCount` to resume asset counting (`processedCount`), attach a `beforeunload` listener preventing premature state wipe during page teardown, and cleanly handle zero assets when Dreamstime redirects back to the uploads batch list (`Finished ${initialCount} assets`).
