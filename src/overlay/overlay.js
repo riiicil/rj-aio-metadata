@@ -21,18 +21,38 @@ const PLATFORM_LIMITS = {
 
 export const DONATION_URL = 'https://trakteer.id/yourname'; // Ganti dengan URL donasi Anda (Saweria, Trakteer, Buy Me a Coffee, dll)
 
-export const hudCoffeeSvg = `
-  <svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
-    <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
-    <line x1="6" y1="1" x2="6" y2="4"></line>
-    <line x1="10" y1="1" x2="10" y2="4"></line>
-    <line x1="14" y1="1" x2="14" y2="4"></line>
-  </svg>
-`;
+export const HUD_DONATION_VARIANTS = [
+  {
+    label: 'Send a coffee',
+    iconSvg: `<svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>`,
+    title: 'Send a coffee to support development'
+  },
+  {
+    label: 'Donate a coin',
+    iconSvg: `<svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"></circle><path d="M18.09 10.37A6 6 0 1 1 10.34 18"></path><path d="M7 6h1v4"></path></svg>`,
+    title: 'Donate a coin to support development'
+  },
+  {
+    label: 'Support dev',
+    iconSvg: `<svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>`,
+    title: 'Support extension development'
+  },
+  {
+    label: 'Gift a pizza',
+    iconSvg: `<svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 11h.01"></path><path d="M11 15h.01"></path><path d="M16 16h.01"></path><path d="m2 2 20 7-9 13Z"></path><path d="M16 11a4 4 0 0 1-4 4"></path></svg>`,
+    title: 'Gift a pizza to support development'
+  },
+  {
+    label: 'Sponsor dev',
+    iconSvg: `<svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>`,
+    title: 'Sponsor the development of RJ AIO Metadata'
+  }
+];
+
+export const hudCoffeeSvg = HUD_DONATION_VARIANTS[0].iconSvg;
 
 export const hudSpinnerSvg = `
-  <svg class="rj-hud-icon-svg rj-status-icon-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <svg class="rj-hud-icon-svg rj-rotating rj-status-icon-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
   </svg>
 `;
@@ -105,6 +125,7 @@ export class OverlayHUD {
     this.hudSupportTickerInterval = null;
     this.hudSupportTickerPhase = 'progress';
     this.hudLatestProgressText = '';
+    this.hudDonationVariantIndex = 0;
 
     // Bind event handlers
     this.onMouseDown = this.onMouseDown.bind(this);
@@ -1021,6 +1042,7 @@ export class OverlayHUD {
     if (this.isStopping) {
       if (btnSupport) {
         btnSupport.style.display = 'flex';
+        btnSupport.classList?.add('rj-visible');
         this.startHudSupportTicker();
       }
       if (btn) {
@@ -1045,6 +1067,7 @@ export class OverlayHUD {
     if (isRunning) {
       if (btnSupport) {
         btnSupport.style.display = 'flex';
+        btnSupport.classList?.add('rj-visible');
         this.startHudSupportTicker();
       }
       if (btn) {
@@ -1066,6 +1089,7 @@ export class OverlayHUD {
       this.stopHudSupportTicker();
       if (btnSupport) {
         btnSupport.style.display = 'none';
+        btnSupport.classList?.remove('rj-visible');
       }
       if (this.isLockedByOtherPlatform) {
         this.setFormControlsDisabled(false);
@@ -1097,8 +1121,9 @@ export class OverlayHUD {
 
   /**
    * Renders the current phase (progress or donation) into HUD support button.
+   * @param {boolean} [triggerAnimation=false]
    */
-  renderHudSupportTickerContent() {
+  renderHudSupportTickerContent(triggerAnimation = false) {
     if (!this.shadow) return;
     const btn = this.shadow.querySelector('#rjBtnHudSupportProgress');
     const iconEl = this.shadow.querySelector('#rjHudSupportProgressIcon');
@@ -1110,21 +1135,35 @@ export class OverlayHUD {
       if (textEl) textEl.textContent = this.hudLatestProgressText || 'Processing...';
       btn.title = this.hudLatestProgressText ? `Progress: ${this.hudLatestProgressText} — Click to support development` : 'Processing... Click to support development';
     } else {
-      if (iconEl) iconEl.innerHTML = hudCoffeeSvg;
-      if (textEl) textEl.textContent = 'Send a coffee';
-      btn.title = 'Send a coffee to support development';
+      const variant = HUD_DONATION_VARIANTS[this.hudDonationVariantIndex] || HUD_DONATION_VARIANTS[0];
+      if (iconEl) iconEl.innerHTML = variant.iconSvg;
+      if (textEl) textEl.textContent = variant.label;
+      btn.title = variant.title;
+    }
+
+    if (triggerAnimation && btn.classList) {
+      btn.classList.remove('rj-ticker-animating');
+      if (typeof btn.offsetWidth === 'number') {
+        void btn.offsetWidth;
+      }
+      btn.classList.add('rj-ticker-animating');
     }
   }
 
   /**
-   * Starts rotating HUD ticker between live progress and coffee support.
+   * Starts rotating HUD ticker between live progress and rotating donation variations.
    */
   startHudSupportTicker() {
     if (this.hudSupportTickerInterval) return;
-    this.renderHudSupportTickerContent();
+    this.renderHudSupportTickerContent(false);
     this.hudSupportTickerInterval = setInterval(() => {
-      this.hudSupportTickerPhase = (this.hudSupportTickerPhase === 'progress') ? 'coffee' : 'progress';
-      this.renderHudSupportTickerContent();
+      if (this.hudSupportTickerPhase === 'progress') {
+        this.hudSupportTickerPhase = 'donate';
+        this.hudDonationVariantIndex = (this.hudDonationVariantIndex + 1) % HUD_DONATION_VARIANTS.length;
+      } else {
+        this.hudSupportTickerPhase = 'progress';
+      }
+      this.renderHudSupportTickerContent(true);
     }, 3500);
   }
 
@@ -1137,6 +1176,13 @@ export class OverlayHUD {
       this.hudSupportTickerInterval = null;
     }
     this.hudSupportTickerPhase = 'progress';
+    this.hudDonationVariantIndex = 0;
+    if (this.shadow) {
+      const btn = this.shadow.querySelector('#rjBtnHudSupportProgress');
+      if (btn?.classList) {
+        btn.classList.remove('rj-ticker-animating');
+      }
+    }
   }
 
   /**

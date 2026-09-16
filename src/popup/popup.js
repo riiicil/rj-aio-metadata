@@ -20,7 +20,35 @@ export const PLATFORM_DISPLAY_NAMES = {
 
 export const DONATION_URL = 'https://trakteer.id/yourname'; // Ganti dengan URL donasi Anda (Saweria, Trakteer, Buy Me a Coffee, dll)
 
-export const COFFEE_ICON_SVG = `<svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>`;
+export const DONATION_VARIANTS = [
+  {
+    label: 'Send a coffee',
+    iconSvg: `<svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>`,
+    title: 'Send a coffee to support development'
+  },
+  {
+    label: 'Donate a coin',
+    iconSvg: `<svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"></circle><path d="M18.09 10.37A6 6 0 1 1 10.34 18"></path><path d="M7 6h1v4"></path></svg>`,
+    title: 'Donate a coin to support development'
+  },
+  {
+    label: 'Support dev',
+    iconSvg: `<svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>`,
+    title: 'Support extension development'
+  },
+  {
+    label: 'Gift a pizza',
+    iconSvg: `<svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 11h.01"></path><path d="M11 15h.01"></path><path d="M16 16h.01"></path><path d="m2 2 20 7-9 13Z"></path><path d="M16 11a4 4 0 0 1-4 4"></path></svg>`,
+    title: 'Gift a pizza to support development'
+  },
+  {
+    label: 'Sponsor dev',
+    iconSvg: `<svg class="rj-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>`,
+    title: 'Sponsor the development of RJ AIO Metadata'
+  }
+];
+
+export const COFFEE_ICON_SVG = DONATION_VARIANTS[0].iconSvg;
 export const SPINNER_ICON_SVG = `<svg class="rj-icon rj-rotating" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg>`;
 
 let currentConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
@@ -37,36 +65,52 @@ let isSavingLocally = false;
 let supportTickerInterval = null;
 let supportTickerPhase = 'progress';
 let latestSupportProgressText = '';
+let currentDonationVariantIndex = 0;
 
 /**
  * Renders current phase (progress or donation) into the popup support button.
+ * @param {boolean} [triggerAnimation=false]
  */
-function renderSupportTickerContent() {
-  const btn = document.getElementById('btnSupportProgress') || btnSupportProgress;
+function renderSupportTickerContent(triggerAnimation = false) {
+  const btn = document.getElementById('btnSupportProgress') || (typeof btnSupportProgress !== 'undefined' ? btnSupportProgress : null);
   if (!btn) return;
-  const iconEl = document.getElementById('supportProgressIcon') || supportProgressIcon;
-  const textEl = document.getElementById('supportProgressText') || supportProgressText;
+  const iconEl = document.getElementById('supportProgressIcon') || (typeof supportProgressIcon !== 'undefined' ? supportProgressIcon : null);
+  const textEl = document.getElementById('supportProgressText') || (typeof supportProgressText !== 'undefined' ? supportProgressText : null);
 
   if (supportTickerPhase === 'progress') {
     if (iconEl) iconEl.innerHTML = SPINNER_ICON_SVG;
     if (textEl) textEl.textContent = latestSupportProgressText || 'Processing...';
     btn.title = latestSupportProgressText ? `Progress: ${latestSupportProgressText} — Click to support development` : 'Processing... Click to support development';
   } else {
-    if (iconEl) iconEl.innerHTML = COFFEE_ICON_SVG;
-    if (textEl) textEl.textContent = 'Send a coffee';
-    btn.title = 'Send a coffee to support development';
+    const variant = DONATION_VARIANTS[currentDonationVariantIndex] || DONATION_VARIANTS[0];
+    if (iconEl) iconEl.innerHTML = variant.iconSvg;
+    if (textEl) textEl.textContent = variant.label;
+    btn.title = variant.title;
+  }
+
+  if (triggerAnimation && btn.classList) {
+    btn.classList.remove('rj-ticker-animating');
+    if (typeof btn.offsetWidth === 'number') {
+      void btn.offsetWidth;
+    }
+    btn.classList.add('rj-ticker-animating');
   }
 }
 
 /**
- * Starts rotating ticker between live progress and coffee support.
+ * Starts rotating ticker between live progress and rotating donation variations.
  */
 function startSupportTicker() {
   if (supportTickerInterval) return;
-  renderSupportTickerContent();
+  renderSupportTickerContent(false);
   supportTickerInterval = setInterval(() => {
-    supportTickerPhase = (supportTickerPhase === 'progress') ? 'coffee' : 'progress';
-    renderSupportTickerContent();
+    if (supportTickerPhase === 'progress') {
+      supportTickerPhase = 'donate';
+      currentDonationVariantIndex = (currentDonationVariantIndex + 1) % DONATION_VARIANTS.length;
+    } else {
+      supportTickerPhase = 'progress';
+    }
+    renderSupportTickerContent(true);
   }, 3500);
 }
 
@@ -79,6 +123,11 @@ function stopSupportTicker() {
     supportTickerInterval = null;
   }
   supportTickerPhase = 'progress';
+  currentDonationVariantIndex = 0;
+  const btn = document.getElementById('btnSupportProgress') || (typeof btnSupportProgress !== 'undefined' ? btnSupportProgress : null);
+  if (btn?.classList) {
+    btn.classList.remove('rj-ticker-animating');
+  }
 }
 
 /**
@@ -89,8 +138,8 @@ function updateSupportProgressText(text) {
   if (!text) return;
   latestSupportProgressText = text;
   if (supportTickerPhase === 'progress') {
-    const textEl = document.getElementById('supportProgressText') || supportProgressText;
-    const btn = document.getElementById('btnSupportProgress') || btnSupportProgress;
+    const textEl = document.getElementById('supportProgressText') || (typeof supportProgressText !== 'undefined' ? supportProgressText : null);
+    const btn = document.getElementById('btnSupportProgress') || (typeof btnSupportProgress !== 'undefined' ? btnSupportProgress : null);
     if (textEl) textEl.textContent = text;
     if (btn) btn.title = `Progress: ${text} — Click to support development`;
   }
@@ -869,6 +918,7 @@ function updateAutomationButtonUI(state) {
     stopSupportTicker();
     if (btnSupport) {
       btnSupport.style.display = 'none';
+      btnSupport.classList?.remove('rj-visible');
     }
     const runnerName = PLATFORM_DISPLAY_NAMES[runnerPlatformId] || runnerPlatformId;
     btnToggleAutomation.classList.remove('rj-btn-accent', 'rj-btn-running', 'rj-btn-danger', 'rj-btn-stopping');
@@ -887,6 +937,7 @@ function updateAutomationButtonUI(state) {
   if (isStopping) {
     if (btnSupport) {
       btnSupport.style.display = 'flex';
+      btnSupport.classList?.add('rj-visible');
       startSupportTicker();
     }
     if (effectiveState && typeof effectiveState === 'object' && effectiveState.progressText) {
@@ -903,6 +954,7 @@ function updateAutomationButtonUI(state) {
   } else if (isRunning) {
     if (btnSupport) {
       btnSupport.style.display = 'flex';
+      btnSupport.classList?.add('rj-visible');
       startSupportTicker();
     }
     if (effectiveState && typeof effectiveState === 'object' && effectiveState.progressText) {
@@ -920,6 +972,7 @@ function updateAutomationButtonUI(state) {
     stopSupportTicker();
     if (btnSupport) {
       btnSupport.style.display = 'none';
+      btnSupport.classList?.remove('rj-visible');
     }
     btnToggleAutomation.classList.remove('rj-btn-danger', 'rj-btn-running', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
     btnToggleAutomation.classList.add('rj-btn-accent');

@@ -122,6 +122,31 @@ body::-webkit-scrollbar-thumb:hover {
   flex: 1;
   min-width: 0;
   height: 34px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--rj-font-sans);
+}
+
+@keyframes rj-btn-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rj-ticker-swap {
+  0% {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .rj-btn.rj-btn-support {
@@ -132,8 +157,9 @@ body::-webkit-scrollbar-thumb:hover {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 11.5px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--rj-font-sans);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
@@ -143,6 +169,11 @@ body::-webkit-scrollbar-thumb:hover {
 
 .rj-btn.rj-btn-support.rj-visible {
   display: flex;
+  animation: rj-btn-appear 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.rj-ticker-animating > * {
+  animation: rj-ticker-swap 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .rj-btn.rj-btn-support:hover {
@@ -160,4 +191,5 @@ body::-webkit-scrollbar-thumb:hover {
   height: 14px;
   flex-shrink: 0;
 }
+
 

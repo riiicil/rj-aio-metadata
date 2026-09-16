@@ -407,7 +407,7 @@ input[type="number"] {
 .rj-btn-primary {
   background-color: var(--rj-text-primary);
   color: #000000;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .rj-btn-primary:hover {
@@ -441,7 +441,7 @@ input[type="number"] {
 .rj-btn-accent {
   background-color: #079183;
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .rj-btn-accent:hover {
@@ -456,7 +456,7 @@ input[type="number"] {
 .rj-btn-danger {
   background-color: var(--rj-accent-red);
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .rj-btn-danger:hover {
@@ -469,6 +469,7 @@ input[type="number"] {
   background-color: #ef4444 !important;
   border-color: #dc2626 !important;
   color: #ffffff !important;
+  font-weight: 500 !important;
   cursor: not-allowed !important;
   opacity: 0.85;
 }
@@ -477,6 +478,7 @@ input[type="number"] {
   background-color: #141719 !important;
   color: #c0c4c7 !important;
   border: 1px solid #282b2e !important;
+  font-weight: 500 !important;
   cursor: not-allowed !important;
   opacity: 0.95 !important;
   pointer-events: none !important;

@@ -5,25 +5,28 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Dynamic Progress & Support Ticker Button Complete)
+- **Current Milestone**: Phase 5: End-to-End Hardening & Polish (Support Ticker Polish: Animations, Spinner, Fonts & Multi-Variant Rotation Complete)
 - **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: `a7cb612` (`feat(ui): implement dynamic progress and support ticker button in popup and hud`)
+- **Latest Commit**: Pending (`fix(ui): polish support ticker animations, spinner rotation, font weights, and multi-variant donations`)
 - **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (7/7 on support ticker suite, 4/4 on exclusive lock suite, 7/7 on multi-tab isolation suite, 18/18 on Adobe auto-heal suite, 88/88 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
+- **Build / Test State**: Verified healthy (11/11 on support ticker suite, 4/4 on exclusive lock suite, 7/7 on multi-tab isolation suite, 18/18 on Adobe auto-heal suite, 88/88 on Tier 1 adapters, 45/45 on Sub-phase 5.6, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **Dynamic Progress & Support Ticker Button (Popup & HUD)**:
-   - **Obsolete Save Button Cleanup**: Fully removed legacy `#btnSaveSettings` logic from Toolbar Popup (auto-save was already implemented) and repurposed into an interactive dual-function ticker button `#btnSupportProgress`.
-   - **HUD Parity**: Injected equivalent `#rjBtnHudSupportProgress` in the In-Page Floating HUD wrapped inside `.rj-hud-actions-row`.
-   - **Adaptive Layout Transitions**:
-     - *Idle*: Support button is hidden (`display: none;`), and the `Start Automation` button dynamically expands to **100% full width**.
-     - *Running*: Support button activates (`display: flex;`), splitting the action row into a balanced **50% / 50% flex layout**.
-   - **Rotating Ticker Engine**: Alternates every ~3.5 seconds between:
-     1. *Live Progress*: Rotating SVG spinner + `X/Y (Z%)` counter (e.g. `2/10 (20%)`).
-     2. *Support / Donation*: SVG Coffee cup + `Send a coffee`.
+0. **Support Ticker Polish & Animations (Popup & HUD)**:
+   - **HUD Spinner Rotation Fix**: Added global `.rj-rotating, .rj-status-icon-spinner { animation: rj-spin 0.8s linear infinite; flex-shrink: 0; }` in `src/overlay/overlay.css` and added `.rj-rotating` class to `hudSpinnerSvg` in `src/overlay/overlay.js`.
+   - **Smooth Entrance & Exit Animation**: Applied `@keyframes rj-btn-appear` (`scale(0.92)` to `scale(1)` with cubic-bezier easing) to `#btnSupportProgress` and `#rjBtnHudSupportProgress` via `.rj-visible` class.
+   - **Smooth Ticker Content Swap Animation**: Applied `@keyframes rj-ticker-swap` (`translateY(2px)` with fade) to `.rj-ticker-animating > *` re-triggered during every phase transition.
+   - **Typography Standardization**: Standardized all bottom action buttons across Popup and HUD to `font-size: 12px`, `font-weight: 500` (removed bold), and system sans font-family (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`).
+   - **5 Rotating Donation Variations**: Replaced single coffee item with array of 5 cycling variations:
+     1. `Send a coffee` (`[Coffee SVG]`)
+     2. `Donate a coin` (`[Coins SVG]`)
+     3. `Support dev` (`[Banknote SVG]`)
+     4. `Gift a pizza` (`[Pizza SVG]`)
+     5. `Sponsor dev` (`[Heart SVG]`)
+     All strictly adhere to the Zero Native Emoji policy.
    - **Interactive Donation Trigger**: Clicking the button opens the user's donation link in a new browser tab (`window.open(DONATION_URL, '_blank')`).
    - **Configurable `DONATION_URL`**: Declared as a clean constant at the very top of `src/popup/popup.js` and `src/overlay/overlay.js` (`export const DONATION_URL = 'https://trakteer.id/yourname';`).
 
