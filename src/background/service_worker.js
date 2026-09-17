@@ -52,7 +52,7 @@ export function parseModelList(json) {
   const models = [];
   if (!json) return models;
 
-  // Standard OpenAI / Mistral / OpenRouter / Groq schema: { data: [{ id: "..." }] }
+  // Standard OpenAI / Mistral / OpenRouter / Custom endpoint schema: { data: [{ id: "..." }] }
   if (Array.isArray(json.data)) {
     for (const item of json.data) {
       if (item && item.id) models.push(item.id);

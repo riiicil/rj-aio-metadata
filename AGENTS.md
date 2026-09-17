@@ -35,9 +35,10 @@ Before doing any work, read these files **strictly in this order**:
 ## 3. Core Technical Standards
 
 ### A. Universal OpenAI-Compatible Vision API Protocol
-The extension is **provider-agnostic**. It supports any AI provider adhering to the standard OpenAI chat completions format with multimodal image support:
-- Custom base URLs (e.g. `https://generativelanguage.googleapis.com/v1beta/openai/`, `https://api.groq.com/openai/v1`, `https://api.mistral.ai/v1`, `https://api.openai.com/v1`, `https://openrouter.ai/api/v1`, custom Ollama/LocalAI endpoints).
+The extension is **provider-agnostic**. It supports any AI provider adhering to the standard OpenAI chat completions format with multimodal image support across 5 native presets (Google Gemini, Mistral AI, OpenAI, OpenRouter, and Custom Endpoints):
+- Custom base URLs (e.g. `https://generativelanguage.googleapis.com/v1beta/openai/`, `https://api.mistral.ai/v1`, `https://api.openai.com/v1`, `https://openrouter.ai/api/v1`, or user-supplied custom OpenAI-compatible proxy gateways).
 - Direct browser-to-API communication or routed through `background/service_worker.js` to bypass CORS.
+
 
 ### B. Icon Policy
 - **Native Emoji are STRICTLY FORBIDDEN in the UI**. Do not use native emoji characters (e.g., 🔴, ⏹️, 📁, 🚀, 💡, etc.) in buttons, labels, or modals.
