@@ -52,7 +52,7 @@ export function parseModelList(json) {
   const models = [];
   if (!json) return models;
 
-  // Standard OpenAI / Mistral / OpenRouter / Groq schema: { data: [{ id: "..." }] }
+  // Standard OpenAI / Mistral / OpenRouter / Custom endpoint schema: { data: [{ id: "..." }] }
   if (Array.isArray(json.data)) {
     for (const item of json.data) {
       if (item && item.id) models.push(item.id);
@@ -606,5 +606,92 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
       });
       return true;
     }
+
+    if (message.action === 'RESET_AUTOMATION_STATE') {
+      resetAutomationState(message.platformId || null);
+      sendResponse({ success: true });
+      return true;
+    }
+
+    if (message.action === 'GET_SENDER_TAB_ID') {
+      sendResponse({ tabId: sender.tab?.id || null, success: true });
+      return true;
+    }
   });
 }
+
+/**
+ * Resets persisted automation state to idle across tabs and storage.
+ * @param {string|null} [platformId=null]
+ */
+export function resetAutomationState(platformId = null) {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    chrome.storage.local.set({
+      rj_automation_state: {
+        isRunning: false,
+        isStopping: false,
+        status: 'idle',
+        platformId: platformId,
+        tabId: null,
+        timestamp: Date.now()
+      }
+    });
+  }
+}
+
+// Reset automation state on extension startup or install/reload
+if (typeof chrome !== 'undefined') {
+  if (chrome.runtime?.onInstalled) {
+    chrome.runtime.onInstalled.addListener(() => {
+      resetAutomationState();
+    });
+  }
+  if (chrome.runtime?.onStartup) {
+    chrome.runtime.onStartup.addListener(() => {
+      resetAutomationState();
+    });
+  }
+
+  // Auto-heal on tab reload/navigation: strictly verify that the reloading tab is the runner tab
+  if (chrome.tabs?.onUpdated) {
+    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+      if (changeInfo.status === 'loading') {
+        chrome.storage.local.get(['rj_automation_state'], (res) => {
+          const state = res?.rj_automation_state;
+          if (state && (state.isRunning || state.isStopping || state.status === 'stopping')) {
+            // Only auto-heal if this exact tab was running the automation
+            const isRunnerTab = (state.tabId && state.tabId === tabId) ||
+              (!state.tabId && tab?.url && state.platformId && tab.url.toLowerCase().includes(state.platformId));
+
+            if (isRunnerTab) {
+              const url = tab?.url || changeInfo?.url || '';
+              const isDreamstimeContinuation = state.platformId === 'dreamstime' &&
+                !state.isStopping &&
+                state.status !== 'stopping' &&
+                (url === '' || url.toLowerCase().includes('dreamstime.com'));
+
+              if (!isDreamstimeContinuation) {
+                resetAutomationState(state.platformId);
+              }
+            }
+          }
+        });
+      }
+    });
+  }
+
+  // Auto-heal on runner tab closed: reset state if the tab running automation is closed
+  if (chrome.tabs?.onRemoved) {
+    chrome.tabs.onRemoved.addListener((closedTabId) => {
+      chrome.storage.local.get(['rj_automation_state'], (res) => {
+        const state = res?.rj_automation_state;
+        if (state && (state.isRunning || state.isStopping || state.status === 'stopping')) {
+          if (state.tabId && state.tabId === closedTabId) {
+            resetAutomationState(state.platformId);
+          }
+        }
+      });
+    });
+  }
+}
+

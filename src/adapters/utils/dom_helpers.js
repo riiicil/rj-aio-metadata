@@ -73,11 +73,13 @@ export function setNativeValue(element, value) {
   const safeValue = value ?? '';
 
   try {
-    const prototype = (typeof HTMLTextAreaElement !== 'undefined' && element instanceof HTMLTextAreaElement)
-      ? HTMLTextAreaElement.prototype
-      : (typeof HTMLInputElement !== 'undefined' && element instanceof HTMLInputElement)
-        ? HTMLInputElement.prototype
-        : Object.getPrototypeOf(element);
+    const prototype = (typeof HTMLSelectElement !== 'undefined' && element instanceof HTMLSelectElement)
+      ? HTMLSelectElement.prototype
+      : (typeof HTMLTextAreaElement !== 'undefined' && element instanceof HTMLTextAreaElement)
+        ? HTMLTextAreaElement.prototype
+        : (typeof HTMLInputElement !== 'undefined' && element instanceof HTMLInputElement)
+          ? HTMLInputElement.prototype
+          : Object.getPrototypeOf(element);
 
     const descriptor = prototype ? Object.getOwnPropertyDescriptor(prototype, 'value') : null;
     const nativeSetter = descriptor?.set;
@@ -394,11 +396,27 @@ export function simulateClick(element) {
     // Ignore scroll errors in non-browser environments
   }
 
+  // Calculate viewport center coordinates if element provides getBoundingClientRect
+  let clientX = 0;
+  let clientY = 0;
+  try {
+    if (typeof element.getBoundingClientRect === 'function') {
+      const rect = element.getBoundingClientRect();
+      if (rect && (rect.width > 0 || rect.height > 0)) {
+        clientX = Math.round(rect.left + rect.width / 2);
+        clientY = Math.round(rect.top + rect.height / 2);
+      }
+    }
+  } catch {
+    // Ignore rect calculation errors
+  }
+
   // Pointer and mouse events leading up to click
   const pointerAndMouseEvents = ['pointerdown', 'mousedown', 'pointerup', 'mouseup'];
   for (const evtName of pointerAndMouseEvents) {
     try {
       const isPointer = evtName.startsWith('pointer');
+      const isUp = evtName.endsWith('up');
       const EvtClass = isPointer && typeof PointerEvent !== 'undefined'
         ? PointerEvent
         : (typeof MouseEvent !== 'undefined' ? MouseEvent : (typeof Event !== 'undefined' ? Event : null));
@@ -409,7 +427,11 @@ export function simulateClick(element) {
           cancelable: true,
           view: typeof window !== 'undefined' ? window : null,
           button: 0,
-          buttons: 1,
+          buttons: isUp ? 0 : 1,
+          clientX,
+          clientY,
+          screenX: clientX,
+          screenY: clientY,
           pointerId: 1,
           pointerType: 'mouse',
           isPrimary: true
@@ -440,7 +462,11 @@ export function simulateClick(element) {
           cancelable: true,
           view: typeof window !== 'undefined' ? window : null,
           button: 0,
-          buttons: 1,
+          buttons: 0,
+          clientX,
+          clientY,
+          screenX: clientX,
+          screenY: clientY,
           isPrimary: true
         });
         element.dispatchEvent(evt);

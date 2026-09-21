@@ -220,4 +220,44 @@ Before creating any git commit:
 - [ ] Has `docs/CURRENT_STATE.md` been updated with new file inventory and branch status?
 - [ ] Has `docs/HANDOFF.md` been updated with the latest in-flight context and next steps?
 - [ ] Has `docs/agent-logs/YYYY-MM-DD.md` been updated with the new session entry at the top?
+- [ ] For release commits, has `CHANGELOG.md` and `src/manifest.json` been synchronized?
 - [ ] Are all headings and tables free of native emoji characters?
+
+---
+
+## 7. Standard Template: `CHANGELOG.md`
+
+`CHANGELOG.md` must follow the [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) format and adhere to [Semantic Versioning](https://semver.org/spec/v2.0.0.html):
+
+```markdown
+# Changelog — RJ AIO Metadata Extension
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+-
+
+### Changed
+-
+
+### Fixed
+-
+
+## [X.Y.Z] - YYYY-MM-DD
+
+### Added
+- **Feature Name**: Detailed explanation of the new feature, user benefits, and affected components.
+- **Service Name**: Description of new internal service or protocol.
+
+### Changed
+- **Component Area**: Specific changes made to existing behaviors, styling, or architecture.
+
+### Fixed
+- **Bug Title / Scoped Area**: Root cause explanation, how the bug was diagnosed, and exact fix implemented.
+```
+

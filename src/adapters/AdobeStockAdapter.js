@@ -81,13 +81,13 @@ export const ADOBE_LANGUAGE_MAP = {
   en: '1',
   english: '1',
   '1': '1',
-  de: '2',
-  german: '2',
-  deutsch: '2',
+  fr: '2',
+  french: '2',
+  français: '2',
   '2': '2',
-  fr: '4',
-  french: '4',
-  français: '4',
+  de: '4',
+  german: '4',
+  deutsch: '4',
   '4': '4',
   es: '5',
   spanish: '5',
@@ -113,9 +113,7 @@ export const ADOBE_LANGUAGE_MAP = {
   korean: '14',
   '한국': '14',
   '한국어': '14',
-  '14': '14',
-  zh: '14',
-  chinese: '14'
+  '14': '14'
 };
 
 export class AdobeStockAdapter extends BaseAdapter {
@@ -272,79 +270,132 @@ export class AdobeStockAdapter extends BaseAdapter {
   }
 
   /**
-   * Helper to set either Adobe React Spectrum custom dropdown button or fallback native select.
+   * Sets either native select via Direct Select Injection (primary strategy: fast, 0 UI flicker, immune to zoom/clipping)
+   * or React Spectrum button dropdown as fallback.
+   * Operates strictly by invariant numeric ID without relying on UI labels.
+   *
    * @private
    */
-  async _setSpectrumOrNativeDropdown({ buttonSelector, selectSelector, targetKey, targetText, altKeys = [] }) {
+  async _setSpectrumOrNativeDropdown({ buttonSelector, selectSelector, targetKey }) {
     if (typeof document === 'undefined') return false;
 
-    // 1. Check and set native select first if present
-    const nativeSelect = document.querySelector(selectSelector);
+    const stringTargetKey = String(targetKey);
+
+    // 1. Direct match check on native select (Already set: return immediately without touching UI)
+    let nativeSelect = document.querySelector(selectSelector);
+    if (nativeSelect && String(nativeSelect.value) === stringTargetKey) {
+      (this.logger || logger).info?.(`Dropdown ${selectSelector} already matches ${stringTargetKey}`);
+      return true;
+    }
+
+    // 2. Direct Select Injection (PRIMARY STRATEGY: instant, reliable, zero UI clipping across zoom levels)
+    if (!nativeSelect || (typeof document.contains === 'function' && !document.contains(nativeSelect))) {
+      nativeSelect = document.querySelector(selectSelector);
+    }
     if (nativeSelect) {
-      const keysToMatch = [String(targetKey), ...altKeys.map(String)];
-      let matchedOpt = null;
+      setNativeValue(nativeSelect, stringTargetKey);
+      nativeSelect.value = stringTargetKey;
+      nativeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      nativeSelect.dispatchEvent(new Event('input', { bubbles: true }));
+      await sleep(200);
 
-      if (nativeSelect.options && Array.isArray(Array.from(nativeSelect.options))) {
-        for (const opt of Array.from(nativeSelect.options)) {
-          if (keysToMatch.includes(String(opt.value))) {
-            matchedOpt = opt;
-            break;
-          }
-          if (targetText && (opt.text?.trim().toLowerCase() === targetText.toLowerCase() || opt.text?.trim().toLowerCase().includes(targetText.toLowerCase()))) {
-            matchedOpt = opt;
-            break;
-          }
-        }
-      }
-
-      if (matchedOpt) {
-        nativeSelect.selectedIndex = matchedOpt.index;
-        setNativeValue(nativeSelect, matchedOpt.value);
-      } else {
-        setNativeValue(nativeSelect, String(targetKey));
+      if (String(nativeSelect.value) === stringTargetKey) {
+        (this.logger || logger).info?.(`Dropdown confirmed via direct select injection: ${stringTargetKey}`);
+        return true;
       }
     }
 
-    // 2. React Spectrum Button Dropdown
+    // 3. Fallback: React Spectrum Button Dropdown interaction (if native select wasn't confirmed)
     const triggerBtn = document.querySelector(buttonSelector);
+    const optionSelectors = [
+      `div[role="option"][id$="-option-${stringTargetKey}"]`,
+      `[role="option"][id$="-option-${stringTargetKey}"]`,
+      `div[role="option"][data-key="${stringTargetKey}"]`,
+      `[role="option"][data-key="${stringTargetKey}"]`,
+      `[data-key="${stringTargetKey}"]`
+    ].join(', ');
+
     if (triggerBtn) {
-      const btnText = (triggerBtn.textContent || '').trim();
-      if (targetText && btnText.toLowerCase().includes(targetText.toLowerCase())) {
-        return true; // Already selected
+      const isExpanded = triggerBtn.getAttribute?.('aria-expanded') === 'true';
+      if (!isExpanded) {
+        simulateClick(triggerBtn);
+        await sleep(250);
       }
 
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        const isExpanded = triggerBtn.getAttribute?.('aria-expanded') === 'true';
-        if (!isExpanded) {
-          simulateClick(triggerBtn);
-          await new Promise(r => setTimeout(r, 250));
+      // Wait up to 3000ms for option element to appear in DOM (handles Spectrum portal mount & animations)
+      let optionEl = null;
+      try {
+        optionEl = await waitForElement(optionSelectors, document, 3000);
+      } catch {
+        optionEl = null;
+      }
+
+      // If not immediately visible, check listbox scroll container to find virtualized/clipped items
+      if (!optionEl) {
+        const listbox = document.querySelector('div[role="listbox"], .spectrum-Menu, [role="listbox"]');
+        if (listbox && listbox.scrollHeight > listbox.clientHeight) {
+          const maxScroll = listbox.scrollHeight - listbox.clientHeight;
+          const step = Math.max(80, Math.floor(listbox.clientHeight * 0.8));
+          for (let pos = 0; pos <= maxScroll && !optionEl; pos += step) {
+            listbox.scrollTop = pos;
+            await sleep(100);
+            optionEl = listbox.querySelector(optionSelectors);
+          }
+        }
+      }
+
+      if (optionEl) {
+        // Scroll listbox container to vertically center the target option (prevents zoom / boundary clipping)
+        const listbox = optionEl.closest?.('div[role="listbox"], .spectrum-Menu, [role="listbox"]')
+          || document.querySelector('div[role="listbox"], .spectrum-Menu, [role="listbox"]');
+        if (listbox && listbox.scrollHeight > listbox.clientHeight) {
+          const optionTop = optionEl.offsetTop || 0;
+          const optionHeight = optionEl.offsetHeight || 32;
+          const listboxHeight = listbox.clientHeight || 200;
+          listbox.scrollTop = Math.max(0, optionTop - (listboxHeight / 2) + (optionHeight / 2));
+          await sleep(50);
         }
 
-        const keysToMatch = [String(targetKey), ...altKeys.map(String)];
-        let optionEl = null;
-
-        for (const k of keysToMatch) {
-          optionEl = document.querySelector(`div[role="option"][data-key="${k}"], li[role="option"][data-key="${k}"], [role="option"][data-key="${k}"]`);
-          if (optionEl) break;
+        // Scroll into view if needed
+        if (typeof optionEl.scrollIntoView === 'function') {
+          try {
+            optionEl.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+          } catch {
+            // Ignore scroll errors in mock environments
+          }
         }
+        await sleep(150);
 
-        if (!optionEl && targetText) {
-          const allOptions = Array.from(document.querySelectorAll('div[role="option"], li[role="option"], .spectrum-Menu-item'));
-          optionEl = allOptions.find(el => {
-            const t = (el.textContent || '').trim().toLowerCase();
-            return t === targetText.toLowerCase() || t.includes(targetText.toLowerCase());
-          });
-        }
-
-        if (optionEl) {
+        // Click target: prefer inner item label/grid if present, fallback to optionEl
+        const clickTarget = optionEl.querySelector?.('.spectrum-Menu-itemLabel, .spectrum-Menu-itemGrid, span') || optionEl;
+        simulateClick(clickTarget);
+        if (clickTarget !== optionEl) {
           simulateClick(optionEl);
-          await new Promise(r => setTimeout(r, 350));
+        }
+        if (typeof optionEl.click === 'function') {
+          try { optionEl.click(); } catch {}
+        }
+        await sleep(350);
+
+        // Re-check native select confirmation
+        if (!nativeSelect || (typeof document.contains === 'function' && !document.contains(nativeSelect))) {
+          nativeSelect = document.querySelector(selectSelector);
+        }
+        if (nativeSelect && String(nativeSelect.value) === stringTargetKey) {
+          (this.logger || logger).info?.(`Dropdown confirmed via option click: ${stringTargetKey}`);
           return true;
         }
 
+        // Close dropdown if still expanded after option click
         if (triggerBtn.getAttribute?.('aria-expanded') === 'true') {
           simulateClick(triggerBtn);
-          await new Promise(r => setTimeout(r, 150));
+          await sleep(200);
+        }
+      } else {
+        // Option element not found in DOM, close dropdown cleanly
+        if (triggerBtn.getAttribute?.('aria-expanded') === 'true') {
+          simulateClick(triggerBtn);
+          await sleep(200);
         }
       }
     }
@@ -372,8 +423,7 @@ export class AdobeStockAdapter extends BaseAdapter {
       await this._setSpectrumOrNativeDropdown({
         buttonSelector: 'button[data-t="content-tagger-category-select"], div[data-t="content-tagger-category-wrapper"] button',
         selectSelector: 'select[name="category"], select[data-t="content-tagger-category-select"]',
-        targetKey: resolvedCat.id,
-        targetText: resolvedCat.name
+        targetKey: resolvedCat.id
       });
       await sleep(800);
     }
@@ -409,7 +459,7 @@ export class AdobeStockAdapter extends BaseAdapter {
     // For Non-AI assets: Set 'Recognizable people or property?' to 'No'
     if (!isAi) {
       const noReleaseRadio = document.querySelector(
-        'input[data-t="has-release-no"], input[name="hasReleases"][value="no"]'
+        'input[data-testid="has-release-no"], input[data-t="has-release-no"], input[name="hasReleases"][value="no"], input[name="hasReleases"][value="false"]'
       );
       if (noReleaseRadio) {
         if (!noReleaseRadio.checked) {
@@ -426,18 +476,23 @@ export class AdobeStockAdapter extends BaseAdapter {
           await sleep(300);
         }
       } else {
-        // Fallback: search within elements mentioning Recognizable people or property
+        // Fallback: search containers with name="hasReleases" or release attributes
         const candidateContainers = Array.from(document.querySelectorAll('div, fieldset, section')).filter(el =>
           el.querySelector?.('input[name="hasReleases"]') ||
-          (el.textContent && el.textContent.includes('Recognizable people or property'))
+          el.querySelector?.('input[data-testid*="release"], input[data-t*="release"]')
         );
         for (const container of candidateContainers) {
-          const noBtn = Array.from(container.querySelectorAll('label, span, button')).find(
-            b => b.textContent?.trim() === 'No'
-          );
-          if (noBtn) {
-            simulateClick(noBtn);
-            (this.logger || logger).step('Recognizable people or property', 'No (container match)');
+          const radios = Array.from(container.querySelectorAll('input[type="radio"]'));
+          const noRadio = radios.find(r => r.value === 'no' || r.value === 'false' || r.getAttribute('data-testid')?.includes('no') || r.getAttribute('data-t')?.includes('no')) || radios[1];
+          if (noRadio) {
+            const clickTarget = noRadio.parentElement?.querySelector?.('label, .switch__body') || noRadio;
+            simulateClick(clickTarget);
+            if (clickTarget !== noRadio) simulateClick(noRadio);
+            try {
+              noRadio.checked = true;
+              noRadio.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch {}
+            (this.logger || logger).step('Recognizable people or property', 'No (structural radio)');
             await sleep(300);
             break;
           }
@@ -460,17 +515,12 @@ export class AdobeStockAdapter extends BaseAdapter {
     if (rawLang !== undefined && rawLang !== null) {
       const normalizedLangKey = String(rawLang).toLowerCase().trim();
       const mappedLangId = ADOBE_LANGUAGE_MAP[normalizedLangKey] || String(rawLang);
-      const isKorean = normalizedLangKey === 'ko' || normalizedLangKey === 'korean';
-      const targetText = isKorean ? '한국' : (mappedLangId === '1' ? 'English' : null);
-      const altKeys = isKorean ? ['14', '10'] : [];
 
-      (this.logger || logger).step('language dropdown', targetText || mappedLangId);
+      (this.logger || logger).step('language dropdown', mappedLangId);
       await this._setSpectrumOrNativeDropdown({
         buttonSelector: 'button[data-t="content-tagger-keywords-language-select"], div[data-t="content-tagger-keywords-language-wrapper"] button',
         selectSelector: 'select[name="language"], select[data-t="content-tagger-keywords-language-select"]',
-        targetKey: mappedLangId,
-        targetText,
-        altKeys
+        targetKey: mappedLangId
       });
       await sleep(500);
     }
@@ -522,15 +572,19 @@ export class AdobeStockAdapter extends BaseAdapter {
   _findSaveWorkButton() {
     if (typeof document === 'undefined') return null;
 
-    // 1. Direct attribute match
-    const directSaveBtn = document.querySelector('button[data-t="save-work"]');
+    // 1. Direct attribute match (data-testid, data-t)
+    const directSaveBtn = document.querySelector(
+      'button[data-testid="save-work"], button[data-t="save-work"]'
+    );
     if (directSaveBtn && !directSaveBtn.disabled) return directSaveBtn;
 
-    // 2. Filter buttons strictly matching 'Save work' or 'Save' text, excluding 'submit'
+    // 2. Filter buttons strictly matching data attributes or fallback text, excluding submit
     const candidateButtons = Array.from(document.querySelectorAll('button'));
     return candidateButtons.find((btn) => {
+      const dataTestId = (btn.getAttribute('data-testid') || '').toLowerCase();
       const dataT = (btn.getAttribute('data-t') || '').toLowerCase();
-      if (dataT.includes('submit')) return false;
+      if (dataTestId.includes('submit') || dataT.includes('submit')) return false;
+      if (dataTestId === 'save-work' || dataT === 'save-work') return !btn.disabled;
 
       const txt = (btn.textContent || '').trim().toLowerCase();
       return (txt === 'save work' || txt === 'save') && !btn.disabled;
@@ -563,30 +617,40 @@ export class AdobeStockAdapter extends BaseAdapter {
   async bulkSave(isAiGenerated = false) {
     if (typeof document === 'undefined') return true;
 
-    // 1. Select All
-    const selectAllText = Array.from(document.querySelectorAll('div.text-sregular.margin-left-xsmall.left'))
-      .find(el => el.textContent.trim() === 'Select All');
+    // 1. Select All - check data-testid, data-t, and structural grid selectors first
+    const selectAllCheckbox = document.querySelector(
+      'input[data-testid="select-all-checkbox"], input[data-t="select-all-checkbox"], div[data-testid="assets-content-grid-wrapper"] .content-grid-wrapper input[type="checkbox"], div.upload-tile__select-all input, div.content-tagger__select-all input'
+    );
 
-    if (selectAllText) {
-      const icon = selectAllText.previousElementSibling;
-      if (icon && icon.classList.contains('icon-checkbox-inactive')) {
-        simulateClick(icon);
+    if (selectAllCheckbox) {
+      if (!selectAllCheckbox.checked) {
+        simulateClick(selectAllCheckbox);
         await sleep(500);
       }
     } else {
-      const selectAllCheckbox = document.querySelector(
-        'input[data-t="select-all-checkbox"], div.upload-tile__select-all input, div.content-tagger__select-all input'
-      );
-      if (selectAllCheckbox && !selectAllCheckbox.checked) {
-        simulateClick(selectAllCheckbox);
+      const selectAllIcon = document.querySelector('.icon-checkbox-inactive');
+      if (selectAllIcon) {
+        simulateClick(selectAllIcon);
         await sleep(500);
+      } else {
+        const selectAllText = Array.from(document.querySelectorAll('div.text-sregular.margin-left-xsmall.left'))
+          .find(el => el.textContent.trim().toLowerCase().includes('select all'));
+        if (selectAllText) {
+          const icon = selectAllText.previousElementSibling;
+          if (icon && icon.classList.contains('icon-checkbox-inactive')) {
+            simulateClick(icon);
+            await sleep(500);
+          }
+        }
       }
     }
     await sleep(1000);
 
     // 2. Releases switch to "no" (for non-AI assets)
     if (!isAiGenerated) {
-      const noReleaseRadio = document.querySelector('input[data-t="has-release-no"], input[name="hasReleases"][value="no"]');
+      const noReleaseRadio = document.querySelector(
+        'input[data-testid="has-release-no"], input[data-t="has-release-no"], input[name="hasReleases"][value="no"], input[name="hasReleases"][value="false"]'
+      );
       if (noReleaseRadio) {
         if (!noReleaseRadio.checked) {
           const clickTarget = noReleaseRadio.parentElement?.querySelector?.('label, .switch__body') || noReleaseRadio;

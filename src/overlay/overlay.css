@@ -178,12 +178,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
 }
 
 .rj-hud-asset-label {
   font-size: 11.5px;
   font-weight: 600;
   color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .rj-hud-status-badge {
@@ -198,6 +205,17 @@
   color: #079183;
   border: 1px solid rgba(7, 145, 131, 0.3);
   transition: all 0.18s ease;
+  max-width: 140px;
+  flex-shrink: 0;
+}
+
+.rj-hud-status-badge span#rjAutomationStatusText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .rj-hud-status-badge.rj-running {
@@ -426,25 +444,109 @@
   transform: translateX(14px);
 }
 
-/* Primary Action Button */
+/* Primary Action Button Row */
+.rj-hud-actions-row {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  margin-top: 3px;
+}
+
 .rj-hud-btn-action {
+  flex: 1;
+  min-width: 0;
   height: 32px;
   border-radius: 6px;
   border: none;
-  font-size: 11.5px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   cursor: pointer;
-  margin-top: 3px;
+  margin-top: 0;
   transition: background-color 0.15s ease, filter 0.15s ease;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@keyframes rj-btn-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rj-ticker-swap {
+  0% {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rj-hud-btn-action.rj-btn-support {
+  display: none;
+  background-color: #141719;
+  border: 1px solid #282b2e;
+  color: #c0c4c7;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  padding: 0 8px;
+}
+
+.rj-hud-btn-action.rj-btn-support.rj-visible {
+  display: flex !important;
+  animation: rj-btn-appear 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.rj-hud-btn-action.rj-ticker-animating > * {
+  animation: rj-ticker-swap 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.rj-hud-btn-action.rj-btn-support:hover {
+  background-color: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+}
+
+.rj-hud-btn-action.rj-btn-support:hover svg {
+  stroke: #fbbf24;
+}
+
+.rj-hud-btn-action.rj-btn-support svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+#rjHudSupportProgressIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .rj-hud-btn-action.rj-btn-start {
   background-color: #079183;
   color: #ffffff;
+  font-weight: 500;
 }
 
 .rj-hud-btn-action.rj-btn-start:hover {
@@ -454,10 +556,38 @@
 .rj-hud-btn-action.rj-btn-stop {
   background-color: #ff6161;
   color: #ffffff;
+  font-weight: 500;
 }
 
 .rj-hud-btn-action.rj-btn-stop:hover {
   background-color: #ff7575;
+}
+
+.rj-hud-btn-action.rj-btn-stopping {
+  background-color: #ef4444 !important;
+  color: #ffffff !important;
+  font-weight: 500 !important;
+  cursor: not-allowed !important;
+  opacity: 0.85 !important;
+  pointer-events: none !important;
+  filter: none !important;
+}
+
+.rj-hud-btn-action.rj-btn-locked {
+  background-color: #141719 !important;
+  color: #c0c4c7 !important;
+  border: 1px solid #282b2e !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  cursor: not-allowed !important;
+  opacity: 0.95 !important;
+  pointer-events: none !important;
+  filter: none !important;
+}
+
+.rj-hud-btn-action.rj-btn-locked svg {
+  stroke: #8a9096 !important;
 }
 
 .rj-hud-btn-action:disabled,
@@ -555,6 +685,27 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+@keyframes rj-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rj-rotating,
+.rj-status-icon-spinner {
+  animation: rj-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.rj-hud-pill-status .rj-status-icon-spinner {
+  width: 13px;
+  height: 13px;
+  stroke: #079183;
 }
 
 .rj-hud-pill-status .rj-status-icon-ready,

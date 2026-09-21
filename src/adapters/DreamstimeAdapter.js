@@ -395,20 +395,22 @@ export class DreamstimeAdapter extends BaseAdapter {
   async setLicenseType(isEditorial = false) {
     if (typeof document === 'undefined') return;
 
-    const allLinks = Array.from(
-      document.querySelectorAll('#licensesubmissiontype a, div.popup__form-element--buttons a, a')
-    );
-    const comBtn = allLinks.find(a => a.textContent && a.textContent.includes('Commercial (RF)')) ||
-      document.querySelector('#licensesubmissiontype > a:nth-of-type(1)');
-    const edBtn = allLinks.find(a => a.textContent && a.textContent.includes('Editorial (ED)')) ||
-      document.querySelector('#licensesubmissiontype > a:nth-of-type(2)');
+    const container = document.querySelector('#licensesubmissiontype');
+    const links = container ? Array.from(container.querySelectorAll('a')) : [];
+
+    const comBtn = links[0] ||
+      document.querySelector('#licensesubmissiontype > a:nth-of-type(1)') ||
+      Array.from(document.querySelectorAll('#licensesubmissiontype a, a')).find(a => a.textContent && a.textContent.includes('Commercial'));
+    const edBtn = links[1] ||
+      document.querySelector('#licensesubmissiontype > a:nth-of-type(2)') ||
+      Array.from(document.querySelectorAll('#licensesubmissiontype a, a')).find(a => a.textContent && a.textContent.includes('Editorial'));
 
     const targetBtn = isEditorial ? edBtn : comBtn;
     const targetLabel = isEditorial ? 'Editorial (ED)' : 'Commercial (RF)';
 
     if (targetBtn) {
-      const isActive = targetBtn.getAttribute('data-state') === 'active' ||
-                       targetBtn.classList.contains('active');
+      const isActive = targetBtn.getAttribute?.('data-state') === 'active' ||
+                       Boolean(targetBtn.classList?.contains?.('active'));
       if (!isActive) {
         logger.step(`Setting License Type to ${targetLabel}...`);
         simulateClick(targetBtn);

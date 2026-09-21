@@ -407,7 +407,7 @@ input[type="number"] {
 .rj-btn-primary {
   background-color: var(--rj-text-primary);
   color: #000000;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .rj-btn-primary:hover {
@@ -427,21 +427,21 @@ input[type="number"] {
 
 .rj-btn.rj-btn-active,
 .rj-btn-secondary.rj-btn-active {
-  border-color: #57c1ff !important;
-  color: #57c1ff !important;
-  background-color: rgba(87, 193, 255, 0.08) !important;
-  box-shadow: 0 0 0 1px rgba(87, 193, 255, 0.4), 0 0 8px rgba(87, 193, 255, 0.18) !important;
+  border-color: #079183 !important;
+  color: #59d499 !important;
+  background-color: rgba(7, 145, 131, 0.12) !important;
+  box-shadow: 0 0 0 1px rgba(7, 145, 131, 0.35), 0 0 8px rgba(7, 145, 131, 0.18) !important;
 }
 
 .rj-btn.rj-btn-active svg,
 .rj-btn-secondary.rj-btn-active svg {
-  stroke: #57c1ff !important;
+  stroke: #59d499 !important;
 }
 
 .rj-btn-accent {
   background-color: #079183;
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .rj-btn-accent:hover {
@@ -456,11 +456,37 @@ input[type="number"] {
 .rj-btn-danger {
   background-color: var(--rj-accent-red);
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .rj-btn-danger:hover {
   background-color: #ff7575;
+}
+
+.rj-btn.rj-btn-stopping,
+.rj-btn-danger.rj-btn-stopping,
+.rj-hud-btn-action.rj-btn-stopping {
+  background-color: #ef4444 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+  font-weight: 500 !important;
+  cursor: not-allowed !important;
+  opacity: 0.85;
+}
+
+.rj-btn.rj-btn-locked {
+  background-color: #141719 !important;
+  color: #c0c4c7 !important;
+  border: 1px solid #282b2e !important;
+  font-weight: 500 !important;
+  cursor: not-allowed !important;
+  opacity: 0.95 !important;
+  pointer-events: none !important;
+  filter: none !important;
+}
+
+.rj-btn.rj-btn-locked svg {
+  stroke: #8a9096 !important;
 }
 
 .rj-btn:disabled,

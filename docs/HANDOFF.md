@@ -5,17 +5,105 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 4: Platform Adapters (MiriCanvas Keyword Bulk Trash Elimination & Reactive Verified Per-Chip Removal with Disappearance Polling & Bottom-Up Scroll, Sequential Form Ordering, Keyword Chip Creation, Trash Button Discrimination, Bulk Save Button Disabled & Toast Wait with 2000ms Sync Buffer & Fresh Navbar Uncheck, Depositphotos Full-String Native Comma Splitting, Dreamstime, Vecteezy, Freepik / Magnific, Shutterstock & Adobe Stock Complete)
-- **Active Branch**: `task/platform-adapters`
-- **Latest Commit**: `fix(miricanvas): eliminate keyword bulk trash logic and implement reactive verified per-chip removal`
-- **Working Tree**: Clean local branch
-- **Build / Test State**: Verified healthy (113/113 passed on Tier 3, 750+ assertions across all suites, zero emoji clean)
+- **Current Milestone**: Phase 5 Complete / Ready for v0.1.0 Release
+- **Active Branch**: `task/e2e-hardening-polish`
+- **Latest Commit**: `d7ba885` (`docs(repo): synchronize release documentation, changelog, and roadmap for v0.1.0`)
+- **Working Tree**: Clean, all documentation and build artifacts synchronized
+- **Build / Test State**: Verified healthy (`node build.js` generates `dist/LOAD THIS FOLDER/` & `releases/v0.1.0.zip` (1.22 MB), 11/11 multi-language resilience suite, 500+ test assertions passed, zero native emoji clean)
+
 
 ---
 
 ## 2. Active In-Flight Context
 
-Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bugfixing across Tier 1, Tier 2, and Tier 3 platforms, and aligned MiriCanvas, Depositphotos, Dreamstime, Vecteezy, and Freepik (Magnific):
+0. **Shutterstock Spelling Approval Precision Targeting & Keyword Overflow Prevention (`ShutterstockAdapter.js`)**:
+   - **User Diagnostic Demonstration (`rekaman-shutterstock-20260917_034756.json`)**: User provided a manual recording demonstrating exact click on `"Mark all keywords as correct"` inside `div[data-testid="keyword-input"] > div:nth-of-type(3) > button[data-testid="button"]`.
+   - **Keyword Overflow Bug Diagnosed (`rekaman-shutterstock-20260917_034439.json`)**: An overly broad container query in previous commit matched and clicked `button[data-testid="add-all-button"]` (Shutterstock's suggested keywords block), which added extra suggested tags causing keywords to overflow past 50 (to 64/50 and 65/50).
+   - **Clean Rollback & Precision Fix**: Rolled back working tree to `256fe01`. Updated `approveSpellingWarnings` to specifically target `div[data-testid="keyword-input"]` searching for text `"mark all keywords as correct"` or `"mark all as correct"`, while explicitly excluding `add-all-button`, `more-keyword-actions-button`, and any `role="tab"` or `tab-*`.
+   - **Guaranteed Behavior**: Does NOT click `tab-correction_needed` (no navigation alert), does NOT click `add-all-button` (no keyword overflow), and cleanly clicks the spelling approval button when spelling errors occur.
+
+00. **Production Build & Obfuscation Pipeline (`build.js`, `obfuscator.config.js`, `package.json`, `.gitignore`)**:
+   - **Bundle-First Architecture (Option 2)**: Avoids ESM import breakage by running `esbuild` first across the 4 MV3 entry points (`background/service_worker.js`, `popup/popup.js`, `overlay/overlay.js`, `content/content_main.js`). All internal dependencies are bundled into standalone files in 19ms before `javascript-obfuscator` executes.
+   - **MV3 Safe Obfuscator Configuration**: Configured with `disableConsoleOutput: false` (all console/activity logs appear 100% intact in DevTools), `debugProtection: false` (no debugger freezes), `renameGlobals: false` (protects `chrome.*`, `window.*`, `document.*`), `selfDefending: false` (service worker isolate stability), and `stringArrayEncoding: ['base64']`.
+   - **Automated Distribution Packaging**: Copies static assets, cleans `dist/manifest.json` `web_accessible_resources`, and packages `dist/` into `releases/v[version].zip` ready for direct upload to Ko-fi, Lynk.id, or GitHub Releases.
+   - **Pristine Open Source Git Repository**: `.gitignore` strictly ignores `dist/`, `build/`, `releases/`, `v*/`, `*.zip`, `node_modules/`, `package-lock.json`, `build.js`, `package.json`, and `obfuscator.config.js`. The public GitHub repository remains 100% clean and transparent.
+
+000. **100% Multi-Language Resilience & Zero English Text Dependency (`AdobeStockAdapter`, `ShutterstockAdapter`, `VecteezyAdapter`, `DreamstimeAdapter`, `MiriCanvasAdapter`)**:
+   - **Operational Rule (No Submit/Send)**: User explicitly clarified that except for Dreamstime Mode B carousel submission, **NONE of the platforms use submit/send review** (no submit in Vecteezy, MiriCanvas, Freepik, Adobe Stock, Shutterstock, Depositphotos). All workflows strictly save drafts, changes, and metadata.
+   - **Zero Text Dependency Architecture**: Instead of bloating codebase with multi-language text dictionaries, all adapters now use structural attributes (`data-testid`, `data-t`, `data-f`, `value`, `name`, `:nth-of-type`, SVG icon signatures):
+     - **Adobe Stock**: Releases switch targets `input[data-testid="has-release-no"], input[data-t="has-release-no"], input[name="hasReleases"][value="no"]` and structural second radio in group. Save button prioritizes `button[data-testid="save-work"], button[data-t="save-work"]`. Bulk select prioritizes `input[data-testid="select-all-checkbox"]`.
+     - **Shutterstock**: Keyword clearing targets `li[data-testid="clear-action"]`. Save button targets `button[data-testid="edit-dialog-save-button"]`. Toolbar selection uses `#bulk-editor button[data-testid="button"]`.
+     - **Vecteezy**: License radios target `label[data-testid="radio-input"] input[value="pro"]`, `value="free"`, and `value="editorial"` natively. Selection and save check `div[data-testid="filter-bar"] button[data-testid="button"]` and `div[data-testid="save-changes-icon"]` with progressbar waiting.
+     - **Dreamstime**: License switching uses container `#licensesubmissiontype` links indexing (`links[0]` Commercial, `links[1]` Editorial).
+     - **MiriCanvas**: Save button targets `button[data-f="SG-8f01"]` and diskette SVG path `path[d^="M7 19v-6h10v6"]`.
+     - **Depositphotos & Freepik**: Fully resilient via BEM classes and `button[data-cy="savePreitems"]`.
+
+00. **Dreamstime Cross-Page Continuation & Auto-Heal Exception (`service_worker.js`, `AutomationOrchestrator.js`, `overlay.js`)**:
+   - **Cross-Page Navigation Gotcha**: Dreamstime redirects / navigates between assets (`/upload/edit?item_id=...`). The service worker's `tabs.onUpdated` auto-heal previously mistook in-domain reloads as cancellation signals, wiping state to idle. Concurrently, newly mounted `OverlayHUD` instances wiped storage because `orchestrator.isProcessing` was initially false on fresh JS execution contexts.
+   - **Service Worker Exception**: Updated `service_worker.js:tabs.onUpdated` to preserve active state during Dreamstime in-domain navigation (`state.platformId === 'dreamstime' && !state.isStopping && (url === '' || url.includes('dreamstime.com'))`). Reloading while stopping or navigating away (e.g. to Google) still safely triggers auto-heal reset.
+   - **Orchestrator State Tracking & Unload Guard**: Updated `AutomationOrchestrator.js` to decouple visual running state from loop execution via `this.isExecutionLoopActive`, pass `initialCount` to resume asset counting (`processedCount`), attach a `beforeunload` listener preventing premature state wipe during page teardown, and cleanly handle zero assets when Dreamstime redirects back to the uploads batch list (`Finished ${initialCount} assets`).
+   - **OverlayHUD Auto-Resume**: In `overlay.js:restoreAutomationState()`, detects `isDreamstimeContinuation`, immediately sets `isAutomationRunning = true` to display "Stop" without flicker, and schedules `startAutomation(state.processedCount || 0)` with a 1000ms delay to let the newly loaded DOM settle before continuing.
+
+00. **UI Polish: Stop Button Shortening, Donate Icon Unboxing & Content Script Match Restriction**:
+   - **Stop Button Shortening**: Shortened running button label from `"Stop Automation"` to `"Stop"` across both Popup (`popup.js`) and HUD (`overlay.js`), maintaining 12px font-weight 500 typography and square stop Lucide SVG.
+   - **Support Icon Unboxing**: Removed `.rj-btn-icon` class from `#supportProgressIcon` in `popup.html` (which previously applied a 34x34px bordered box from `components.css:527`), and set transparent styles in `popup.css` and `overlay.css`.
+   - **Restricted Content Script Matches**: Restricted `content_scripts.matches` in `manifest.json` from wildcards (`http://*/*`, `https://*/*`) to the 8 explicit supported platform domains, and added `isSupportedPlatformPage()` hostname whitelist check in `content_main.js`.
+
+000. **Support Ticker Polish & Animations (Popup & HUD)**:
+   - **HUD Spinner Rotation Fix**: Added global `.rj-rotating, .rj-status-icon-spinner { animation: rj-spin 0.8s linear infinite; flex-shrink: 0; }` in `src/overlay/overlay.css` and added `.rj-rotating` class to `hudSpinnerSvg` in `src/overlay/overlay.js`.
+   - **Smooth Entrance & Exit Animation**: Applied `@keyframes rj-btn-appear` (`scale(0.92)` to `scale(1)` with cubic-bezier easing) to `#btnSupportProgress` and `#rjBtnHudSupportProgress` via `.rj-visible` class.
+   - **Smooth Ticker Content Swap Animation**: Applied `@keyframes rj-ticker-swap` (`translateY(2px)` with fade) to `.rj-ticker-animating > *` re-triggered during every phase transition.
+   - **Typography Standardization**: Standardized all bottom action buttons across Popup and HUD to `font-size: 12px`, `font-weight: 500` (removed bold), and system sans font-family (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`).
+   - **5 Rotating Donation Variations**: Replaced single coffee item with array of 5 cycling variations:
+     1. `Send a coffee` (`[Coffee SVG]`)
+     2. `Donate a coin` (`[Coins SVG]`)
+     3. `Support dev` (`[Banknote SVG]`)
+     4. `Gift a pizza` (`[Pizza SVG]`)
+     5. `Sponsor dev` (`[Heart SVG]`)
+     All strictly adhere to the Zero Native Emoji policy.
+   - **Interactive Donation Trigger**: Clicking the button opens the user's donation link in a new browser tab (`window.open(DONATION_URL, '_blank')`).
+   - **Configurable `DONATION_URL`**: Declared as a clean constant at the very top of `src/popup/popup.js` and `src/overlay/overlay.js` (`export const DONATION_URL = 'https://trakteer.id/yourname';`).
+
+1. **Exclusive Automation Lock (Single Active Runner Policy)**:
+   - **Cross-Platform Mutual Exclusivity**: Enforces that only one microstock platform can actively run automated metadata generation at any time across the browser.
+   - **Non-Runner Tab Lock State**: When Platform A (e.g. Adobe Stock) is actively running, other platform tabs (e.g. Dreamstime, Depositphotos) automatically lock their HUD `Start Automation` button (`disabled = true`, class `.rj-btn-disabled`, lock SVG icon, text `Running on [Platform]`, badge `Busy ([Platform])`, and informative hover tooltip). Form controls remain editable for manual preparation.
+   - **Single-Instance Toolbar Popup Synchronization**: Popup dynamically checks the active runner's platform against the currently selected platform. When viewing non-runner platforms, the start button is disabled with `Running on [Platform]` and lock SVG icon. Switching platform views updates the lock state in real-time.
+   - **Reactive Auto-Unlock Lifecycle**: As soon as the runner tab completes its batch run or stops, `chrome.storage.onChanged` fires `isRunning: false`, instantaneously unlocking all open tabs back to active green `Start Automation` state.
+
+Sub-phase 5.6 has modularized the in-page overlay controller by extracting the microstock automation batch execution loop, card iteration, Dreamstime carousel workflows, bulk saving, and graceful stop coordination out of `src/overlay/overlay.js` and into a dedicated ES module: `src/overlay/AutomationOrchestrator.js`:
+1. **Extracted ES Module (`src/overlay/AutomationOrchestrator.js`)**:
+   - Encapsulates multi-platform batch automation logic in `AutomationOrchestrator` class (596 lines).
+   - Manages provider validation, platform adapter resolution via `getAdapterForUrl` / `getAdapterForPlatform`, `AbortController` cancellation lifecycle, and granular `rj_automation_state` storage schema updates.
+   - Houses Section 6A Dreamstime continuous in-page carousel loop (editor wait -> thumbnail extraction -> AI metadata generation -> fillMetadata -> draft save -> direct review submission -> carousel advance).
+   - Houses Section 6B standard microstock grid loop (card selection -> editor wait -> thumbnail extraction -> AI metadata generation -> fillMetadata -> Freepik per-item draft save -> cooldown pacing).
+   - Houses post-loop bulk saving execution (`bulkSave()`) triggered on full completion or graceful stop.
+   - Implements two-click graceful stop and force abort mechanics (`stop(force)`), properly maintaining `isStopping` status, disabling buttons, and displaying active pill spinners.
+2. **Streamlined Overlay HUD Controller (`src/overlay/overlay.js`)**:
+   - Reduced `overlay.js` from 2,044 lines to 1,472 lines (572-line reduction), isolating floating HUD UI presentation, viewport-clamped drag mechanics, and Quick Form bindings from automation orchestration.
+   - Instantiates `this.orchestrator = new AutomationOrchestrator(this)` in constructor.
+   - `startAutomation()` and `stopAutomation(force)` delegate cleanly to `this.orchestrator.start()` and `this.orchestrator.stop(force)`.
+   - Preserves 100% of public HUD properties (`isAutomationRunning`, `isStopping`, `isCardProcessing`, `abortController`, `shadow`, etc.) and reactive methods without adapter regression risk.
+3. **Preceding Sub-phase 5.5 Achievements (Popup Modularization)**:
+   - Extracted all 7 platform HTML template generators into dedicated ES module `src/popup/platform_forms.js`, reducing `popup.js` by 257 lines.
+2. **Active HUD Button Theme Alignment (`src/styles/components.css`)**:
+   - Replaced hardcoded cyan/blue (`#57c1ff`, `rgba(87, 193, 255, ...)`) in `.rj-btn.rj-btn-active` and `.rj-btn-secondary.rj-btn-active` with the extension's canonical Emerald Teal palette (`#079183` border, `#59d499` text and icon stroke, `rgba(7, 145, 131, 0.12)` background, `rgba(7, 145, 131, 0.35)` focus ring).
+3. **Minimized Floating Pill Activity Spinner (`src/overlay/overlay.css`, `src/overlay/overlay.js`)**:
+   - Defined `@keyframes rj-spin` with continuous 360deg rotation and `.rj-hud-pill-status .rj-status-icon-spinner` (13x13px, stroke `#079183`).
+   - Integrated `pillSpinnerSvg` during active processing (`Running...`, `Asset X of Y`, `Processing...`) and graceful stopping (`Stopping...`), providing a clear dynamic indicator that background tasks are active even when the HUD card is minimized.
+   - Cleanly transitions to `pillReadySvg` checkmark on completion (`Finished`) and restores idle layers/ready status when reset.
+4. **Status Badge String Simplification & Ellipsis Clamping with Tooltips (`src/overlay/overlay.css`, `src/overlay/overlay.js`)**:
+   - Simplified all status badge string literals to concise canonical labels conforming to the audit specification (`scratch/pre_release_audit_notes.md:L92-L109`):
+     - Normal loop: `'Generating...'`, `'Injecting...'`, `'Saving...'`, `'Submitting...'`, `'Cooldown...'`, `'Next asset...'`, `'Completed'`, `'Stopped'`, `'Idle'`, `'Running'`.
+     - Problematic overflow labels resolved: `'Stopping (saving card)...'` and `'Stopping (saving)...'` simplified to `'Stopping...'`; `'Error: ' + ...` simplified to `'API Error'` or `'Failed'`.
+     - Full operational details (`Generating AI metadata...`, `Saving all assets (X processed)...`, `Error: 400 Bad Request...`) are cleanly routed to the second parameter `tooltip` of `setStatusBadge(text, tooltip = text)`.
+   - Added flexbox truncation rules (`min-width: 0`, `overflow: hidden`, `text-overflow: ellipsis`, `white-space: nowrap`) to `.rj-hud-asset-label` and `span#rjAutomationStatusText`, clamping badge width (`max-width: 140px`) to eliminate card distortion on edge cases.
+   - Synchronized `textContent` and `title` attributes across `#rjAutomationStatusText` and `.rj-hud-status-badge` so full context is always viewable on hover.
+5. **Preceding Sub-phase 5.3 Achievements (Popup Real-Time Auto-Save)**:
+   - Centralized debounced (300ms) and immediate auto-save engine in Popup with anti-loop guards (`isSyncingFromStorage`, `isSavingLocally`).
+6. **Preceding Sub-phase 5.2 Achievements (Automation State Sync & Graceful Stop)**:
+   - Standardized `rj_automation_state` schema `{ isRunning, isStopping, status, platformId, timestamp }`.
+   - Added disabled "Stopping..." state with `.rj-btn-stopping` and repeated-click guards in both HUD and Popup.
+6. **Previous Platform Adapter Achievements**:
 1. **MiriCanvas Live Alignment (`designhub.miricanvas.com/en/element/to-do`)**:
    - **Keyword Bulk Trash Elimination & Reactive Verified Per-Chip Removal Engine (`clearKeywords()`)**: Eliminated the keyword bulk trash button completely as requested. Replaced with a reactive, verified per-chip removal engine:
      1. *Dynamic Querying*: Re-evaluates `getExistingChips()` on each iteration rather than operating on a stale array.
@@ -118,48 +206,31 @@ Phase 4 has resolved cross-origin thumbnail fetching, completed live in-page bug
    - Added active asynchronous polling to `approveSpellingWarnings()` (up to 3.5s) to allow asynchronous chip error rendering and spellcheck latency before clicking mark all correct.
    - Usage toggle: Material-UI toggle buttons `button[data-testid="button-editorial"]` vs `button[data-testid="button-commercial"]` inside `div[data-testid="usage-toggle"]`.
    - Sequential keyword clearing via 3-dots menu (`button[data-testid="more-keyword-actions-button"]` -> `[data-testid="clear-action"]`).
-   - Bulk save: Target first card checkbox, toolbar `button[data-testid="select-page-button"]`, sidebar `button[data-testid="edit-dialog-save-button"]`, waits for save spinner to resolve and button to normalize, clicks toolbar "Deselect page", and closes drawer.
-   - Verified auto-saving on graceful stop mid-batch, with 100ms responsive stop checking during cooldown in `overlay.js`.
-   - Video (19 categories) vs Image (26 categories) shared workflow supported.
-7. **Centralized LoggerService Integration**:
-   - `ShutterstockAdapter.js` and `FreepikAdapter.js` now use `logger.step()`, `.info()`, and `.success()` across every single interaction step.
-8. **Adobe Stock Live Fixes Round 1-5 Verified**:
-   - Strict element sequence, non-AI releases switch to "No", and strict Save work button selector.
 
 ---
 
-## 3. Actionable Next Steps for Incoming Agent (Phase 5)
+## 3. Actionable Next Steps for Incoming Agent
 
-1. **Step 1 (Live Browser Verification on Magnific / Freepik)**:
-   - Contributor reloads unpacked extension (`chrome://extensions`).
-   - Opens `https://contributor.magnific.com/catalog/pending-files/1`.
-   - Confirms Overlay HUD detects `"Freepik (Magnific)"` with correct asset count, popup shows `"Ready on Tab"`, and runs automation with per-item draft save verification.
-2. **Step 2 (Branch Review & Integration)**:
-   - Contributor reviews Phase 4 changes on `task/platform-adapters` and merges into `dev` using `git merge --no-ff`.
+1. **Step 1 (Branch Integration & Merge to `dev`)**:
+   - Merge `task/e2e-hardening-polish` into `dev` using non-fast-forward merge:
+     ```bash
+     git checkout dev
+     git merge --no-ff task/e2e-hardening-polish -m "merge branch 'task/e2e-hardening-polish' into dev"
+     ```
+2. **Step 2 (Production Merge to `main` & Release Tagging)**:
+   - Merge `dev` into `main`:
+     ```bash
+     git checkout main
+     git merge --no-ff dev -m "chore(release): v0.1.0"
+     git tag -a v0.1.0 -m "Release v0.1.0"
+     ```
+3. **Step 3 (Remote Push & Archive Distribution)**:
+   - Push branches and tags to GitHub upon user confirmation:
+     ```bash
+     git push origin main dev --tags
+     ```
+   - Publish `releases/v0.1.0.zip` to GitHub Releases, Ko-fi, and Lynk.id.
 
----
-
-## 6. Recent Session Handoff Log
-
-| Session | Date | Branch | Commit | Summary | Next Focus |
-| :---: | :---: | :--- | :--- | :--- | :--- |
-| 41 | 2026-09-12 | `task/platform-adapters` | `fix(depositphotos)` | Align .itemslist > div.itemeditor card selectors, progressive scroll & stub waiting, card-scoped form filling, condition-checked clearing, to-top bulkSave | Live browser verification on Depositphotos |
-| 40 | 2026-09-11 | `task/platform-adapters` | `fix(dreamstime)` | Subcategory polling, condition-checked clear buttons, single-word keywords, toast lifecycle waiting, and in-page carousel loop | Live browser verification on Dreamstime |
-| 39 | 2026-09-10 | `task/platform-adapters` | `fix(vecteezy)` | Scope metadata editor to right panel, add prepareAutomation, clear buttons, software dropdown, and fix bulkSave selector | Live browser verification on Vecteezy |
-| 38 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Prioritize custom dropdown for AI model, add 500ms interaction pacing, check & toggle off AI in non-AI mode, and add pre-start deselect hook | Live browser verification on Magnific / Freepik |
-| 37 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Target button[data-cy="savePreitems"] (icon--save) for saving item, clamp AI keywords to 49, skip keyword clear when no chips exist | Live browser verification on Magnific / Freepik |
-| 36 | 2026-09-10 | `task/platform-adapters` | `fix(freepik)` | Eliminate card double-click, deduplicate simulateClick in browser, poll active asset selection in waitForEditorReady | Live browser verification on Magnific / Freepik |
-| 35 | 2026-09-10 | `task/platform-adapters` | `feat(freepik)` | Add support for contributor.magnific.com rebranding in manifest, overlay, background worker, popup UI, and integrate LoggerService | Live browser verification on Magnific / Freepik |
-| 34 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Auto-clear editorial prefix on toggle off, tighten Shutterstock chip detection on empty assets, prioritize local storage to fix model saving quota | Live browser verification on Shutterstock |
-| 33 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Async spelling auto-correct polling, save button spinner resolution wait, post-save deselect page, responsive cooldown stop | Live browser testing on Shutterstock |
-| 32 | 2026-09-10 | `task/platform-adapters` | `fix(shutterstock)` | Background CORS image proxy, deepest MUI selectors, sequential clearing, tightened delays, LoggerService wired, 666/666 tests pass | Live browser testing on Shutterstock |
-| 31 | 2026-09-10 | `task/platform-adapters` | `feat(logging)` | Implemented LoggerService.js, wired into AdobeStockAdapter, disabled global clearMetadata in overlay, verified 336/336 tests | Phase 5: End-to-End Live Browser Testing & Polish |
-2. **Step 2 (Phase 5: End-to-End Live Browser Testing & Polish)**:
-   - Load unpacked extension into Chromium browser (`chrome://extensions`).
-   - Live browser testing across available contributor dashboards (Adobe Stock, Shutterstock, Freepik, Vecteezy, Dreamstime, Depositphotos, MiriCanvas).
-   - Verify real thumbnail extraction, vision inference, and native input injection.
-3. **Step 3 (Packaging & Release)**:
-   - Build extension package zip and finalize release documentation.
 
 ---
 
@@ -187,7 +258,11 @@ Incoming agents must pay close attention to these hard-learned lessons:
    - **Vecteezy**: Banned terms trigger a modal; sanitize keywords prior to injection.
    - **Freepik**: Metadata is transient; you **MUST** trigger `saveDraft()` per asset before switching assets.
    - **Depositphotos**: Selecting a country triggers AJAX to load city options; raw tag paste trigger available.
-   - **MiriCanvas**: Capacity selector supports up to 1,000 items; DOM contains hidden virtualizer sizer list `ul[data-f="GU-fa4b"]` with dummy card that must be filtered out in favor of `ul[data-f="TU-5eb5"]`; card selection toggles off if clicked while already active; trash vs copy buttons in section headers share `data-f="TT-c273"` and require disambiguation via `div[data-f="DD-04b4"]` / `svg[data-f="DD-e725"]`; sequential Enter/Comma events commit keyword tags into chips.
+    - **MiriCanvas**: Capacity selector supports up to 1,000 items; DOM contains hidden virtualizer sizer list `ul[data-f="GU-fa4b"]` with dummy card that must be filtered out in favor of `ul[data-f="TU-5eb5"]`; card selection toggles off if clicked while already active; trash vs copy buttons in section headers share `data-f="TT-c273"` and require disambiguation via `div[data-f="DD-04b4"]` / `svg[data-f="DD-e725"]`; sequential Enter/Comma events commit keyword tags into chips.
+8. **Multi-Tab Cross-Platform Storage Isolation**:
+   - `rj_automation_state` in `chrome.storage.local` is broadcast across all open extension contexts. When multiple contributor platform tabs are open simultaneously (e.g. Adobe Stock and Dreamstime in separate tabs):
+     - `OverlayHUD.onStorageChanged` and `restoreAutomationState` must strictly enforce `if (state.platformId && state.platformId !== this.platformId) return;`. Without this guard, inactive tabs misinterpret start signals from other platforms, invoke `startAutomation()`, find 0 cards, and broadcast idle signals that kill active batches in a continuous ping-pong collision loop.
+     - Background service worker `chrome.tabs.onUpdated` auto-heal must strictly verify `state.tabId === tabId` before resetting state to idle. Unrelated tab navigations or background iframe reloads must never terminate active automation runs.
 
 ---
 
@@ -207,6 +282,24 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 57 | 2026-09-17 | `task/e2e-hardening-polish` | `d7ba885` | Comprehensive documentation suite synchronization (README badges/diagram, CHANGELOG Keep-a-Changelog v0.1.0, ARCHITECTURE, DECISIONS ADR-008..013, GIT_POLICY SemVer, DOCS_STYLE template, CURRENT_STATE, HANDOFF), refreshed release archive | Merge task/e2e-hardening-polish into dev & main, tag v0.1.0 |
+
+| 56 | 2026-09-17 | `task/e2e-hardening-polish` | `0e02008` | Precision target Shutterstock spelling warnings button in div[data-testid="keyword-input"] excluding add-all-button and tabs, preventing keyword overflow past 50; updated build.js with LOAD THIS FOLDER subfolder and URL files | Documentation & Release Sync |
+| 55 | 2026-09-17 | `task/e2e-hardening-polish` | `256fe01` | Implemented bundle-first production obfuscation pipeline (esbuild + javascript-obfuscator) generating standalone dist/LOAD THIS FOLDER/ and release zip; updated .gitignore | Shutterstock spelling approval fix |
+| 54 | 2026-09-17 | `task/e2e-hardening-polish` | `405025d` | Hardened all 7 platform adapters for 100% multi-language resilience using structural DOM selectors without English text dependencies (11/11 tests passed) | Production build & obfuscation setup |
+| 53 | 2026-09-17 | `task/e2e-hardening-polish` | `99808b5` | Dreamstime cross-page continuation & auto-heal exception, shortened stop button label to 'Stop', unboxed donate icon, restricted manifest matches | Multi-language resilience audit |
+| 52 | 2026-09-17 | `task/e2e-hardening-polish` | `84794d9` | Polished support ticker animations, spinner rotation, font weights (12px 500), and 5 rotating donation variants with zero native emoji (11/11 tests passed) | Dreamstime continuation & UI polish |
+| 51 | 2026-09-16 | `task/e2e-hardening-polish` | `fix(overlay)` | Hardened locked button contrast with .rj-btn-locked styling in HUD and popup, synchronized popup runner lock with active tab and persisted lastAutomationState across boolean updates, 4/4 and 7/7 tests passed | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
+
+| 50 | 2026-09-15 | `task/e2e-hardening-polish` | `791c639` | Implemented exclusive automation concurrency lock (Single Active Runner Policy) across HUD and toolbar popup, disabling start actions on non-runner tabs with Running on [Platform] status and lock SVG icons, 4/4 tests passed | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
+| 49 | 2026-09-15 | `task/e2e-hardening-polish` | `cdeb90d` | Implemented multi-tab automation state isolation by platformId and tabId scoping across overlay, orchestrator, and service worker, eliminating cross-tab start/stop collision loop and browser freezes (7/7 tests passed) | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
+| 48 | 2026-09-13 | `task/e2e-hardening-polish` | `fix(adobestock)` | Implemented direct native select fast-path and single-attempt waitForElement interaction in AdobeStockAdapter, eliminating 3x dropdown open/close loops; added 4-layer auto-healing across Service Worker, Router, Overlay, and Popup for stuck automation states, 16/16 and 87/87 tests passed | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
+| 47 | 2026-09-13 | `task/e2e-hardening-polish` | `refactor(overlay)` | Extracted automation execution loop and graceful stop into AutomationOrchestrator.js, reducing overlay.js by 572 lines (45/45 tests passed) | Sub-phase 5.7: Final End-to-End Live Verification & Documentation Sync |
+| 46 | 2026-09-13 | `task/e2e-hardening-polish` | `refactor(popup)` | Extracted all 7 platform dynamic form generators into dedicated ES module platform_forms.js, reducing popup.js by 257 lines (77/77 tests passed) | Sub-phase 5.6: Overlay Modularization (Extract AutomationOrchestrator.js) |
+| 45 | 2026-09-13 | `task/e2e-hardening-polish` | `style(ui)` | Optimized logo asset (~60 KB), aligned active button theme to Emerald Teal, added pill spinner, and clamped badge text with tooltips (66/66 tests passed) | Sub-phase 5.5: Popup Modularization (Extract `platform_forms.js`) |
+| 44 | 2026-09-13 | `task/e2e-hardening-polish` | `feat(popup)` | Implemented real-time auto-save engine for all popup fields, debounced text inputs, anti-loop guards, bidirectional HUD <-> Popup sync, 34/34 tests passed | Sub-phase 5.4: Assets, Theme Alignment, Pill Spinner & Status Badge Clamping |
+| 43 | 2026-09-13 | `task/e2e-hardening-polish` | `fix(sync)` | Resolved HUD <-> Popup automation state synchronization during graceful stop, expanded rj_automation_state schema, two-click stop lifecycle, disabled Stopping... state, 65/65 tests passed | Sub-phase 5.3: Popup Real-Time Auto-Save Engine |
+| 42 | 2026-09-13 | `task/e2e-hardening-polish` | `59c9935` | Persisted overlay visibility across navigations via rj_overlay_visible, deleted obsolete stub files (AiVisionService, PromptBuilder), unified platform detection, 35/35 tests passed | Sub-phase 5.2: HUD <-> Popup Automation State Synchronization & Graceful Stop |
 | 36 | 2026-09-13 | `task/platform-adapters` | `fix(miricanvas)` | Eliminated keyword bulk trash logic and implemented reactive verified per-chip removal engine with bottom-up scroll & disappearance polling in MiriCanvas, verified 113/113 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 35 | 2026-09-13 | `task/platform-adapters` | `6fc3650` | Implemented dual-strategy keyword chip clearing (bulk trash button + per-chip 'x' remove icon fallback with 50ms pacing) and sequential form ordering in MiriCanvas, verified 112/112 tests | Phase 5: End-to-End Live Browser Testing & Polish |
 | 34 | 2026-09-13 | `task/platform-adapters` | `8879594` | Resolved MiriCanvas keyword chip conversion via non-blur setter + insertFromPaste InputEvent + Enter/comma fallback, trash button discrimination (`DD-04b4`), and bulk save 8000ms disabled/toast wait with 2000ms sync buffer & fresh navbar uncheck, verified 112/112 tests | Phase 5: End-to-End Live Browser Testing & Polish |

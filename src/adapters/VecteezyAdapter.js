@@ -90,13 +90,17 @@ export class VecteezyAdapter extends BaseAdapter {
       const getToolbarButtons = () => Array.from(
         (filterBar || document).querySelectorAll('button[data-testid="button"], button')
       );
+      const areCardsSelected = Boolean(
+        document.querySelector('div[data-testid="resource-card"].is-selected, div.sc-dhNZpn.is-selected, div[data-testid="resource-card"] input[type="checkbox"]:checked')
+      );
       const deselectBtn = getToolbarButtons().find(
         (b) => b.textContent && b.textContent.trim().toLowerCase().includes('deselect all')
       );
+      const toolbarBtn = filterBar?.querySelector('button[data-testid="button"]') || getToolbarButtons()[0];
 
-      if (deselectBtn) {
+      if (deselectBtn || (areCardsSelected && toolbarBtn)) {
         this.logger.info('Vecteezy: Assets are currently selected, clicking "Deselect all"');
-        simulateClick(deselectBtn);
+        simulateClick(deselectBtn || toolbarBtn);
         await sleep(500);
       } else {
         this.logger.info('Vecteezy: No assets currently selected ("Select all" state), proceeding directly');
@@ -388,7 +392,7 @@ export class VecteezyAdapter extends BaseAdapter {
 
     // Target radio input strictly inside editorForm's radio group
     const licenseRadio = editorForm.querySelector(
-      `div[data-testid="radio-group"] input[value="${targetLicenseVal}"]`
+      `div[data-testid="radio-group"] input[value="${targetLicenseVal}"], label[data-testid="radio-input"] input[value="${targetLicenseVal}"], input[name="license"][value="${targetLicenseVal}"], input[value="${targetLicenseVal}"]`
     ) || Array.from(editorForm.querySelectorAll('label[data-testid="radio-input"]')).find(
       (lbl) => lbl.textContent && lbl.textContent.trim().toLowerCase().includes(normLicense)
     )?.querySelector('input[type="radio"]');
@@ -708,26 +712,35 @@ export class VecteezyAdapter extends BaseAdapter {
     const filterBar = document.querySelector('div[data-testid="filter-bar"]');
     const getButtons = () => Array.from((filterBar || document).querySelectorAll('button[data-testid="button"], button'));
 
-    // 1. Click "Deselect all" if present
+    const areCardsSelected = () => Boolean(
+      document.querySelector('div[data-testid="resource-card"].is-selected, div.sc-dhNZpn.is-selected, div[data-testid="resource-card"] input[type="checkbox"]:checked')
+    );
+
+    // 1. Click "Deselect all" if cards are selected
     const deselectBtn = getButtons().find(
       (b) => b.textContent && b.textContent.trim().toLowerCase().includes('deselect all')
     );
-    if (deselectBtn) {
+    const initialToolbarBtn = filterBar?.querySelector('button[data-testid="button"]') || getButtons()[0];
+
+    if (deselectBtn || (areCardsSelected() && initialToolbarBtn)) {
       this.logger.info('Vecteezy: Bulk save clicking "Deselect all"');
-      simulateClick(deselectBtn);
-      await sleep(200);
+      simulateClick(deselectBtn || initialToolbarBtn);
+      await sleep(300);
     }
 
     // 2. Click "Select all"
+    const currentToolbarBtn = filterBar?.querySelector('button[data-testid="button"]') || getButtons()[0];
     const selectAllBtn = getButtons().find(
       (b) => b.textContent &&
              !b.textContent.trim().toLowerCase().includes('deselect') &&
              b.textContent.trim().toLowerCase().includes('select all')
     );
-    if (selectAllBtn) {
+
+    const targetSelectAll = selectAllBtn || (!areCardsSelected() ? currentToolbarBtn : null);
+    if (targetSelectAll) {
       this.logger.info('Vecteezy: Bulk save clicking "Select all"');
-      simulateClick(selectAllBtn);
-      await sleep(300);
+      simulateClick(targetSelectAll);
+      await sleep(400);
     }
 
     // 3. Click "Save changes"
@@ -738,15 +751,23 @@ export class VecteezyAdapter extends BaseAdapter {
       this.logger.info('Vecteezy: Clicking "Save changes" icon');
       simulateClick(saveIcon);
       await sleep(500);
+
+      // Wait for progressbar spinner if any
+      let waitCount = 0;
+      while (document.querySelector('div[data-testid="save-changes-icon"] [role="progressbar"]') && waitCount < 30) {
+        await sleep(200);
+        waitCount++;
+      }
     }
 
     // 4. Clean up: click "Deselect all"
+    const finalToolbarBtn = filterBar?.querySelector('button[data-testid="button"]') || getButtons()[0];
     const finalDeselectBtn = getButtons().find(
       (b) => b.textContent && b.textContent.trim().toLowerCase().includes('deselect all')
     );
-    if (finalDeselectBtn) {
+    if (finalDeselectBtn || (areCardsSelected() && finalToolbarBtn)) {
       this.logger.info('Vecteezy: Bulk save final clicking "Deselect all"');
-      simulateClick(finalDeselectBtn);
+      simulateClick(finalDeselectBtn || finalToolbarBtn);
       await sleep(200);
     }
 

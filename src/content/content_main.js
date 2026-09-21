@@ -9,14 +9,21 @@ let hud = null;
 /**
  * Initializes and mounts the OverlayHUD instance.
  * Uses dynamic import for vanilla ES module execution in MV3 content script.
+ * @param {boolean} [initialVisible=true]
  */
-async function getOrInitHUD() {
+async function getOrInitHUD(initialVisible = true) {
   if (hud) return hud;
   try {
     const overlayUrl = chrome.runtime.getURL('overlay/overlay.js');
     const { OverlayHUD } = await import(overlayUrl);
     hud = new OverlayHUD();
+    if (!initialVisible) {
+      hud.isVisible = false;
+    }
     await hud.init();
+    if (!initialVisible) {
+      hud.hide(false);
+    }
     return hud;
   } catch (err) {
     console.error('[RJ AIO Metadata] Failed to initialize OverlayHUD:', err);
@@ -24,34 +31,74 @@ async function getOrInitHUD() {
   }
 }
 
-// Auto-mount HUD on page load
-getOrInitHUD().then((instance) => {
-  if (instance) {
-    console.log('[RJ AIO Metadata] Overlay HUD successfully mounted on:', window.location.hostname);
+const SUPPORTED_HOSTS = [
+  'stock.adobe.com',
+  'shutterstock.com',
+  'dreamstime.com',
+  'vecteezy.com',
+  'freepik.com',
+  'magnific.com',
+  'depositphotos.com',
+  'miricanvas.com'
+];
+
+function isSupportedPlatformPage() {
+  if (typeof window === 'undefined' || !window.location?.hostname) return false;
+  const host = window.location.hostname.toLowerCase();
+  return SUPPORTED_HOSTS.some(domain => host.includes(domain));
+}
+
+// Auto-mount HUD on page load only for supported microstock platforms
+if (isSupportedPlatformPage()) {
+  if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+    chrome.storage.local.get(['rj_overlay_visible'], (res) => {
+      const isVisible = res ? res.rj_overlay_visible !== false : true;
+      getOrInitHUD(isVisible).then((instance) => {
+        if (instance) {
+          console.log('[RJ AIO Metadata] Overlay HUD successfully mounted on:', window.location.hostname);
+        }
+      });
+    });
+  } else {
+    getOrInitHUD(true).then((instance) => {
+      if (instance) {
+        console.log('[RJ AIO Metadata] Overlay HUD successfully mounted on:', window.location.hostname);
+      }
+    });
   }
-});
+}
 
 // Listen for runtime messages from background service worker or popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'PING_HUD') {
-    sendResponse({ pong: true, isVisible: hud ? Boolean(hud.isVisible) : false });
+    sendResponse({
+      pong: true,
+      isVisible: Boolean(hud && hud.isVisible),
+      isAutomationRunning: Boolean(hud && hud.isAutomationRunning),
+      isStopping: Boolean(hud && hud.isStopping)
+    });
     return;
   }
 
   if (message.action === 'GET_OVERLAY_STATE') {
-    sendResponse({ success: true, isVisible: hud ? Boolean(hud.isVisible) : false });
+    sendResponse({ success: true, isVisible: Boolean(hud && hud.isVisible) });
     return;
   }
 
   if (message.action === 'TOGGLE_OVERLAY') {
     if (hud) {
-      hud.toggle();
-      sendResponse({ success: true, isVisible: Boolean(hud.isVisible) });
+      if (hud.isVisible) {
+        hud.hide();
+        sendResponse({ success: true, isVisible: false });
+      } else {
+        hud.show();
+        sendResponse({ success: true, isVisible: true });
+      }
     } else {
-      getOrInitHUD().then((instance) => {
+      getOrInitHUD(true).then((instance) => {
         if (instance) {
           instance.show();
-          sendResponse({ success: true, isVisible: Boolean(instance.isVisible) });
+          sendResponse({ success: true, isVisible: true });
         } else {
           sendResponse({ success: false, error: 'Failed to mount overlay HUD.' });
         }

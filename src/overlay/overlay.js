@@ -4,10 +4,9 @@
  * Reference: ADR-002 (Dual UI Strategy), DESIGN.md (Raycast Dark Precision)
  */
 
-import { getAdapterForUrl, getAdapterForPlatform } from '../adapters/index.js';
-import { generateMetadata } from '../services/AiService.js';
-import { randomDelay, sleep } from '../adapters/utils/dom_helpers.js';
+import { getAdapterForUrl } from '../adapters/index.js';
 import { logger } from '../services/LoggerService.js';
+import { AutomationOrchestrator } from './AutomationOrchestrator.js';
 
 // Platform Keyword Count Constraints & Hints
 const PLATFORM_LIMITS = {
@@ -20,6 +19,73 @@ const PLATFORM_LIMITS = {
   depositphotos: { min: 8, max: 50, hint: 'Min 8, Max 50' }
 };
 
+export const DONATION_URL = 'https://s.id/rjsupport'; // Ganti dengan URL donasi Anda (Saweria, Trakteer, Buy Me a Coffee, dll)
+
+export const HUD_DONATION_VARIANTS = [
+  {
+    label: 'Send a coffee',
+    iconSvg: `<svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>`,
+    title: 'Send a coffee to support development'
+  },
+  {
+    label: 'Donate a coin',
+    iconSvg: `<svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"></circle><path d="M18.09 10.37A6 6 0 1 1 10.34 18"></path><path d="M7 6h1v4"></path></svg>`,
+    title: 'Donate a coin to support development'
+  },
+  {
+    label: 'Support dev',
+    iconSvg: `<svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>`,
+    title: 'Support extension development'
+  },
+  {
+    label: 'Gift a pizza',
+    iconSvg: `<svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 11h.01"></path><path d="M11 15h.01"></path><path d="M16 16h.01"></path><path d="m2 2 20 7-9 13Z"></path><path d="M16 11a4 4 0 0 1-4 4"></path></svg>`,
+    title: 'Gift a pizza to support development'
+  },
+  {
+    label: 'Sponsor dev',
+    iconSvg: `<svg class="rj-hud-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>`,
+    title: 'Sponsor the development of RJ AIO Metadata'
+  }
+];
+
+export const hudCoffeeSvg = HUD_DONATION_VARIANTS[0].iconSvg;
+
+export const hudSpinnerSvg = `
+  <svg class="rj-hud-icon-svg rj-rotating rj-status-icon-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+  </svg>
+`;
+
+export const pillSpinnerSvg = `
+  <svg class="rj-hud-icon-svg rj-status-icon-spinner" viewBox="0 0 24 24" fill="none" stroke="#079183" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="12" y1="2" x2="12" y2="6"></line>
+    <line x1="12" y1="18" x2="12" y2="22"></line>
+    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+    <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+    <line x1="2" y1="12" x2="6" y2="12"></line>
+    <line x1="18" y1="12" x2="22" y2="12"></line>
+    <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+    <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+  </svg>
+`;
+
+export const pillReadySvg = `
+  <svg class="rj-hud-icon-svg rj-status-icon-ready" viewBox="0 0 24 24" fill="none" stroke="#59d499" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20 6 9 17 4 12"></polyline>
+  </svg>
+`;
+
+export const PLATFORM_NAMES = {
+  adobestock: 'Adobe Stock',
+  shutterstock: 'Shutterstock',
+  dreamstime: 'Dreamstime',
+  vecteezy: 'Vecteezy',
+  freepik: 'Freepik',
+  depositphotos: 'Depositphotos',
+  miricanvas: 'MiriCanvas'
+};
+
 export class OverlayHUD {
   constructor() {
     this.hostId = 'rj-overlay-host';
@@ -29,6 +95,7 @@ export class OverlayHUD {
     this.cardEl = null;
     this.pillEl = null;
     this.isMinimized = false;
+    this.currentTab = 'general';
     this.isVisible = true;
     this.isDragging = false;
     this.isTransitioning = false;
@@ -41,12 +108,24 @@ export class OverlayHUD {
     // Platform & Asset Detection
     this.platformId = this.detectPlatformId();
     this.platformName = this.detectPlatform();
+    this.tabId = null;
+    this.isLockedByOtherPlatform = false;
     this.assetCount = 0;
     this.isAutomationRunning = false;
+    this.isStopping = false;
+    this.isCardProcessing = false;
     this.abortController = null;
     this.scanInterval = null;
     this.mutationObserver = null;
     this.saveDebounceTimer = null;
+    this.isSyncingFromStorage = false;
+    this.orchestrator = new AutomationOrchestrator(this);
+
+    // Support & Live Progress Ticker state
+    this.hudSupportTickerInterval = null;
+    this.hudSupportTickerPhase = 'progress';
+    this.hudLatestProgressText = '';
+    this.hudDonationVariantIndex = 0;
 
     // Bind event handlers
     this.onMouseDown = this.onMouseDown.bind(this);
@@ -61,6 +140,17 @@ export class OverlayHUD {
    */
   async init() {
     if (this.mounted) return;
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      try {
+        chrome.runtime.sendMessage({ action: 'GET_SENDER_TAB_ID' }, (res) => {
+          if (res && res.tabId) {
+            this.tabId = res.tabId;
+          }
+        });
+      } catch {
+        // Non-fatal if runtime message fails
+      }
+    }
     this.mount();
     this.setupAdaptiveQuickForm();
     await this.restorePositionAndState();
@@ -70,34 +160,24 @@ export class OverlayHUD {
   }
 
   /**
-   * Identifies the platform ID key based on hostname.
+   * Identifies the platform ID key based on active URL adapter.
    * @returns {string} Platform ID
    */
   detectPlatformId() {
-    const host = window.location.hostname.toLowerCase();
-    if (host.includes('stock.adobe.com')) return 'adobestock';
-    if (host.includes('shutterstock.com')) return 'shutterstock';
-    if (host.includes('dreamstime.com')) return 'dreamstime';
-    if (host.includes('vecteezy.com')) return 'vecteezy';
-    if (host.includes('freepik.com') || host.includes('magnific.com')) return 'freepik';
-    if (host.includes('depositphotos.com')) return 'depositphotos';
-    if (host.includes('miricanvas.com')) return 'miricanvas';
+    const url = typeof window !== 'undefined' ? window.location?.href : '';
+    const adapter = getAdapterForUrl(url);
+    if (adapter) return adapter.platformId;
     return 'unknown';
   }
 
   /**
-   * Detects the active microstock contributor platform display name based on hostname.
+   * Detects the active microstock contributor platform display name based on active URL adapter.
    * @returns {string} Platform display name
    */
   detectPlatform() {
-    const host = window.location.hostname.toLowerCase();
-    if (host.includes('stock.adobe.com')) return 'Adobe Stock';
-    if (host.includes('shutterstock.com')) return 'Shutterstock';
-    if (host.includes('dreamstime.com')) return 'Dreamstime';
-    if (host.includes('vecteezy.com')) return 'Vecteezy';
-    if (host.includes('freepik.com') || host.includes('magnific.com')) return 'Freepik (Magnific)';
-    if (host.includes('depositphotos.com')) return 'Depositphotos';
-    if (host.includes('miricanvas.com')) return 'MiriCanvas';
+    const url = typeof window !== 'undefined' ? window.location?.href : '';
+    const adapter = getAdapterForUrl(url);
+    if (adapter) return adapter.platformName;
     return 'Unknown Page';
   }
 
@@ -106,7 +186,7 @@ export class OverlayHUD {
    * @returns {{ count: number, mediaType?: string, isSingleAsset?: boolean, assetId?: string, label: string, selector: string }}
    */
   detectAssetCount() {
-    const host = window.location.hostname.toLowerCase();
+    const host = typeof window !== 'undefined' ? (window.location?.hostname?.toLowerCase() || '') : '';
 
     // 1. Adobe Stock
     if (host.includes('stock.adobe.com')) {
@@ -305,10 +385,10 @@ export class OverlayHUD {
       const validArticles = realListArticles.length > 0
         ? realListArticles
         : Array.from(
-            document.querySelectorAll(
-              'article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, article'
-            )
-          ).filter((a) => !a.closest?.('ul[data-f="GU-fa4b"], ul.panda-ecnXzs'));
+          document.querySelectorAll(
+            'article[data-f="CA-d943"], ul > li > article, article.er317d30, article.css-3q5rav, article'
+          )
+        ).filter((a) => !a.closest?.('ul[data-f="GU-fa4b"], ul.panda-ecnXzs'));
 
       const count = validArticles.length;
       return {
@@ -526,11 +606,17 @@ export class OverlayHUD {
               </label>
             </div>
 
-            <!-- Row 5: Primary Automation Action Button -->
-            <button type="button" id="rjBtnToggleAutomation" class="rj-hud-btn-action rj-btn-start">
-              <svg id="rjAutomationIcon" class="rj-hud-icon-svg" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-              <span id="rjAutomationBtnText">Start Automation</span>
-            </button>
+            <!-- Row 5: Primary Automation Actions -->
+            <div class="rj-hud-actions-row">
+              <button type="button" id="rjBtnHudSupportProgress" class="rj-hud-btn-action rj-btn-support" style="display: none;" title="Send a coffee to support development">
+                <span id="rjHudSupportProgressIcon"></span>
+                <span id="rjHudSupportProgressText">Send a coffee</span>
+              </button>
+              <button type="button" id="rjBtnToggleAutomation" class="rj-hud-btn-action rj-btn-start">
+                <svg id="rjAutomationIcon" class="rj-hud-icon-svg" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                <span id="rjAutomationBtnText">Start Automation</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -558,6 +644,10 @@ export class OverlayHUD {
     this.wrapper = this.shadow.querySelector('#rjHudWrapper');
     this.cardEl = this.shadow.querySelector('#rjHudCard');
     this.pillEl = this.shadow.querySelector('#rjHudPill');
+
+    if (!this.isVisible && this.wrapper) {
+      this.wrapper.classList.add('rj-hidden');
+    }
 
     // Attach listeners
     this.attachEventListeners();
@@ -713,13 +803,29 @@ export class OverlayHUD {
       });
     }
 
+    // Support / Donate Button Click Listener
+    const btnHudSupport = this.shadow.querySelector('#rjBtnHudSupportProgress');
+    if (btnHudSupport) {
+      btnHudSupport.addEventListener('click', (e) => {
+        e.stopPropagation();
+        try {
+          window.open(DONATION_URL, '_blank');
+        } catch (err) {
+          console.error('Failed to open donation link:', err);
+        }
+      });
+    }
+
     // Automation Toggle Button
     const btnAutomation = this.shadow.querySelector('#rjBtnToggleAutomation');
     if (btnAutomation) {
       btnAutomation.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (this.isLockedByOtherPlatform || btnAutomation.disabled) {
+          return;
+        }
         if (this.isStopping) {
-          this.stopAutomation(true);
+          return; // Already in graceful stopping process; button is disabled to prevent double-clicks
         } else if (this.isAutomationRunning) {
           this.stopAutomation();
         } else {
@@ -742,10 +848,10 @@ export class OverlayHUD {
   /**
    * Checks if the active provider has valid credentials and a selected model.
    * @param {Object} config
-   * @returns {boolean}
+   * @returns {boolean} True if ready
    */
   isProviderReady(config) {
-    if (!config) return false;
+    if (!config || !config.providers) return false;
     const activeProvId = config.activeProvider || 'gemini';
     const provider = config.providers ? config.providers[activeProvId] : null;
     if (!provider) return false;
@@ -758,10 +864,59 @@ export class OverlayHUD {
   }
 
   /**
+   * Locks HUD controls when automation is active on another platform tab.
+   * @param {string} runnerPlatformId
+   */
+  setLockedByOtherPlatformUI(runnerPlatformId) {
+    this.isLockedByOtherPlatform = true;
+    if (!this.shadow) return;
+
+    this.stopHudSupportTicker();
+    const btnSupport = this.shadow.querySelector('#rjBtnHudSupportProgress');
+    if (btnSupport) {
+      btnSupport.style.display = 'none';
+    }
+
+    const runnerName = PLATFORM_NAMES[runnerPlatformId] || runnerPlatformId || 'another platform';
+    const btn = this.shadow.querySelector('#rjBtnToggleAutomation');
+    const btnText = this.shadow.querySelector('#rjAutomationBtnText');
+    const icon = this.shadow.querySelector('#rjAutomationIcon');
+    const badge = this.shadow.querySelector('#rjAutomationBadge');
+
+    if (btn) {
+      btn.classList.remove('rj-btn-start', 'rj-btn-stop', 'rj-btn-stopping', 'rj-btn-accent');
+      btn.classList.add('rj-btn-disabled', 'rj-btn-locked');
+      btn.disabled = true;
+      btn.title = `Automation is currently running on ${runnerName}. Stop it on that tab or wait until finished.`;
+    }
+    if (btnText) {
+      btnText.textContent = `Running on ${runnerName}`;
+    }
+    if (icon) {
+      // SVG Lock icon (Phosphor / Lucide 14x14)
+      icon.innerHTML = '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>';
+    }
+    if (badge) {
+      badge.classList.remove('rj-running');
+    }
+    this.setStatusBadge(`Busy (${runnerName})`, `Automation is currently running on ${runnerName}. Only one platform can run at a time.`);
+  }
+
+  /**
+   * Unlocks HUD controls when automation on another platform stops.
+   */
+  clearLockedByOtherPlatformUI() {
+    this.isLockedByOtherPlatform = false;
+    if (!this.shadow) return;
+    this.updateAutomationUI(false);
+    this.updateStartButtonReadiness();
+  }
+
+  /**
    * Updates start button disabled status based on active provider readiness.
    */
   updateStartButtonReadiness() {
-    if (this.isAutomationRunning) return;
+    if (this.isAutomationRunning || this.isStopping || this.isLockedByOtherPlatform) return;
     const btn = this.shadow?.querySelector('#rjBtnToggleAutomation');
     if (btn) {
       if (this.platformId === 'unknown') {
@@ -815,14 +970,56 @@ export class OverlayHUD {
       const state = changes.rj_automation_state.newValue;
       if (state) {
         const isRunning = Boolean(state.isRunning);
-        if (this.isAutomationRunning !== isRunning) {
-          if (!isRunning && this.isAutomationRunning) {
-            this.stopAutomation();
-          } else if (isRunning && !this.isAutomationRunning) {
-            this.startAutomation();
+        const isStopping = Boolean(state.isStopping || state.status === 'stopping');
+
+        // Exclusive automation lock: check if state belongs to another platform
+        if (state.platformId && state.platformId !== this.platformId) {
+          if (isRunning || isStopping) {
+            this.setLockedByOtherPlatformUI(state.platformId);
+          } else if (this.isLockedByOtherPlatform) {
+            this.clearLockedByOtherPlatformUI();
           }
+          return;
+        }
+
+        // State belongs to this platform (or global reset)
+        if (this.isLockedByOtherPlatform) {
+          this.clearLockedByOtherPlatformUI();
+        }
+
+        if (state.progressText) {
+          this.updateHudSupportProgress(state.progressText);
+        }
+
+        if (isStopping && !this.isStopping && this.isAutomationRunning) {
+          // External graceful stop triggered from popup
+          this.stopAutomation();
+        } else if (!isRunning && !isStopping && (this.isAutomationRunning || this.isStopping)) {
+          // External stop triggered
+          this.stopAutomation(true);
+        } else if (isRunning && !isStopping && !this.isAutomationRunning && !this.isStopping) {
+          // External start triggered from popup
+          this.startAutomation();
         }
       }
+    }
+  }
+
+  /**
+   * Sets text and tooltip title on the automation status badge.
+   * @param {string} text
+   * @param {string} [tooltip]
+   */
+  setStatusBadge(text, tooltip = text) {
+    if (!this.shadow) return;
+    const statusText = this.shadow.querySelector('#rjAutomationStatusText');
+    const badge = this.shadow.querySelector('#rjAutomationBadge');
+    if (statusText) {
+      statusText.textContent = text;
+      statusText.title = tooltip;
+    }
+    if (badge) {
+      badge.title = tooltip;
     }
   }
 
@@ -835,29 +1032,71 @@ export class OverlayHUD {
     if (!this.shadow) return;
 
     const btn = this.shadow.querySelector('#rjBtnToggleAutomation');
+    const btnSupport = this.shadow.querySelector('#rjBtnHudSupportProgress');
     const btnText = this.shadow.querySelector('#rjAutomationBtnText');
     const icon = this.shadow.querySelector('#rjAutomationIcon');
     const badge = this.shadow.querySelector('#rjAutomationBadge');
-    const statusText = this.shadow.querySelector('#rjAutomationStatusText');
     const progressTrack = this.shadow.querySelector('#rjProgressTrack');
     const pillStatus = this.shadow.querySelector('#rjPillStatus');
 
-    if (isRunning) {
-      if (btn) {
-        btn.classList.remove('rj-btn-start');
-        btn.classList.add('rj-btn-stop');
-        btn.disabled = false;
-        btn.title = 'Stop Automation';
+    if (this.isStopping) {
+      if (btnSupport) {
+        btnSupport.style.display = 'flex';
+        btnSupport.classList?.add('rj-visible');
+        this.startHudSupportTicker();
       }
-      if (btnText) btnText.textContent = 'Stop Automation';
+      if (btn) {
+        btn.classList.remove('rj-btn-start', 'rj-btn-stop', 'rj-btn-accent');
+        btn.classList.add('rj-btn-stopping', 'rj-btn-disabled');
+        btn.disabled = true;
+        btn.title = 'Stopping automation (saving work)...';
+      }
+      if (btnText) btnText.textContent = 'Stopping...';
       if (icon) icon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
       if (badge) badge.classList.add('rj-running');
-      if (statusText) statusText.textContent = 'Running';
+      this.setStatusBadge('Stopping...');
       if (progressTrack) progressTrack.style.display = 'block';
-      if (pillStatus) pillStatus.textContent = 'Running...';
-    } else {
+      if (pillStatus) {
+        pillStatus.innerHTML = `${pillSpinnerSvg}<span>Stopping...</span>`;
+        pillStatus.title = 'Stopping automation (saving work)...';
+      }
+      this.setFormControlsDisabled(true);
+      return;
+    }
+
+    if (isRunning) {
+      if (btnSupport) {
+        btnSupport.style.display = 'flex';
+        btnSupport.classList?.add('rj-visible');
+        this.startHudSupportTicker();
+      }
       if (btn) {
-        btn.classList.remove('rj-btn-stop');
+        btn.classList.remove('rj-btn-start', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
+        btn.classList.add('rj-btn-stop');
+        btn.disabled = false;
+        btn.title = 'Stop';
+      }
+      if (btnText) btnText.textContent = 'Stop';
+      if (icon) icon.innerHTML = '<rect x="6" y="6" width="12" height="12"></rect>';
+      if (badge) badge.classList.add('rj-running');
+      this.setStatusBadge('Running');
+      if (progressTrack) progressTrack.style.display = 'block';
+      if (pillStatus) {
+        pillStatus.innerHTML = `${pillSpinnerSvg}<span>Running...</span>`;
+        pillStatus.title = 'Automation running...';
+      }
+    } else {
+      this.stopHudSupportTicker();
+      if (btnSupport) {
+        btnSupport.style.display = 'none';
+        btnSupport.classList?.remove('rj-visible');
+      }
+      if (this.isLockedByOtherPlatform) {
+        this.setFormControlsDisabled(false);
+        return;
+      }
+      if (btn) {
+        btn.classList.remove('rj-btn-stop', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
         btn.classList.add('rj-btn-start');
         if (this.platformId === 'unknown') {
           btn.disabled = true;
@@ -871,7 +1110,7 @@ export class OverlayHUD {
       if (btnText) btnText.textContent = 'Start Automation';
       if (icon) icon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
       if (badge) badge.classList.remove('rj-running');
-      if (statusText) statusText.textContent = 'Idle';
+      this.setStatusBadge('Idle');
       if (progressTrack) progressTrack.style.display = 'none';
       this.updateAssetCounter();
     }
@@ -881,427 +1120,92 @@ export class OverlayHUD {
   }
 
   /**
-   * Starts sequential AI metadata generation and injection across detected assets.
+   * Renders the current phase (progress or donation) into HUD support button.
+   * @param {boolean} [triggerAnimation=false]
    */
-  async startAutomation() {
-    if (this.isAutomationRunning || this.isStopping) return;
+  renderHudSupportTickerContent(triggerAnimation = false) {
+    if (!this.shadow) return;
+    const btn = this.shadow.querySelector('#rjBtnHudSupportProgress');
+    const iconEl = this.shadow.querySelector('#rjHudSupportProgressIcon');
+    const textEl = this.shadow.querySelector('#rjHudSupportProgressText');
+    if (!btn) return;
 
-    // 1. Resolve active platform adapter
-    const currentUrl = typeof window !== 'undefined' ? window.location?.href : '';
-    let adapter = getAdapterForUrl(currentUrl);
-    if (!adapter && this.platformId && this.platformId !== 'unknown') {
-      adapter = getAdapterForPlatform(this.platformId);
-    }
-    if (adapter && (!this.platformId || this.platformId === 'unknown')) {
-      this.platformId = adapter.platformId;
-    }
-
-    if (!adapter) {
-      logger.warn('No platform adapter matched for URL:', currentUrl);
-      const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
-      if (statusText) statusText.textContent = 'Unsupported Page';
-      return;
+    if (this.hudSupportTickerPhase === 'progress') {
+      if (iconEl) iconEl.innerHTML = hudSpinnerSvg;
+      if (textEl) textEl.textContent = this.hudLatestProgressText || 'Processing...';
+      btn.title = this.hudLatestProgressText ? `Progress: ${this.hudLatestProgressText} — Click to support development` : 'Processing... Click to support development';
+    } else {
+      const variant = HUD_DONATION_VARIANTS[this.hudDonationVariantIndex] || HUD_DONATION_VARIANTS[0];
+      if (iconEl) iconEl.innerHTML = variant.iconSvg;
+      if (textEl) textEl.textContent = variant.label;
+      btn.title = variant.title;
     }
 
-    // 2. Validate active provider credentials
-    if (!this.currentConfig) {
-      await this.syncFromStorage();
-    }
-    if (!this.isProviderReady(this.currentConfig)) {
-      logger.warn('AI Provider is not ready. Configure in popup first.');
-      const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
-      if (statusText) statusText.textContent = 'Setup Model';
-      return;
-    }
-
-    // 3. Initialize AbortController
-    this.abortController = new AbortController();
-    const signal = this.abortController.signal;
-
-    // 4. Update HUD UI state to Running
-    this.updateAutomationUI(true);
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      chrome.storage.local.set({
-        rj_automation_state: {
-          isRunning: true,
-          platformId: this.platformId,
-          timestamp: Date.now()
-        }
-      });
-    }
-
-    const progressFill = this.shadow?.querySelector('#rjProgressFill');
-    const countText = this.shadow?.querySelector('#rjAssetCountText');
-    const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
-    const pillStatus = this.shadow?.querySelector('#rjPillStatus');
-    const badge = this.shadow?.querySelector('#rjAutomationBadge');
-
-    try {
-      // 5. Query asset cards on the page
-      const rawCards = adapter.getAssetCards();
-      const cards = Array.isArray(rawCards) ? rawCards : (rawCards ? Array.from(rawCards) : []);
-      const total = cards.length;
-
-      if (total === 0) {
-        this.updateAutomationUI(false);
-        if (countText) countText.textContent = '0 Assets Detected';
-        if (statusText) statusText.textContent = '0 Assets Detected';
-        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-          chrome.storage.local.set({
-            rj_automation_state: {
-              isRunning: false,
-              platformId: this.platformId,
-              timestamp: Date.now()
-            }
-          });
-        }
-        return;
+    if (triggerAnimation && btn.classList) {
+      btn.classList.remove('rj-ticker-animating');
+      if (typeof btn.offsetWidth === 'number') {
+        void btn.offsetWidth;
       }
+      btn.classList.add('rj-ticker-animating');
+    }
+  }
 
-      logger.banner(`Automation started on ${this.platformId} with ${total} assets`);
-
-      // Pre-automation initialization (e.g. deselecting header select-all checkboxes)
-      if (typeof adapter.prepareAutomation === 'function') {
-        await adapter.prepareAutomation();
-        if (signal.aborted || this.isStopping) return;
-        await sleep(300);
-      }
-
-      this.isStopping = false;
-      this.isCardProcessing = false;
-      let processedCount = 0;
-
-      // 6A. Dreamstime In-Page Carousel Loop
-      if (this.platformId === 'dreamstime') {
-        let assetIdx = 0;
-        while (!signal.aborted && !this.isStopping) {
-          const currentCards = adapter.getAssetCards();
-          const card = currentCards && currentCards.length > 0 ? currentCards[0] : null;
-          if (!card) break;
-
-          const currentId = adapter.getCurrentAssetId();
-          if (countText) countText.textContent = `Asset ${assetIdx + 1}${currentId ? ` (ID ${currentId})` : ''}`;
-          if (statusText) statusText.textContent = this.isStopping ? 'Stopping...' : 'Processing...';
-          if (pillStatus) pillStatus.textContent = `Asset ${assetIdx + 1}`;
-
-          logger.asset(assetIdx + 1, 'Carousel');
-
-          this.isCardProcessing = true;
-          try {
-            // Step 1: Wait for Editor Ready
-            await adapter.waitForEditorReady(card, 4000);
-            if (signal.aborted) break;
-            await sleep(300);
-
-            // Step 2: Extract preview thumbnail
-            const thumb = adapter.getThumbnailUrl(card);
-
-            // Step 3: AI Metadata Generation
-            if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving)...' : 'Generating AI...';
-
-            let keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 70;
-            const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
-            const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
-            const isAiGenerated = Boolean(this.shadow?.querySelector('#rjToggleAiDeclaration')?.checked);
-            const language = this.currentConfig?.platformSettings?.dreamstime?.language || 'en';
-
-            const sanitizedData = await generateMetadata({
-              image: thumb,
-              platformId: 'dreamstime',
-              assetType: 'image',
-              targetKeywordCount: keywordCount,
-              customKeywords,
-              isAiGenerated,
-              editorialPrefix: '',
-              language,
-              assetIndex: assetIdx,
-              providerConfig: this.currentConfig
-            });
-
-            if (signal.aborted) break;
-            await sleep(400);
-
-            // Step 4: Inject sanitized metadata
-            if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving)...' : 'Injecting metadata...';
-
-            const platformSettings = this.currentConfig?.platformSettings?.dreamstime || {};
-            const isEditorial = Boolean(platformSettings.isEditorial);
-            const platformOptions = {
-              ...platformSettings,
-              isAiGenerated,
-              isEditorial,
-              language
-            };
-
-            await adapter.fillMetadata(sanitizedData, platformOptions);
-            processedCount++;
-
-            // Step 5: Save edits (waits for toast appear & disappear)
-            if (statusText) statusText.textContent = 'Saving edits...';
-            await adapter.saveDraft();
-
-            // Step 6: If Mode B (submit_direct), submit for review
-            if (platformSettings.mode === 'submit_direct') {
-              if (statusText) statusText.textContent = 'Submitting file...';
-              await adapter.submitForReview(isEditorial);
-            }
-
-            logger.success(`Completed asset ${assetIdx + 1}${currentId ? ` (ID: ${currentId})` : ''}`);
-          } catch (assetErr) {
-            if (signal.aborted || assetErr?.message === 'ABORTED') break;
-            logger.warn(`Error processing asset ${assetIdx + 1}:`, assetErr);
-          } finally {
-            this.isCardProcessing = false;
-          }
-
-          if (this.isStopping || signal.aborted) break;
-
-          // Step 7: Cooldown Delay
-          if (statusText) statusText.textContent = 'Cooldown...';
-          const minWait = this._cooldownMin ?? 1000;
-          const maxWait = this._cooldownMax ?? 4000;
-          const cooldownTarget = Math.floor(Math.random() * (maxWait - minWait + 1)) + minWait;
-          const cooldownStart = Date.now();
-          while (Date.now() - cooldownStart < cooldownTarget) {
-            if (this.isStopping || signal.aborted) break;
-            await sleep(100).catch(() => {});
-          }
-
-          if (this.isStopping || signal.aborted) break;
-
-          // Step 8: Navigate to next
-          if (statusText) statusText.textContent = 'Next asset...';
-          const navResult = await adapter.navigateToNext();
-          if (navResult?.done) {
-            break;
-          }
-
-          assetIdx++;
-          await sleep(500);
-        }
-
-        if (this.isStopping || signal.aborted) {
-          logger.banner('Dreamstime automation stopped.');
-          this.isStopping = false;
-          this.isAutomationRunning = false;
-          this.updateAutomationUI(false);
-          if (statusText) statusText.textContent = 'Stopped';
-        } else {
-          logger.success(`Dreamstime automation finished ${processedCount} assets.`);
-          if (progressFill) progressFill.style.width = '100%';
-          if (countText) countText.textContent = `Finished ${processedCount} assets`;
-          this.lastCompletedAssetLabel = `Finished ${processedCount} assets`;
-          if (badge) badge.classList.remove('rj-running');
-          if (statusText) statusText.textContent = 'Completed';
-          if (pillStatus) pillStatus.textContent = 'Finished';
-
-          const finishWait = this._completionWait ?? 3000;
-          await sleep(finishWait);
-          this.updateAutomationUI(false);
-        }
-        return;
-      }
-
-      // 6B. Sequential Asset Processing Loop (Grid / List platforms)
-      for (let i = 0; i < total; i++) {
-        if (signal.aborted || this.isStopping) break;
-
-        const card = cards[i];
-
-        // Update HUD progress
-        const pct = Math.round((i / total) * 100);
-        if (progressFill) progressFill.style.width = `${pct}%`;
-        if (countText) countText.textContent = `Asset ${i + 1} of ${total}`;
-        if (statusText) statusText.textContent = this.isStopping ? 'Stopping...' : 'Processing...';
-        if (pillStatus) pillStatus.textContent = `${i + 1}/${total} (${pct}%)`;
-
-        logger.asset(i + 1, total);
-
-        this.isCardProcessing = true;
-        try {
-          // Step 1: Select Card
-          await adapter.selectCard(card);
-          if (signal.aborted) break;
-          await sleep(600);
-
-          // Step 2: Wait for Editor Ready
-          const isEditorReady = await adapter.waitForEditorReady(card, 4000);
-          if (signal.aborted) break;
-          if (!isEditorReady && this.platformId === 'miricanvas') {
-            logger.warn(`Editor not ready for asset ${i + 1}, retrying card selection...`);
-            await adapter.selectCard(card);
-            await adapter.waitForEditorReady(card, 2000);
-          }
-          await sleep(300);
-
-          // Step 3: Extract preview thumbnail
-          const thumb = adapter.getThumbnailUrl(card);
-
-          // Step 4: AI Metadata Generation
-          if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving card)...' : 'Generating AI...';
-
-          let keywordCount = Number(this.shadow?.querySelector('#rjInputKeywordCount')?.value) || 50;
-          const specificKeywordsRaw = this.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
-          const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
-          const isAiGenerated = (this.platformId !== 'shutterstock' && this.platformId !== 'depositphotos')
-            ? Boolean(this.shadow?.querySelector('#rjToggleAiDeclaration')?.checked)
-            : false;
-          if (this.platformId === 'freepik' && isAiGenerated) {
-            keywordCount = Math.min(keywordCount, 49);
-          }
-          const isShutterstockEditorial = this.platformId === 'shutterstock' && Boolean(this.currentConfig?.platformSettings?.shutterstock?.isEditorial);
-          const editorialPrefix = isShutterstockEditorial ? (this.currentConfig?.platformSettings?.shutterstock?.editorialPrefix || '') : '';
-          const language = this.currentConfig?.platformSettings?.[this.platformId]?.language || 'en';
-          const isVideo = this.platformId === 'shutterstock' && typeof window !== 'undefined' && window.location?.pathname?.includes('/video');
-          const assetType = isVideo ? 'video' : 'image';
-
-          const sanitizedData = await generateMetadata({
-            image: thumb,
-            platformId: this.platformId,
-            assetType,
-            targetKeywordCount: keywordCount,
-            customKeywords,
-            isAiGenerated,
-            editorialPrefix,
-            language,
-            assetIndex: i,
-            providerConfig: this.currentConfig
-          });
-
-          if (signal.aborted) break;
-          await sleep(500);
-
-          // Step 5: Clear existing metadata (Temporarily disabled/commented out; clearing delegated sequentially inside platform adapters)
-          /*
-          if (this.platformId !== 'adobestock') {
-            await adapter.clearMetadata();
-            if (signal.aborted) break;
-            await sleep(300);
-          }
-          */
-
-          // Step 6: Inject sanitized metadata
-          if (statusText) statusText.textContent = this.isStopping ? 'Stopping (saving card)...' : 'Injecting metadata...';
-
-          const platformSettings = this.currentConfig?.platformSettings?.[this.platformId] || {};
-          const platformOptions = {
-            ...platformSettings,
-            isAiGenerated,
-            language
-          };
-
-          await adapter.fillMetadata(sanitizedData, platformOptions, card);
-          processedCount++;
-
-          // Step 7: Per-item save (for Freepik and Dreamstime)
-          if (this.platformId === 'freepik' || this.platformId === 'dreamstime') {
-            await adapter.saveDraft();
-          }
-
-          logger.success(`Completed asset ${i + 1} of ${total}`);
-        } catch (assetErr) {
-          if (signal.aborted || assetErr?.message === 'ABORTED') {
-            break;
-          }
-          if (total === 1) {
-            throw assetErr;
-          }
-          logger.warn(`Error processing asset ${i + 1}/${total}:`, assetErr);
-          if (statusText) statusText.textContent = `Asset ${i + 1} skipped`;
-          await randomDelay(1000, 2000, signal);
-          continue;
-        } finally {
-          this.isCardProcessing = false;
-        }
-
-        // If stop was requested while processing this card, finish here and proceed to bulk save
-        if (this.isStopping || signal.aborted) break;
-
-        // Step 8: Cooldown Delay (Responsive to graceful stop)
-        if (statusText) statusText.textContent = 'Cooldown...';
-        const minWait = this._cooldownMin ?? 1000;
-        const maxWait = this._cooldownMax ?? 5000;
-        const cooldownTarget = Math.floor(Math.random() * (maxWait - minWait + 1)) + minWait;
-        const cooldownStart = Date.now();
-        while (Date.now() - cooldownStart < cooldownTarget) {
-          if (this.isStopping || signal.aborted) break;
-          await sleep(100).catch(() => {});
-        }
-
-        if (this.isStopping || signal.aborted) break;
-
-        // Dreamstime special carousel navigation
-        if (this.platformId === 'dreamstime') {
-          const navResult = await adapter.navigateToNext();
-          if (navResult?.done) {
-            break;
-          }
-        }
-      }
-
-      // End of Loop / Bulk Save (Triggers on completion or graceful stop)
-      const bulkSavePlatforms = ['adobestock', 'shutterstock', 'vecteezy', 'depositphotos', 'miricanvas'];
-      if (bulkSavePlatforms.includes(this.platformId) && processedCount > 0 && !signal.aborted) {
-        const saveLabel = this.isStopping ? 'Saving work...' : 'Saving all...';
-        logger.banner(
-          `${this.isStopping ? 'Stop requested. Triggering bulk save' : 'All assets processed. Triggering bulk save'} for ${this.platformId} (${processedCount} processed assets)...`
-        );
-        if (statusText) statusText.textContent = saveLabel;
-        await sleep(1000);
-        await adapter.bulkSave();
-        await sleep(1000);
-      }
-
-      if (this.isStopping || signal.aborted) {
-        logger.banner('Automation gracefully saved and stopped.');
-        this.isStopping = false;
-        this.isAutomationRunning = false;
-        this.updateAutomationUI(false);
-        if (statusText) statusText.textContent = 'Stopped';
+  /**
+   * Starts rotating HUD ticker between live progress and rotating donation variations.
+   */
+  startHudSupportTicker() {
+    if (this.hudSupportTickerInterval) return;
+    this.renderHudSupportTickerContent(false);
+    this.hudSupportTickerInterval = setInterval(() => {
+      if (this.hudSupportTickerPhase === 'progress') {
+        this.hudSupportTickerPhase = 'donate';
+        this.hudDonationVariantIndex = (this.hudDonationVariantIndex + 1) % HUD_DONATION_VARIANTS.length;
       } else {
-        logger.success('Automation completed successfully!');
-
-        // Completion status
-        if (progressFill) progressFill.style.width = '100%';
-        if (countText) countText.textContent = `Finished ${total} assets`;
-        this.lastCompletedAssetLabel = `Finished ${total} assets`;
-        if (badge) badge.classList.remove('rj-running');
-        if (statusText) statusText.textContent = 'Completed';
-        if (pillStatus) pillStatus.textContent = 'Finished';
-
-        const finishWait = this._completionWait ?? 3000;
-        await sleep(finishWait);
-        this.updateAutomationUI(false);
+        this.hudSupportTickerPhase = 'progress';
       }
-    } catch (err) {
-      if (err.message === 'ABORTED' || signal.aborted) {
-        logger.info('Automation stopped.');
-        this.isStopping = false;
-        this.isAutomationRunning = false;
-        this.updateAutomationUI(false);
-        if (statusText) statusText.textContent = 'Stopped';
-      } else {
-        logger.error('Automation error:', err);
-        this.isStopping = false;
-        this.isAutomationRunning = false;
-        this.updateAutomationUI(false);
-        if (statusText) statusText.textContent = 'Error: ' + (err.message || 'Failed');
-      }
-    } finally {
-      this.isStopping = false;
-      this.isCardProcessing = false;
-      this.abortController = null;
-      this.isAutomationRunning = false;
-      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-        chrome.storage.local.set({
-          rj_automation_state: {
-            isRunning: false,
-            platformId: this.platformId,
-            timestamp: Date.now()
-          }
-        });
+      this.renderHudSupportTickerContent(true);
+    }, 3500);
+  }
+
+  /**
+   * Stops HUD ticker and resets to progress phase.
+   */
+  stopHudSupportTicker() {
+    if (this.hudSupportTickerInterval) {
+      clearInterval(this.hudSupportTickerInterval);
+      this.hudSupportTickerInterval = null;
+    }
+    this.hudSupportTickerPhase = 'progress';
+    this.hudDonationVariantIndex = 0;
+    if (this.shadow) {
+      const btn = this.shadow.querySelector('#rjBtnHudSupportProgress');
+      if (btn?.classList) {
+        btn.classList.remove('rj-ticker-animating');
       }
     }
+  }
+
+  /**
+   * Updates progress text displayed by HUD support ticker.
+   * @param {string} text
+   */
+  updateHudSupportProgress(text) {
+    if (!text) return;
+    this.hudLatestProgressText = text;
+    if (this.hudSupportTickerPhase === 'progress' && this.shadow) {
+      const textEl = this.shadow.querySelector('#rjHudSupportProgressText');
+      const btn = this.shadow.querySelector('#rjBtnHudSupportProgress');
+      if (textEl) textEl.textContent = text;
+      if (btn) btn.title = `Progress: ${text} — Click to support development`;
+    }
+  }
+
+  /**
+   * Starts the batch automation sequence via AutomationOrchestrator.
+   * @param {number} [initialCount=0]
+   */
+  async startAutomation(initialCount = 0) {
+    return this.orchestrator.start(initialCount);
   }
 
   /**
@@ -1309,46 +1213,7 @@ export class OverlayHUD {
    * @param {boolean} [force=false]
    */
   stopAutomation(force = false) {
-    if (!this.isAutomationRunning && !this.isStopping) {
-      this.updateAutomationUI(false);
-      return;
-    }
-
-    const statusText = this.shadow?.querySelector('#rjAutomationStatusText');
-
-    if (this.isStopping || force) {
-      // Second click or forced stop: immediate hard abort
-      logger.warn('Force stop requested. Aborting immediately...');
-      if (this.abortController) {
-        this.abortController.abort();
-        this.abortController = null;
-      }
-      this.isStopping = false;
-      this.isCardProcessing = false;
-      this.isAutomationRunning = false;
-      this.updateAutomationUI(false);
-      if (statusText) statusText.textContent = 'Stopped';
-    } else {
-      // First click: graceful stop after active card finishes and saves
-      this.isStopping = true;
-      this.isAutomationRunning = false;
-      const btn = this.shadow?.querySelector('#rjBtnToggleAutomation');
-      const btnText = this.shadow?.querySelector('#rjAutomationBtnText');
-      if (btn) btn.title = 'Stopping automation (saving work)...';
-      if (btnText) btnText.textContent = 'Stopping...';
-      if (statusText) statusText.textContent = 'Stopping...';
-      logger.warn('Stop requested. Waiting for active card to finish then saving work...');
-    }
-
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      chrome.storage.local.set({
-        rj_automation_state: {
-          isRunning: false,
-          platformId: this.platformId,
-          timestamp: Date.now()
-        }
-      });
-    }
+    return this.orchestrator.stop(force);
   }
 
   /**
@@ -1357,14 +1222,19 @@ export class OverlayHUD {
   async syncFromStorage() {
     if (!this.shadow || typeof chrome === 'undefined' || !chrome.storage) return;
 
+    this.isSyncingFromStorage = true;
     return new Promise((resolve) => {
       const localStore = chrome.storage.local;
       const syncStore = chrome.storage.sync;
 
       const applyAndResolve = (config) => {
         this.currentConfig = config || {};
-        this._applyConfigToInputs(this.currentConfig);
-        this.updateStartButtonReadiness();
+        try {
+          this._applyConfigToInputs(this.currentConfig);
+          this.updateStartButtonReadiness();
+        } finally {
+          this.isSyncingFromStorage = false;
+        }
         resolve();
       };
 
@@ -1392,6 +1262,7 @@ export class OverlayHUD {
         return;
       }
 
+      this.isSyncingFromStorage = false;
       resolve();
     });
   }
@@ -1437,8 +1308,10 @@ export class OverlayHUD {
    * Debounced persistence of Quick Form inputs into chrome.storage.
    */
   saveFormStateToStorage() {
+    if (this.isSyncingFromStorage) return;
     if (this.saveDebounceTimer) clearTimeout(this.saveDebounceTimer);
     this.saveDebounceTimer = setTimeout(() => {
+      if (this.isSyncingFromStorage) return;
       if (typeof chrome === 'undefined' || !chrome.storage) return;
 
       const limits = PLATFORM_LIMITS[this.platformId] || { min: 8, max: 50 };
@@ -1480,8 +1353,8 @@ export class OverlayHUD {
                     }
                   });
                 }
-                syncStore.set(syncConfig, () => {});
-              } catch {}
+                syncStore.set(syncConfig, () => { });
+              } catch { }
             }
           });
         } else if (syncStore) {
@@ -1502,7 +1375,69 @@ export class OverlayHUD {
       }
       chrome.storage.local.get(['rj_automation_state'], (res) => {
         if (res && res.rj_automation_state) {
-          const isRunning = Boolean(res.rj_automation_state.isRunning);
+          const state = res.rj_automation_state;
+
+          // Exclusive lock check on page load: If another platform is actively running, lock this HUD
+          if (state.platformId && state.platformId !== this.platformId) {
+            if (state.isRunning || state.isStopping) {
+              this.setLockedByOtherPlatformUI(state.platformId);
+            }
+            resolve();
+            return;
+          }
+
+          const isRunning = Boolean(state.isRunning);
+          const isStopping = Boolean(state.isStopping || state.status === 'stopping');
+
+          // Cross-page continuation for Dreamstime:
+          // Dreamstime redirects/reloads between assets (/upload/edit?item_id=...).
+          // If the batch was running on Dreamstime and not stopping, maintain running UI
+          // and auto-resume orchestrator with the persisted processedCount after DOM settles.
+          const isDreamstimeContinuation = this.platformId === 'dreamstime' &&
+            state.platformId === 'dreamstime' &&
+            isRunning &&
+            !isStopping;
+
+          if (isDreamstimeContinuation) {
+            this.isAutomationRunning = true;
+            this.isStopping = false;
+            this.updateAutomationUI(true);
+            if (state.progressText) {
+              this.updateHudSupportProgress(state.progressText);
+            }
+            setTimeout(() => {
+              if (this.isAutomationRunning && !this.isStopping && !this.orchestrator?.isExecutionLoopActive) {
+                this.startAutomation(state.processedCount || 0);
+              }
+            }, 1000);
+            resolve();
+            return;
+          }
+
+          // Auto-heal on page mount: A newly mounted overlay instance on page reload is never
+          // actively stopping an old batch from a dead JS execution context.
+          if (isStopping || (isRunning && !this.orchestrator?.isProcessing)) {
+            this.isAutomationRunning = false;
+            this.isStopping = false;
+            this.updateAutomationUI(false);
+            chrome.storage.local.set({
+              rj_automation_state: {
+                isRunning: false,
+                isStopping: false,
+                status: 'idle',
+                platformId: this.platformId || null,
+                tabId: this.tabId || null,
+                progressText: '',
+                processedCount: 0,
+                timestamp: Date.now()
+              }
+            });
+            resolve();
+            return;
+          }
+
+          this.isAutomationRunning = isRunning;
+          this.isStopping = isStopping;
           this.updateAutomationUI(isRunning);
         }
         resolve();
@@ -1678,10 +1613,12 @@ export class OverlayHUD {
 
     // Trigger graceful entry animation based on active state
     if (this.isMinimized && this.pillEl) {
+      this.pillEl.classList.remove('rj-hidden');
       this.pillEl.classList.remove('rj-pill-exiting');
       this.pillEl.classList.add('rj-pill-entering');
       setTimeout(() => this.pillEl.classList.remove('rj-pill-entering'), 220);
     } else if (this.cardEl) {
+      this.cardEl.classList.remove('rj-hidden');
       this.cardEl.classList.remove('rj-anim-minimizing');
       this.cardEl.classList.add('rj-anim-expanding');
       setTimeout(() => this.cardEl.classList.remove('rj-anim-expanding'), 240);
@@ -1695,8 +1632,9 @@ export class OverlayHUD {
 
   /**
    * Hides the overlay HUD with exit animation.
+   * @param {boolean} [animate=true]
    */
-  hide() {
+  hide(animate = true) {
     if (!this.wrapper) return;
     this.isVisible = false;
 
@@ -1704,10 +1642,19 @@ export class OverlayHUD {
       chrome.storage.local.set({ rj_overlay_visible: false });
     }
 
+    if (!animate) {
+      this.wrapper.classList.add('rj-hidden');
+      if (this.isMinimized && this.pillEl) {
+        this.pillEl.classList.add('rj-hidden');
+      }
+      return;
+    }
+
     if (this.isMinimized && this.pillEl) {
       this.pillEl.classList.add('rj-pill-exiting');
       setTimeout(() => {
         this.wrapper.classList.add('rj-hidden');
+        this.pillEl.classList.add('rj-hidden');
         this.pillEl.classList.remove('rj-pill-exiting');
       }, 120);
     } else if (this.cardEl) {
@@ -1742,20 +1689,37 @@ export class OverlayHUD {
         return;
       }
 
-      chrome.storage.local.get(['rj_hud_pos'], (res) => {
+      chrome.storage.local.get(['rj_hud_pos', 'rj_overlay_visible'], (res) => {
         if (chrome.runtime.lastError) {
           logger.warn('Storage load error:', chrome.runtime.lastError);
           resolve();
           return;
         }
 
-        if (res && res.rj_hud_pos) {
-          const { top, left, isMinimized } = res.rj_hud_pos;
-          if (typeof left === 'number' && typeof top === 'number') {
-            this.clampAndSetPosition(left, top);
+        if (res) {
+          if (res.rj_hud_pos) {
+            const { top, left, isMinimized } = res.rj_hud_pos;
+            if (typeof left === 'number' && typeof top === 'number') {
+              this.clampAndSetPosition(left, top);
+            }
+            if (typeof isMinimized === 'boolean' && isMinimized) {
+              this.setMinimized(true, false, false);
+            }
           }
-          if (typeof isMinimized === 'boolean' && isMinimized) {
-            this.setMinimized(true, false, false);
+
+          if (res.rj_overlay_visible === false) {
+            this.isVisible = false;
+            if (this.wrapper) {
+              this.wrapper.classList.add('rj-hidden');
+            }
+            if (this.isMinimized && this.pillEl) {
+              this.pillEl.classList.add('rj-hidden');
+            }
+          } else {
+            this.isVisible = true;
+            if (this.wrapper) {
+              this.wrapper.classList.remove('rj-hidden');
+            }
           }
         }
         resolve();

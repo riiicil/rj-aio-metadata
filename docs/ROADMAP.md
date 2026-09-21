@@ -17,9 +17,9 @@ gantt
     section Phase 3
     Universal Vision API Engine   :done, 2026-09-07, 2d
     section Phase 4
-    Platform Adapters (7 Sites)   :active, 2026-09-09, 2d
+    Platform Adapters (7 Sites)   :done, 2026-09-09, 4d
     section Phase 5
-    E2E Automation & Release      :2026-09-11, 1d
+    E2E Hardening & Release       :done, 2026-09-13, 5d
 ```
 
 ---
@@ -41,7 +41,8 @@ gantt
 - [x] Implement `src/background/service_worker.js` with dynamic model fetcher (`/v1/models`), Google Gemini query auth, active tab routing, and overlay toggle relay.
 - [x] Build Platform-Adaptive Toolbar Popup UI (`src/popup/popup.html`, `popup.css`, `popup.js`, `src/styles/components.css`):
   - Active platform selector with real-time match indicator (Green check vs Red mismatch + navigation helper link).
-  - API provider configuration (Gemini, Groq, Mistral, OpenAI, OpenRouter, Custom) + API Key password toggle & `.txt` file import.
+  - API provider configuration (Gemini, Mistral, OpenAI, OpenRouter, Custom) + API Key password toggle & `.txt` file import.
+
   - Model dropdown + dynamic model fetching with refresh rotation animation and active model selection guard.
   - Universal settings: Keyword count stepper with platform limit boundaries + Specific custom keywords (index 0 priority).
   - 100% modular platform-dynamic settings for Adobe Stock, Shutterstock, Dreamstime, Vecteezy, Freepik, Depositphotos (with 237 countries catalog), MiriCanvas.
@@ -96,22 +97,35 @@ gantt
 
 ---
 
-### Phase 4: Platform Adapters Implementation (7 Platforms) `[NEXT]`
-- [ ] Create `src/adapters/BaseAdapter.js` abstract interface.
-- [ ] **Tier 1 Adapters**:
-  - `AdobeStockAdapter.js` (React Spectrum value setter, 21 categories).
-  - `ShutterstockAdapter.js` (Material-UI selectors, Image vs Video categories, spelling warnings auto-approval).
-  - `FreepikAdapter.js` (Mandatory save draft loop per asset, AI base models).
-- [ ] **Tier 2 Adapters**:
-  - `VecteezyAdapter.js` (Automatic filetype category, prohibited terms handling, AI 'Other' model input).
-  - `DreamstimeAdapter.js` (15 Main / 182 Subcategories tree, Mode A vs Mode B loop).
-  - `DepositphotosAdapter.js` (160 items/page paginator, raw tag paste trigger, editorial country/city AJAX).
-  - `MiriCanvasAdapter.js` (1,000 items/page batching, ContentType & Tier radios).
-- [ ] Implement `src/adapters/index.js` adapter registry & auto-router.
+### Phase 4: Platform Adapters Implementation (7 Platforms) `[COMPLETE]`
+- [x] Create `src/adapters/BaseAdapter.js` abstract interface & `src/adapters/utils/dom_helpers.js` utilities.
+- [x] **Tier 1 Adapters**:
+  - `AdobeStockAdapter.js` (React Spectrum prototype value setter, 21 category IDs, AI declaration, releases switch, bulk save).
+  - `ShutterstockAdapter.js` (Material-UI selectors, Photo 26 / Video 19 categories, spelling warnings auto-approval, bulk save).
+  - `FreepikAdapter.js` (Rebranded contributor/magnific support, fake card filtering, 47 base models, mandatory per-item save draft loop).
+- [x] **Tier 2 Adapters**:
+  - `VecteezyAdapter.js` (Right-panel scoping, automatic filetype category, prohibited terms handling, AI 'Other' model input, bulk save).
+  - `DreamstimeAdapter.js` (15 Main / 182 Subcategories tree, AJAX option wait, single-word tag splitting, RF vs ED licenses, cross-page carousel loop).
+  - `DepositphotosAdapter.js` (Modern itemeditor virtualized cards, scoped queries, 160 items/page, raw tag paste trigger, editorial country/city AJAX).
+  - `MiriCanvasAdapter.js` (1,000 items/page batching, ContentTier, AI checkbox, reactive per-chip removal engine, bulk save).
+- [x] Implement `src/adapters/index.js` adapter auto-registry & platform routing utilities.
 
 ---
 
-### Phase 5: End-to-End Batch Automation, Auto-Save, and Release
-- [ ] End-to-end integration testing across all 7 contributor platforms.
-- [ ] Batch automation orchestrator: Sequential asset processing with customizable delay intervals.
-- [ ] Package extension release and final documentation wrap-up.
+### Phase 5: End-to-End Hardening, Polish, and Release Packaging `[COMPLETE]`
+- [x] **Sub-phase 5.1 (Overlay Lifecycle & Discovery)**: Persisted overlay visibility across navigations via `rj_overlay_visible`, deleted obsolete stub files, unified platform detection.
+- [x] **Sub-phase 5.2 (Automation State Synchronization)**: Standardized `rj_automation_state` schema across storage, popup, and HUD; two-click graceful stop and force abort mechanics.
+- [x] **Sub-phase 5.3 (Popup Real-Time Auto-Save)**: Debounced (300ms) text inputs and immediate switches/steppers auto-save with bidirectional storage sync.
+- [x] **Sub-phase 5.4 (UI Precision & Styling Polish)**: Logo asset compression to ~60 KB, Emerald Teal active button alignment, pill spinner, and badge tooltip clamping.
+- [x] **Sub-phase 5.5 (Popup Modularization)**: Extracted all 7 platform HTML dynamic generators into `src/popup/platform_forms.js`.
+- [x] **Sub-phase 5.6 (Overlay Modularization)**: Extracted batch execution loops and graceful stop coordination into `src/overlay/AutomationOrchestrator.js`.
+- [x] **Sub-phase 5.7 (Hardening, Resilience & Release Packaging)**:
+  - Multi-tab automation state isolation and auto-heal stabilization.
+  - Exclusive Single-Runner Automation Concurrency Lock across all platform tabs and popup.
+  - Dynamic Progress & Support Ticker with 5 rotating donation variants and smooth animations.
+  - Dreamstime cross-page navigation continuation and auto-heal exception.
+  - 100% Multi-Language Resilience: Structural DOM selectors without English text dependencies.
+  - Shutterstock precision spelling approval button targeting preventing keyword overflow past 50.
+  - Bundle-first production obfuscation pipeline (`build.js`, `obfuscator.config.js`) packaging into `dist/LOAD THIS FOLDER/` and `releases/v0.1.0.zip`.
+  - Comprehensive documentation suite synchronization and release readiness validation.
+
