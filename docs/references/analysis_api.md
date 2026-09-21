@@ -9,7 +9,7 @@
 This document validates the Base URL configurations, models, and parameters based on **Official Developer Docs** from each AI provider combined with **live empirical request testing**:
 
 1. **Universal OpenAI Compatibility Standard**:
-   All major providers (Google Gemini, Mistral AI, Groq, OpenRouter, and OpenAI) officially provide REST API interfaces compatible with the OpenAI schema (`/v1/chat/completions` and `/v1/models`). The extension only requires a single universal HTTP client.
+   All supported providers (Google Gemini, Mistral AI, OpenAI, OpenRouter, and Custom Endpoints) officially provide REST API interfaces compatible with the OpenAI schema (`/v1/chat/completions` and `/v1/models`). The extension uses a single universal HTTP client with 5 configured presets in `StorageService.js`.
 
 2. **Full Dynamic Model Fetching (`GET /models`)**:
    Per official specifications, the `/models` endpoint provides the live catalog of active models. The extension does not need artificial client-side filtering; all returned models will be displayed as-is in the dropdown options.
@@ -25,16 +25,14 @@ This document validates the Base URL configurations, models, and parameters base
 
 | Provider | Official Base URL (OpenAI-Compat) | Models Endpoint | Chat Completions Endpoint | Authentication | Official Documentation |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **OpenRouter** | `https://openrouter.ai/api/v1` | `GET /models` | `POST /chat/completions` | `Bearer <KEY>` | [OpenRouter API Reference](https://openrouter.ai/docs/api-reference) |
-| **OpenAI** | `https://api.openai.com/v1` | `GET /models` | `POST /chat/completions` | `Bearer <KEY>` | [OpenAI API Docs](https://platform.openai.com/docs/api-reference) |
-| **Google Gemini** | `https://generativelanguage.googleapis.com/v1beta/openai` | `GET /models` | `POST /chat/completions` | `Bearer <KEY>` | [Gemini OpenAI Compatibility Guide](https://ai.google.dev/gemini-api/docs/openai) |
-| **Groq** | `https://api.groq.com/openai/v1` | `GET /models` | `POST /chat/completions` | `Bearer <KEY>` | [Groq API & OpenAI Guide](https://console.groq.com/docs/openai) |
+| **Google Gemini** | `https://generativelanguage.googleapis.com/v1beta/openai` | `GET /models` | `POST /chat/completions` | `Bearer <KEY>` / `?key=<KEY>` | [Gemini OpenAI Compatibility Guide](https://ai.google.dev/gemini-api/docs/openai) |
 | **Mistral AI** | `https://api.mistral.ai/v1` | `GET /models` | `POST /chat/completions` | `Bearer <KEY>` | [Mistral API & Vision Docs](https://docs.mistral.ai/capabilities/vision/) |
-| **Ollama (Local AI)** | `http://localhost:11434/v1` | `GET /models` | `POST /chat/completions` | *Optional* | [Ollama OpenAI Compatibility](https://github.com/ollama/ollama/blob/main/docs/openai.md) |
-| **LM Studio (Local)** | `http://localhost:1234/v1` | `GET /models` | `POST /chat/completions` | *Optional* | [LM Studio Local Server Docs](https://lmstudio.ai/docs) |
-| **Custom / Sniffox Proxy** | `https://<domain>/v1` | `GET /models` | `POST /chat/completions` | `Bearer <KEY>` | Follows standard OpenAI API spec |
+| **OpenAI** | `https://api.openai.com/v1` | `GET /models` | `POST /chat/completions` | `Bearer <KEY>` | [OpenAI API Docs](https://platform.openai.com/docs/api-reference) |
+| **OpenRouter** | `https://openrouter.ai/api/v1` | `GET /models` | `POST /chat/completions` | `Bearer <KEY>` | [OpenRouter API Reference](https://openrouter.ai/docs/api-reference) |
+| **Custom Endpoint** | `https://<domain>/v1` (User-specified) | `GET /models` | `POST /chat/completions` | `Bearer <KEY>` | Standard OpenAI API spec |
 
 ---
+
 
 ## 3. Vision Model Landscape & Cost-Effective Recommendations
 
@@ -67,19 +65,20 @@ For microstock workflows (mass processing of dozens to hundreds of image files),
 - **Official Parameter Rules**:
   - Supports `temperature: 0.0 - 1.0` and multimodal message format `{ type: "image_url", image_url: { url: "..." } }`.
 
-### D. Groq
+### D. OpenRouter (Multi-Provider Catalog)
 - **Primary Recommendations**:
-  - `llama-3.2-11b-vision-preview` / active Llama multimodal variants on Groq LPU endpoints.
+  - `google/gemini-2.5-flash`, `google/gemini-2.5-flash-lite`, `meta-llama/llama-3.2-11b-vision-instruct`.
+  - Free tier models denoted by `:free` (e.g. `meta-llama/llama-3.2-11b-vision-instruct:free`).
 - **Official Parameter Rules**:
-  - Maximum recommended Base64 payload up to ~4MB.
-  - Ultra-high hardware LPU inference speed (hundreds of tokens per second).
+  - Requires `HTTP-Referer` and `X-Title` headers (natively handled by service worker).
+  - Preserves vendor prefix format (e.g. `google/...`, `openai/...`, `meta-llama/...`).
 
-### E. OpenRouter (Multi-Provider Catalog)
+### E. Custom OpenAI-Compatible Endpoints
 - **Primary Recommendations**:
-  - `google/gemini-3.7-flash`, `deepseek/deepseek-v4-flash-vision-exp`, `qwen/qwen3.8-flash`.
-  - Free tier models denoted by `:free` (e.g. `inclusionai/ling-3.0-flash-fin:free`, `nvidia/nemotron-3.5-lightning:free`).
+  - Any proxy, gateway, or third-party endpoint implementing the standard OpenAI `/chat/completions` API schema with multimodal vision support.
 - **Official Parameter Rules**:
-  - Recommended optional headers: `HTTP-Referer` and `X-Title`.
+  - User specifies custom `baseUrl` (e.g. `https://my-proxy.domain/v1`).
+  - Standard multimodal message payload structure (`image_url` with base64 Data URL).
 
 ---
 

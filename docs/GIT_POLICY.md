@@ -82,3 +82,45 @@ Never stage or commit:
 - `*.log`
 - `node_modules/` or `dist/`
 - Unpackaged private keys (`*.key`, `*.pem`)
+
+---
+
+## 6. Release & Versioning Policy
+
+The project strictly follows **Semantic Versioning 2.0.0 (SemVer)**:
+
+$$\mathbf{vX.Y.Z} \quad (\text{MAJOR}.\text{MINOR}.\text{PATCH})$$
+
+### A. Version Increment Rules
+- **MAJOR (`X.0.0`)**: Incompatible API changes, major architectural redesigns, or breaking storage migrations (e.g., manifest standard upgrades, radical configuration format redesign).
+- **MINOR (`0.X.0`)**: Backwards-compatible new features (e.g., adding a new platform adapter, integrating a new AI vision provider, new UI panels).
+- **PATCH (`0.0.X`)**: Backwards-compatible bug fixes, DOM selector adjustments for microstock portal updates, performance optimizations, or documentation fixes.
+
+### B. Version Synchronization
+Whenever a release is prepared, the version number **must be strictly synchronized across three files**:
+1. `src/manifest.json`: `"version": "X.Y.Z"` (Chromium Manifest V3 standard requires pure integer dot notation without the 'v' prefix).
+2. `package.json`: `"version": "X.Y.Z"`.
+3. `CHANGELOG.md`: `## [X.Y.Z] - YYYY-MM-DD`.
+
+### C. Release Tagging & Merge Sequence
+1. Ensure all tests pass and documentation is synchronized on the working branch.
+2. Run `node build.js` to create production artifacts in `dist/LOAD THIS FOLDER/` and `releases/vX.Y.Z.zip`.
+3. Merge the feature/hardening branch into `dev` using non-fast-forward:
+   ```bash
+   git checkout dev
+   git merge --no-ff task/<branch-name> -m "merge branch 'task/<branch-name>' into dev"
+   ```
+4. Merge `dev` into `main` for the official release:
+   ```bash
+   git checkout main
+   git merge --no-ff dev -m "chore(release): vX.Y.Z"
+   ```
+5. Create an annotated Git tag matching the version:
+   ```bash
+   git tag -a vX.Y.Z -m "Release vX.Y.Z"
+   ```
+6. Push branches and tags to the remote repository only upon explicit user instruction:
+   ```bash
+   git push origin main dev --tags
+   ```
+

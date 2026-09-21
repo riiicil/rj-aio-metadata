@@ -24,3 +24,12 @@ Thumbs.db
 node_modules/
 dist/
 build/
+releases/
+v*/
+*.zip
+
+# Local build tooling & lockfiles
+package-lock.json
+build.js
+package.json
+obfuscator.config.js

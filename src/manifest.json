@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "RJ AIO Metadata — Microstock AI Assistant",
+  "name": "RJ AIO Metadata",
   "version": "0.1.0",
-  "description": "All-in-one AI metadata generator and auto-fill assistant for microstock contributor dashboards.",
+  "description": "All-in-one AI metadata generator and auto-fill assistant for microstock contributors.",
   "permissions": [
     "storage",
     "activeTab",
@@ -14,30 +14,46 @@
     "*://*.dreamstime.com/*",
     "*://*.vecteezy.com/*",
     "*://*.freepik.com/*",
+    "*://*.magnific.com/*",
     "*://*.depositphotos.com/*",
     "*://*.miricanvas.com/*",
+    "http://*/*",
     "https://*/*",
     "http://localhost:*/*"
   ],
   "background": {
-    "service_worker": "background/service_worker.js"
+    "service_worker": "background/service_worker.js",
+    "type": "module"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "RJ AIO Metadata Assistant"
+    "default_title": "RJ AIO Metadata",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "content_scripts": [
     {
       "matches": [
-        "*://contributor.stock.adobe.com/*",
-        "*://submit.shutterstock.com/*",
+        "*://*.stock.adobe.com/*",
+        "*://*.shutterstock.com/*",
         "*://*.dreamstime.com/*",
-        "*://contributors.vecteezy.com/*",
-        "*://contributor.freepik.com/*",
+        "*://*.vecteezy.com/*",
+        "*://*.freepik.com/*",
+        "*://*.magnific.com/*",
         "*://*.depositphotos.com/*",
-        "*://designhub.miricanvas.com/*"
+        "*://*.miricanvas.com/*"
       ],
-      "js": ["content/content_main.js"],
+      "js": [
+        "content/content_main.js"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -45,10 +61,13 @@
     {
       "resources": [
         "overlay/*",
-        "styles/*"
+        "styles/*",
+        "icons/*",
+        "services/*",
+        "adapters/*"
       ],
       "matches": [
-        "*://*/*"
+        "<all_urls>"
       ]
     }
   ]
