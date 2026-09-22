@@ -14,7 +14,7 @@
 - **Phase 3 — Universal Vision Service**: [COMPLETE] (Step 3.1 Prompt Engine, Step 3.2 Sanitizer Engine, Step 3.3 Universal Vision Client & Background Proxy Worker complete, merged to dev)
 - **Phase 4 — Platform Adapters**: [COMPLETE] (Platform adapters and live alignment verified across all 7 platforms: Adobe Stock, Shutterstock, Freepik / Magnific, Vecteezy, Dreamstime, Depositphotos, and MiriCanvas merged to dev)
 - **Phase 5 — End-to-End Testing & Polish**: [COMPLETE] (100% multi-language resilience without English text dependencies across all 7 platforms; Shutterstock precision spelling approval fix; Dreamstime cross-page continuation; Exclusive single-runner automation concurrency lock & multi-tab isolation; Real-time popup auto-save; Dynamic support & progress ticker; Modularized AutomationOrchestrator.js and platform_forms.js; Bundle-first production obfuscation pipeline generating `dist/LOAD THIS FOLDER/` and `releases/v0.1.0.zip`; Documentation suite and CHANGELOG.md fully synchronized)
-- **Post-v0.1.0 Maintenance**: [IN_PROGRESS] (v0.1.1 patch adding missing `Authorization: Bearer` header for Google Gemini's OpenAI-compatible endpoint)
+- **Post-v0.1.0 Maintenance**: [COMPLETE] (v0.1.1 patch: added missing `Authorization: Bearer` header for Google Gemini's OpenAI-compatible endpoint in `service_worker.js`, and synchronized toolbar popup Start button readiness with AI provider credentials/models in `popup.js`)
 
 
 ---
@@ -25,7 +25,7 @@
 | :--- | :--- | :--- |
 | `main` | Clean (1 empty commit) | Stable production releases only |
 | `dev` | Integration (Phase 0-5 merged) | Active development integration branch |
-| `task/fix-gemini-auth-header` | Active | Version 0.1.1: Fix Google Gemini OpenAI endpoint Authorization header |
+| `task/fix-gemini-auth-header` | Active | Version 0.1.1: Fix Google Gemini OpenAI endpoint Authorization header & sync popup start button readiness |
 | `task/e2e-hardening-polish` | Historical | Phase 5: End-to-End Hardening & Polish (v0.1.0 release preparation) |
 
 ---

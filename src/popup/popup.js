@@ -768,9 +768,14 @@ function isCurrentProviderReady() {
   const provider = currentConfig.providers ? currentConfig.providers[activeProvId] : null;
   if (!provider) return false;
 
-  const rawKey = (apiKeyInput ? apiKeyInput.value.trim() : '') || provider.apiKey || '';
+  if (activeProvId === 'custom') {
+    const customUrl = baseUrlInput ? baseUrlInput.value.trim() : (provider.baseUrl || '');
+    if (!customUrl) return false;
+  }
+
+  const rawKey = apiKeyInput ? apiKeyInput.value.trim() : (provider.apiKey || '');
   const keys = StorageService.parseApiKeys(rawKey);
-  const selectedModel = (modelSelect ? modelSelect.value : '') || provider.selectedModel || '';
+  const selectedModel = (modelSelect && !modelSelect.disabled ? modelSelect.value : '') || provider.selectedModel || '';
 
   return keys.length > 0 && Boolean(selectedModel) && (modelSelect ? !modelSelect.disabled : true);
 }
@@ -976,8 +981,14 @@ function updateAutomationButtonUI(state) {
     }
     btnToggleAutomation.classList.remove('rj-btn-danger', 'rj-btn-running', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
     btnToggleAutomation.classList.add('rj-btn-accent');
-    btnToggleAutomation.disabled = false;
-    btnToggleAutomation.title = 'Start Automation';
+
+    const ready = isCurrentProviderReady();
+    btnToggleAutomation.disabled = !ready;
+    btnToggleAutomation.title = ready ? 'Start Automation' : 'Please input API key and select an AI model first';
+    if (!ready) {
+      btnToggleAutomation.classList.add('rj-btn-disabled');
+    }
+
     if (automationBtnText) automationBtnText.textContent = 'Start Automation';
     if (automationIcon) {
       automationIcon.innerHTML = `<polygon points="5 3 19 12 5 21 5 3"></polygon>`;
@@ -1206,6 +1217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const parsed = StorageService.parseApiKeys(rawKeys);
         showToast(`Imported ${parsed.length} API key(s) from file`);
         await autoSaveConfig(true);
+        updateAutomationButtonUI(isAutomationRunning);
       } catch (err) {
         showToast(`Failed to read key: ${err.message}`, true);
       }
@@ -1242,6 +1254,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateModelDropdownState(currentConfig.providers[activeProvId]);
         showToast(`Fetched ${response.models.length} models successfully`);
         autoSaveConfig(true);
+        updateAutomationButtonUI(isAutomationRunning);
       } else {
         showToast(response?.error || 'Failed to fetch models', true);
       }
@@ -1263,10 +1276,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Event: Start / Stop Automation Toggle
   btnToggleAutomation.addEventListener('click', () => {
-    if (btnToggleAutomation.disabled || btnToggleAutomation.classList.contains('rj-btn-locked')) return;
+    if (btnToggleAutomation.disabled || btnToggleAutomation.classList.contains('rj-btn-locked') || btnToggleAutomation.classList.contains('rj-btn-disabled')) return;
     if (isStopping) {
       autoHealAutomationState();
       showToast('Automation reset to idle');
+      return;
+    }
+
+    if (!isAutomationRunning && !isCurrentProviderReady()) {
+      showToast('Please input API key and select an AI model first', true);
       return;
     }
 
@@ -1366,6 +1384,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
           isSyncingFromStorage = false;
         }
+        updateAutomationButtonUI(isAutomationRunning);
       }
       // 3. Sync overlay HUD visibility changes from page
       if (changes.rj_overlay_visible) {
@@ -1399,6 +1418,8 @@ export {
   renderPlatformDynamicForm,
   isAutomationRunning,
   isStopping,
+  isCurrentProviderReady,
+  currentConfig,
   autoSaveConfig,
   saveCurrentSettings,
   saveActiveFormStateToMemory,
