@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 -
 
+## [0.1.1] - 2026-09-22
+
+### Fixed
+- **Google Gemini OpenAI Endpoint Authorization**: Added required `Authorization: Bearer <API_KEY>` header to `buildProviderRequestParams` in `src/background/service_worker.js`. Previously, Google Gemini requests only transmitted `x-goog-api-key` and query param `?key=...`, causing Google's OpenAI-compatible endpoint (`/v1beta/openai/chat/completions`) to reject requests with `400 Bad Request: Missing or invalid Authorization header`.
+- **Toolbar Popup Start Button Readiness Synchronization**: Restored AI provider credentials and model selection validation (`isCurrentProviderReady`) in `src/popup/popup.js`. Previously, the idle branch in `updateAutomationButtonUI` unconditionally set `disabled = false`, causing the toolbar start button to appear active and clickable on fresh installations before entering an API key or fetching models, whereas the in-page overlay HUD correctly stayed disabled. Connected automatic button readiness re-evaluation across model fetching, file key imports, input typing, and storage synchronization.
+
 ## [0.1.0] - 2026-09-17
 
 ### Added

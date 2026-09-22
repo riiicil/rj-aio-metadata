@@ -173,6 +173,7 @@ export function buildProviderRequestParams({ provider, activeKey, payload }) {
 
   if (isGemini) {
     endpointUrl += `${endpointUrl.includes('?') ? '&' : '?'}key=${encodeURIComponent(activeKey)}`;
+    headers['Authorization'] = `Bearer ${activeKey}`;
     headers['x-goog-api-key'] = activeKey;
     if (payload && typeof payload.model === 'string') {
       // Gemini's OpenAI /chat/completions endpoint expects model name without 'models/' prefix
