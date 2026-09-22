@@ -5,18 +5,28 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Phase 5 Complete / Ready for v0.1.0 Release
-- **Active Branch**: `task/e2e-hardening-polish`
-- **Latest Commit**: `d7ba885` (`docs(repo): synchronize release documentation, changelog, and roadmap for v0.1.0`)
-- **Working Tree**: Clean, all documentation and build artifacts synchronized
-- **Build / Test State**: Verified healthy (`node build.js` generates `dist/LOAD THIS FOLDER/` & `releases/v0.1.0.zip` (1.22 MB), 11/11 multi-language resilience suite, 500+ test assertions passed, zero native emoji clean)
-
+- **Current Milestone**: Version 0.1.1 Maintenance Patch / Gemini Auth & Popup Readiness Fixes
+- **Active Branch**: `task/fix-gemini-auth-header`
+- **Latest Commit**: `2c0992d` (`fix(popup): sync start button readiness with ai provider and overlay hud`)
+- **Working Tree**: Clean (on branch `task/fix-gemini-auth-header`)
+- **Build / Test State**: Verified healthy (4/4 popup readiness tests passed, 88/88 adapter tests passed, 4/4 lock tests passed, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **Shutterstock Spelling Approval Precision Targeting & Keyword Overflow Prevention (`ShutterstockAdapter.js`)**:
+0. **Toolbar Popup Start Button Readiness & HUD Synchronization (`popup.js`)**:
+   - **Discrepancy Diagnosed**: Investigated issue where the Toolbar Popup's "Start Automation" button was enabled immediately upon fresh installation, even when no API key or model was configured, whereas the In-Page Overlay HUD correctly kept the Start button disabled.
+   - **Root Cause**: Identified regression originating from commit `6aaf749` where the call to `isCurrentProviderReady()` inside `updateAutomationButtonUI` in `src/popup/popup.js` was accidentally replaced with a hardcoded `btnToggleAutomation.disabled = false;`.
+   - **Enforced Provider Readiness in Toolbar Popup**: Re-connected `isCurrentProviderReady()` into `updateAutomationButtonUI` in `src/popup/popup.js`, setting `btnToggleAutomation.disabled = !ready`, toggling `.rj-btn-disabled` class, and updating title. Connected dynamic re-evaluation upon model fetching (`btnFetchModels`), file import (`apiKeyFileInput`), and storage sync (`chrome.storage.onChanged`), plus added defense-in-depth guard in click handler.
+   - **Verification**: Verified 4/4 lifecycle assertions with `scratch/test_popup_readiness.mjs` and all regression test suites.
+
+00. **Google Gemini OpenAI Endpoint Authorization Header Fix (`service_worker.js`) & Version 0.1.1 Bump**:
+   - **Root Cause Diagnosed**: Investigated console log errors from `bahan/log_console_shutterstock.md` (lines 209-224, 519-530) and `bahan/log_console_adobestock.md`: `API Error (API_REQUEST_FAILED): Provider API error (400): [{"error": {"code": 400, "message": "Missing or invalid Authorization header.", "status": "INVALID_ARGUMENT"}}]`.
+   - **Fix Applied**: In `src/background/service_worker.js:buildProviderRequestParams`, added `headers['Authorization'] = `Bearer ${activeKey}`;` to the `if (isGemini)` branch. Google's `/v1beta/openai/chat/completions` endpoint strictly validates standard OpenAI authentication headers; omitting it triggered HTTP 400 rejection.
+   - **Version 0.1.1 Synchronized**: Version bumped to 0.1.1 across `src/manifest.json`, `package.json`, and `CHANGELOG.md` per `docs/GIT_POLICY.md` Section 6.
+
+00. **Shutterstock Spelling Approval Precision Targeting & Keyword Overflow Prevention (`ShutterstockAdapter.js`)**:
    - **User Diagnostic Demonstration (`rekaman-shutterstock-20260917_034756.json`)**: User provided a manual recording demonstrating exact click on `"Mark all keywords as correct"` inside `div[data-testid="keyword-input"] > div:nth-of-type(3) > button[data-testid="button"]`.
    - **Keyword Overflow Bug Diagnosed (`rekaman-shutterstock-20260917_034439.json`)**: An overly broad container query in previous commit matched and clicked `button[data-testid="add-all-button"]` (Shutterstock's suggested keywords block), which added extra suggested tags causing keywords to overflow past 50 (to 64/50 and 65/50).
    - **Clean Rollback & Precision Fix**: Rolled back working tree to `256fe01`. Updated `approveSpellingWarnings` to specifically target `div[data-testid="keyword-input"]` searching for text `"mark all keywords as correct"` or `"mark all as correct"`, while explicitly excluding `add-all-button`, `more-keyword-actions-button`, and any `role="tab"` or `tab-*`.
@@ -282,6 +292,8 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 59 | 2026-09-22 | `task/fix-gemini-auth-header` | `2c0992d` | Enforced provider readiness validation (isCurrentProviderReady) on toolbar popup Start button with disabled styling, tooltips, and dynamic re-evaluation across models/keys/storage to sync 1:1 with Overlay HUD | Review & merge task/fix-gemini-auth-header to dev, build v0.1.1 |
+| 58 | 2026-09-22 | `task/fix-gemini-auth-header` | `96df8a5` | Added missing Authorization: Bearer header for Google Gemini OpenAI endpoint in service_worker.js, bumped version to 0.1.1 across manifest.json, package.json, and CHANGELOG.md | Popup start button readiness sync & release verification |
 | 57 | 2026-09-17 | `task/e2e-hardening-polish` | `d7ba885` | Comprehensive documentation suite synchronization (README badges/diagram, CHANGELOG Keep-a-Changelog v0.1.0, ARCHITECTURE, DECISIONS ADR-008..013, GIT_POLICY SemVer, DOCS_STYLE template, CURRENT_STATE, HANDOFF), refreshed release archive | Merge task/e2e-hardening-polish into dev & main, tag v0.1.0 |
 
 | 56 | 2026-09-17 | `task/e2e-hardening-polish` | `0e02008` | Precision target Shutterstock spelling warnings button in div[data-testid="keyword-input"] excluding add-all-button and tabs, preventing keyword overflow past 50; updated build.js with LOAD THIS FOLDER subfolder and URL files | Documentation & Release Sync |
