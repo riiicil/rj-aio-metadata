@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 -
 
+## [0.1.1] - 2026-09-22
+
+### Fixed
+- **Google Gemini OpenAI Endpoint Authorization**: Added required `Authorization: Bearer <API_KEY>` header to `buildProviderRequestParams` in `src/background/service_worker.js`. Previously, Google Gemini requests only transmitted `x-goog-api-key` and query param `?key=...`, causing Google's OpenAI-compatible endpoint (`/v1beta/openai/chat/completions`) to reject requests with `400 Bad Request: Missing or invalid Authorization header`.
+
 ## [0.1.0] - 2026-09-17
 
 ### Added

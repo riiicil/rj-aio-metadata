@@ -1,7 +1,7 @@
 # RJ AIO Metadata Extension
 
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-57c1ff?style=flat-square)
-![Version](https://img.shields.io/badge/version-0.1.0-59d499?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.1.1-59d499?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-242728?style=flat-square)
 ![Supported Platforms](https://img.shields.io/badge/platforms-7%20supported-079183?style=flat-square)
 ![Design System](https://img.shields.io/badge/design-Raycast%20Dark-07080a?style=flat-square)
@@ -47,7 +47,7 @@ flowchart LR
 
 ### Option A: End-User Installation (Recommended)
 
-1. Download the latest release archive (`v0.1.0.zip`) from [GitHub Releases](https://github.com/riiicil/rj-aio-metadata/releases).
+1. Download the latest release archive (`v0.1.1.zip`) from [GitHub Releases](https://github.com/riiicil/rj-aio-metadata/releases).
 2. Extract the ZIP file on your computer.
 3. Open your Chromium browser (Chrome / Edge / Brave) and navigate to `chrome://extensions/`.
 4. Enable **Developer mode** toggle in the top right corner.
