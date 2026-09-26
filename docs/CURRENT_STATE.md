@@ -137,17 +137,12 @@
 - Synchronization & Depositphotos locale suite verified with `scratch/test_sync_and_depositphotos_locale.mjs` (11/11 localized URL match cases, tab match Start button readiness transitions, exclusive lock triggers, and storage sync passes).
 - Syntax validation passed for `src/background/service_worker.js`, `src/overlay/AutomationOrchestrator.js`, `src/overlay/overlay.js`, `src/popup/popup.js`, `src/popup/platform_forms.js`, `src/content/content_main.js`, `src/services/AiPrompt.js`, `src/services/SanitizerService.js`, `src/adapters/ShutterstockAdapter.js`, `src/adapters/DreamstimeAdapter.js`, and `src/adapters/index.js` via `node --check`.
 - Zero Native Emoji Policy strictly enforced across all files, code, and documentation.
-- Version 0.1.1 synchronization verified across `src/manifest.json`, `package.json`, and `CHANGELOG.md`.
+- Version 0.1.2 synchronization verified across `src/manifest.json`, `package.json`, `package-lock.json`, `src/popup/popup.html`, `build.js`, `README.md`, and `CHANGELOG.md`.
 
 ---
 
 ## 7. Immediate Next Step
 
-1. Commit changes on `task/multilingual-fixes`:
-   ```bash
-   git add src/adapters/DreamstimeAdapter.js src/adapters/ShutterstockAdapter.js src/overlay/AutomationOrchestrator.js src/services/AiPrompt.js src/services/SanitizerService.js CHANGELOG.md docs/
-   git commit -m "feat(adapters): expand limits, implement two-tier saving, and resolve multilingual categories"
-   ```
-2. Present complete summary of Issues 1-5 resolution to the user for review.
-3. Await user confirmation before merging `task/multilingual-fixes` into `dev`.
+1. Complete verification and present summary to user.
+2. Await user confirmation before merging `task/multilingual-fixes` into `dev` or building release assets.
 

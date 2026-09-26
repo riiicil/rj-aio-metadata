@@ -109,6 +109,8 @@ Whenever a release is prepared, the version number **must be strictly synchroniz
    ```bash
    git checkout dev
    git merge --no-ff task/<branch-name> -m "merge branch 'task/<branch-name>' into dev"
+   git push origin dev
+   git branch -d task/<branch-name>
    ```
 4. Merge `dev` into `main` for the official release:
    ```bash

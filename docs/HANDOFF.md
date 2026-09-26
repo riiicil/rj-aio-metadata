@@ -5,11 +5,11 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Multi-Language Architecture & Platform Hardening (Issues 1-5)
+- **Current Milestone**: Version 0.1.2 Bump & Platform Hardening (Issues 1-5 Complete)
 - **Active Branch**: `task/multilingual-fixes`
-- **Latest Commit**: `fb930cd` (`fix(popup): sync start button tab match and depositphotos locale urls`)
+- **Latest Commit**: `7f85388` (`chore(release): bump version to 0.1.2 across extension and docs`)
 - **Working Tree**: Clean (on branch `task/multilingual-fixes`)
-- **Build / Test State**: Verified healthy (11/11 localized URL and tab match tests passed, 88/88 adapter tests passed, 4/4 lock tests passed, zero native emoji clean)
+- **Build / Test State**: Verified healthy (116/116 tier 3 adapter tests, 85/85 multilingual & saving tests, 65/65 prompt tests, 11/11 localized sync tests, zero native emoji clean)
 
 ---
 
