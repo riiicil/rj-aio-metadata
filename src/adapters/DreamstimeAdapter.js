@@ -26,6 +26,173 @@ import {
   sleep
 } from './utils/dom_helpers.js';
 import { logger } from '../services/LoggerService.js';
+import { PLATFORM_CATEGORIES } from '../services/AiPrompt.js';
+
+/**
+ * Resolves a Dreamstime category or subcategory name (or ID) to its numeric ID.
+ *
+ * @param {string|number} target - Category name, alias, or numeric ID
+ * @param {string|number} [parentMainId=null] - Optional parent main category ID for scoping subcategories
+ * @returns {string|null} Numeric ID string or null if unresolvable
+ */
+export function resolveDreamstimeCategoryId(target, parentMainId = null) {
+  if (target === null || target === undefined) return null;
+  const str = String(target).trim();
+  if (/^\d+$/.test(str)) {
+    return str;
+  }
+
+  const norm = str
+    .toLowerCase()
+    .replace(/&/g, ' ')
+    .replace(/\band\b/g, ' ')
+    .replace(/\bdan\b/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // 1. Check Main Categories
+  const mainMap = {
+    'abstract': '38',
+    'animals': '29',
+    'animal': '29',
+    'arts architecture': '69',
+    'arts': '69',
+    'art': '69',
+    'the arts': '69',
+    'architecture': '69',
+    'business': '74',
+    'editorial': '177',
+    'holidays': '188',
+    'holiday': '188',
+    'seasonal': '188',
+    'it c': '108',
+    'it': '108',
+    'computers': '108',
+    'illustrations clipart': '172',
+    'illustration clipart': '172',
+    'illustrations': '172',
+    'illustration': '172',
+    'clipart': '172',
+    'industries': '86',
+    'industry': '86',
+    'industrial': '86',
+    'nature': '8',
+    'objects': '133',
+    'object': '133',
+    'people': '114',
+    'person': '114',
+    'portraits': '114',
+    'technology': '103',
+    'transportation': '55',
+    'transport': '55',
+    'travel': '55',
+    'web design graphics': '197',
+    'web design': '197',
+    'graphics': '197'
+  };
+
+  if (mainMap[norm]) {
+    return mainMap[norm];
+  }
+
+  // Indonesian Main Category Translations
+  const idMainTranslations = {
+    'abstrak': '38',
+    'hewan': '29',
+    'seni arsitektur': '69',
+    'seni': '69',
+    'arsitektur': '69',
+    'bisnis': '74',
+    'liburan': '188',
+    'ti k': '108',
+    'ti': '108',
+    'komputer': '108',
+    'ilustrasi clipart': '172',
+    'ilustrasi': '172',
+    'industri': '86',
+    'alam': '8',
+    'objek': '133',
+    'orang': '114',
+    'teknologi': '103',
+    'perjalanan': '55',
+    'transportasi': '55',
+    'grafis desain web': '197',
+    'desain web': '197'
+  };
+
+  if (idMainTranslations[norm]) {
+    return idMainTranslations[norm];
+  }
+
+  // 2. Check Subcategories from PLATFORM_CATEGORIES.dreamstime
+  const checkSubMap = (subcategories) => {
+    for (const [id, name] of Object.entries(subcategories || {})) {
+      const nameNorm = name
+        .toLowerCase()
+        .replace(/&/g, ' ')
+        .replace(/\band\b/g, ' ')
+        .replace(/\bdan\b/g, ' ')
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (nameNorm === norm || name.toLowerCase() === str.toLowerCase()) {
+        return String(id);
+      }
+    }
+    return null;
+  };
+
+  // If parent main category provided, check its subcategories first
+  if (parentMainId && PLATFORM_CATEGORIES?.dreamstime) {
+    for (const catData of Object.values(PLATFORM_CATEGORIES.dreamstime)) {
+      if (String(catData.id) === String(parentMainId) && catData.subcategories) {
+        const found = checkSubMap(catData.subcategories);
+        if (found) return found;
+      }
+    }
+  }
+
+  // Search all subcategories across all main categories
+  if (PLATFORM_CATEGORIES?.dreamstime) {
+    for (const catData of Object.values(PLATFORM_CATEGORIES.dreamstime)) {
+      if (catData.subcategories) {
+        const found = checkSubMap(catData.subcategories);
+        if (found) return found;
+      }
+    }
+  }
+
+  // Indonesian / common subcategory overrides
+  const commonSubOverrides = {
+    'generative ai': '212',
+    'ai generatif': '212',
+    'artificial intelligence': '210',
+    'kecerdasan buatan': '210',
+    '3d computer generated': '166',
+    '3d buatan komputer': '166',
+    'hand drawn artistic': '167',
+    'lukisan tangan': '167',
+    'vector': '186',
+    'vektor': '186',
+    'landscapes': '146',
+    'landscape': '146',
+    'pemandangan': '146',
+    'backgrounds': '112',
+    'background': '112',
+    'latar belakang': '112',
+    'wildlife': '168',
+    'satwa liar': '168',
+    'celebrities': '178',
+    'artis': '178'
+  };
+
+  if (commonSubOverrides[norm]) {
+    return commonSubOverrides[norm];
+  }
+
+  return null;
+}
 
 export class DreamstimeAdapter extends BaseAdapter {
   constructor() {
@@ -310,16 +477,31 @@ export class DreamstimeAdapter extends BaseAdapter {
 
   /**
    * Helper to match and select an option in a native <select> element.
+   * Prioritizes immutable numeric ID matching for language resilience, with text fallback.
    * @private
    * @param {HTMLSelectElement} selectEl - Target select element.
-   * @param {string|number} target - Value or text to match.
+   * @param {string|number} target - Value, name, or numeric ID to match.
+   * @param {string|number} [parentMainId=null] - Optional parent main category ID for subcategory resolution.
    * @returns {boolean} True if matched.
    */
-  _matchAndSelectOption(selectEl, target) {
-    if (!selectEl || !target) return false;
+  _matchAndSelectOption(selectEl, target, parentMainId = null) {
+    if (!selectEl || target === null || target === undefined) return false;
     const str = String(target).trim().toLowerCase();
+    const resolvedId = resolveDreamstimeCategoryId(target, parentMainId);
 
     if (selectEl.options && selectEl.options.length > 0) {
+      // 1. First priority: match by immutable numeric ID
+      if (resolvedId) {
+        for (const opt of selectEl.options) {
+          const optVal = String(opt.value ?? '').trim();
+          if (optVal === String(resolvedId)) {
+            selectEl.value = opt.value;
+            return true;
+          }
+        }
+      }
+
+      // 2. Direct match on value or text
       for (const opt of selectEl.options) {
         const optVal = String(opt.value ?? '').trim().toLowerCase();
         const optText = String(opt.textContent || opt.text || '').trim().toLowerCase();
@@ -350,26 +532,28 @@ export class DreamstimeAdapter extends BaseAdapter {
 
   /**
    * Helper to set a category / subcategory select pair with active option polling.
-   * Dispatches input and change events, then polls for subcategory options to populate.
+   * Resolves immutable numeric IDs, dispatches input and change events, then polls for subcategory options.
    * @param {HTMLSelectElement} catSelect - Category select element.
    * @param {HTMLSelectElement} subcatSelect - Dependent subcategory select element.
-   * @param {string|number} mainVal - Main category value or name.
-   * @param {string|number} subVal - Subcategory value or name.
+   * @param {string|number} mainVal - Main category value, name, or numeric ID.
+   * @param {string|number} subVal - Subcategory value, name, or numeric ID.
    * @returns {Promise<boolean>}
    */
   async setCategoryPair(catSelect, subcatSelect, mainVal, subVal) {
     if (!catSelect || !mainVal) return false;
 
     // 1. Select Main Category
+    const resolvedMainId = resolveDreamstimeCategoryId(mainVal);
     const matchedMain = this._matchAndSelectOption(catSelect, mainVal);
     if (!matchedMain) {
-      catSelect.value = String(mainVal);
+      catSelect.value = String(resolvedMainId || mainVal);
     }
     catSelect.dispatchEvent(new Event('input', { bubbles: true }));
     catSelect.dispatchEvent(new Event('change', { bubbles: true }));
 
     // 2. Poll for Subcategory Options to load (Dreamstime AJAX latency)
     if (subcatSelect && subVal) {
+      const parentId = resolvedMainId || catSelect.value;
       const pollStart = Date.now();
       while (subcatSelect.options && subcatSelect.options.length <= 1 && (Date.now() - pollStart) < 3000) {
         await sleep(100);
@@ -377,9 +561,10 @@ export class DreamstimeAdapter extends BaseAdapter {
       await sleep(150);
 
       // 3. Select Subcategory
-      const matchedSub = this._matchAndSelectOption(subcatSelect, subVal);
+      const resolvedSubId = resolveDreamstimeCategoryId(subVal, parentId);
+      const matchedSub = this._matchAndSelectOption(subcatSelect, subVal, parentId);
       if (!matchedSub) {
-        subcatSelect.value = String(subVal);
+        subcatSelect.value = String(resolvedSubId || subVal);
       }
       subcatSelect.dispatchEvent(new Event('input', { bubbles: true }));
       subcatSelect.dispatchEvent(new Event('change', { bubbles: true }));
@@ -512,8 +697,8 @@ export class DreamstimeAdapter extends BaseAdapter {
     const c3Select = document.querySelector('select#M_Category_3, select[name="M_Category_3"]');
     const s3Select = document.querySelector('select#M_Subcategory_3, select[name="M_Subcategory_3"]');
     if (isAi) {
-      logger.step('AI Declaration active: Setting Category 3 to "Illustration & Clipart" / "Generative AI"...');
-      await this.setCategoryPair(c3Select, s3Select, 'Illustration & Clipart', 'Generative AI');
+      logger.step('AI Declaration active: Setting Category 3 to "Illustrations & Clipart" (172) / "Generative AI" (212)...');
+      await this.setCategoryPair(c3Select, s3Select, 172, 212);
       await sleep(250);
     } else if (categories[2]) {
       const cat3 = categories[2];
