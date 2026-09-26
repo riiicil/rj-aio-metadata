@@ -22,6 +22,103 @@ import {
   sleep
 } from './utils/dom_helpers.js';
 import { logger } from '../services/LoggerService.js';
+import {
+  SHUTTERSTOCK_PHOTO_CATEGORY_IDS,
+  SHUTTERSTOCK_VIDEO_CATEGORY_IDS
+} from '../services/AiPrompt.js';
+
+/**
+ * Resolves a Shutterstock category name (in English or Indonesian) or numeric ID to its immutable numeric ID.
+ *
+ * @param {string|number} categoryValue - Category name or ID
+ * @param {boolean} [isVideo=false] - True if video mode (Transportation is '19' instead of '0')
+ * @returns {string|null} Numeric ID string or null if unresolvable
+ */
+export function resolveShutterstockCategoryId(categoryValue, isVideo = false) {
+  if (categoryValue === null || categoryValue === undefined) return null;
+  const str = String(categoryValue).trim();
+  if (/^\d+$/.test(str)) {
+    return str;
+  }
+
+  const norm = str
+    .toLowerCase()
+    .replace(/^the\s+/, '')
+    .replace(/[\s/]+/g, ' ')
+    .trim();
+
+  // Transportation differs between photo ('0') and video ('19')
+  if (norm === 'transportation' || norm === 'transportasi' || norm === 'transport') {
+    return isVideo ? '19' : '0';
+  }
+
+  // Indonesian name mappings to English canonical keys
+  const idToEnglish = {
+    'hewan/satwa liar': 'Animals/Wildlife',
+    'hewan satwa liar': 'Animals/Wildlife',
+    'hewan': 'Animals/Wildlife',
+    'gedung/bangunan terkenal': 'Buildings/Landmarks',
+    'gedung bangunan terkenal': 'Buildings/Landmarks',
+    'gedung': 'Buildings/Landmarks',
+    'latar belakang/tekstur': 'Backgrounds/Textures',
+    'latar belakang tekstur': 'Backgrounds/Textures',
+    'latar belakang': 'Backgrounds/Textures',
+    'bisnis/keuangan': 'Business/Finance',
+    'bisnis keuangan': 'Business/Finance',
+    'bisnis': 'Business/Finance',
+    'edukasi': 'Education',
+    'makanan dan minuman': 'Food and drink',
+    'makanan': 'Food and drink',
+    'kesehatan/medis': 'Healthcare/Medical',
+    'kesehatan medis': 'Healthcare/Medical',
+    'kesehatan': 'Healthcare/Medical',
+    'liburan': 'Holidays',
+    'objek': 'Objects',
+    'industri': 'Industrial',
+    'seni': 'The Arts',
+    'alam': 'Nature',
+    'orang': 'People',
+    'agama': 'Religion',
+    'sains': 'Science',
+    'teknologi': 'Technology',
+    'tanda/simbol': 'Signs/Symbols',
+    'tanda simbol': 'Signs/Symbols',
+    'olahraga/rekreasi': 'Sports/Recreation',
+    'olahraga rekreasi': 'Sports/Recreation',
+    'olahraga': 'Sports/Recreation',
+    'interior': 'Interiors',
+    'bermacam-macam': 'Miscellaneous',
+    'bermacam macam': 'Miscellaneous',
+    'kuno': 'Vintage',
+    'taman/luar ruang': 'Parks/Outdoor',
+    'taman luar ruang': 'Parks/Outdoor',
+    'abstrak': 'Abstract',
+    'kecantikan/mode': 'Beauty/Fashion',
+    'kecantikan mode': 'Beauty/Fashion',
+    'artis': 'Celebrities'
+  };
+
+  const idMap = isVideo ? SHUTTERSTOCK_VIDEO_CATEGORY_IDS : SHUTTERSTOCK_PHOTO_CATEGORY_IDS;
+
+  if (idMap[str]) return idMap[str];
+
+  if (idToEnglish[norm] && idMap[idToEnglish[norm]]) {
+    return idMap[idToEnglish[norm]];
+  }
+
+  for (const [key, id] of Object.entries(idMap)) {
+    const keyNorm = key
+      .toLowerCase()
+      .replace(/^the\s+/, '')
+      .replace(/[\s/]+/g, ' ')
+      .trim();
+    if (keyNorm === norm) {
+      return id;
+    }
+  }
+
+  return null;
+}
 
 export class ShutterstockAdapter extends BaseAdapter {
   constructor() {
@@ -236,10 +333,13 @@ export class ShutterstockAdapter extends BaseAdapter {
   async _selectMuiCategory(testId, inputName, categoryValue) {
     if (!categoryValue || typeof document === 'undefined') return false;
 
+    const isVideo = typeof window !== 'undefined' && Boolean(window.location?.pathname?.includes('/video'));
+    const targetId = resolveShutterstockCategoryId(categoryValue, isVideo);
+
     // 1. Set native value directly on hidden input if present (for form state & testing)
     const hiddenInput = document.querySelector(`input[name="${inputName}"]`);
     if (hiddenInput) {
-      setNativeValue(hiddenInput, categoryValue);
+      setNativeValue(hiddenInput, String(targetId ?? categoryValue));
     }
 
     // 2. Locate container and check if disabled
@@ -280,7 +380,10 @@ export class ShutterstockAdapter extends BaseAdapter {
       const targetValNorm = normalizeCat(categoryValue);
 
       const target = menuItems.find((item) => {
-        const val = item.getAttribute?.('data-value');
+        const val = item.getAttribute?.('value') || item.getAttribute?.('data-value');
+        if (targetId !== null && targetId !== undefined && val === String(targetId)) {
+          return true;
+        }
         const txt = item.textContent?.trim();
         return (
           val === categoryValue ||
@@ -351,8 +454,8 @@ export class ShutterstockAdapter extends BaseAdapter {
       } catch {
         // Ignore focus errors
       }
-      setNativeValue(descEl, descText.slice(0, 200));
-      (this.logger || logger).step('description', descText.slice(0, 200));
+      setNativeValue(descEl, descText.slice(0, 300));
+      (this.logger || logger).step('description', descText.slice(0, 300));
       await sleep(250);
     }
 
@@ -553,32 +656,87 @@ export class ShutterstockAdapter extends BaseAdapter {
   }
 
   /**
+   * Finds the Save button in either English or Indonesian.
+   * @private
+   * @returns {HTMLElement|null}
+   */
+  _findSaveButton() {
+    const direct = document.querySelector('button[data-testid="edit-dialog-save-button"]');
+    if (direct) return direct;
+
+    const allButtons = Array.from(document.querySelectorAll('button'));
+    return allButtons.find((b) => {
+      const testId = (b.getAttribute('data-testid') || '').toLowerCase();
+      const txt = (b.textContent || '').trim().toLowerCase();
+      return testId.includes('save') || txt === 'save' || txt === 'simpan';
+    }) || null;
+  }
+
+  /**
+   * Polls until the Save button's loading spinner disappears and button returns to idle.
+   * @private
+   * @param {HTMLElement} [saveBtn=null]
+   * @param {number} [maxWaitMs=15000]
+   */
+  async _waitForSaveButtonCompletion(saveBtn = null, maxWaitMs = 15000) {
+    const isSaveBusy = () => {
+      const currentSaveBtn = document.querySelector('button[data-testid="edit-dialog-save-button"]') || saveBtn;
+      if (!currentSaveBtn || (typeof document.body?.contains === 'function' && !document.body.contains(currentSaveBtn))) {
+        return false;
+      }
+      const hasSpinner = Boolean(
+        currentSaveBtn.querySelector?.('svg.MuiCircularProgress-svg, .MuiCircularProgress-root, [role="progressbar"], .MuiLoadingButton-loadingIndicator') ||
+        document.querySelector?.('div.MuiDialog-root [role="progressbar"], [data-testid="save-loading"]')
+      );
+      const isDisabled = currentSaveBtn.disabled ||
+        currentSaveBtn.classList?.contains?.('Mui-disabled') ||
+        currentSaveBtn.getAttribute?.('aria-busy') === 'true';
+      const isSavingText = currentSaveBtn.textContent && /saving|menyimpan/i.test(currentSaveBtn.textContent);
+
+      return Boolean(hasSpinner || isDisabled || isSavingText);
+    };
+
+    const saveStartTime = Date.now();
+    let wasBusy = isSaveBusy();
+
+    while (Date.now() - saveStartTime < maxWaitMs) {
+      const busy = isSaveBusy();
+      if (busy) {
+        wasBusy = true;
+      } else if (wasBusy || Date.now() - saveStartTime >= 600) {
+        break;
+      }
+      await sleep(200);
+    }
+  }
+
+  /**
    * Saves metadata draft for currently selected asset.
+   * Clicks "Save" / "Simpan" in sidebar and waits for spinner completion.
    * @returns {Promise<boolean>} True if save clicked.
    */
   async saveDraft() {
     if (typeof document === 'undefined') return true;
-    const saveBtn = document.querySelector(
-      'button[data-testid="edit-dialog-save-button"]'
-    ) || Array.from(document.querySelectorAll('button')).find(
-      (b) => (b.getAttribute('data-testid') || '').includes('save') || (b.textContent && b.textContent.trim() === 'Save')
-    );
+    const saveBtn = this._findSaveButton();
 
     if (saveBtn && !saveBtn.disabled) {
       simulateClick(saveBtn);
-      (this.logger || logger).step('save draft', 'Clicked Save');
+      (this.logger || logger).step('save draft', 'Clicked Save, waiting for completion...');
+      await sleep(250);
+      await this._waitForSaveButtonCompletion(saveBtn, 10000);
+      (this.logger || logger).step('save draft', 'Save completed');
       return true;
     }
     return false;
   }
 
   /**
-   * Bulk save strategy:
+   * Bulk save strategy (two-tier backup save):
    * 1. On target card (first or specified card), click selection checkbox.
-   * 2. In the toolbar, click "Select page" (if more than 1 card).
-   * 3. In the sidebar, click "Save".
+   * 2. In the toolbar, click "Select page" / "Pilih halaman" (if more than 1 card).
+   * 3. In the sidebar, click "Save" / "Simpan".
    * 4. Wait for save spinner to finish and button to return to normal.
-   * 5. Click "Deselect page" in the toolbar.
+   * 5. Click "Deselect page" / "Batal pilih halaman" in the toolbar.
    * 6. Close drawer if close button exists.
    *
    * @param {HTMLElement} [lastCardElement=null] - Optional reference to card element.
@@ -603,14 +761,16 @@ export class ShutterstockAdapter extends BaseAdapter {
 
     await sleep(400);
 
-    // 2. Click "Select page" in toolbar if multiple cards exist
+    // 2. Click "Select page" / "Pilih halaman" in toolbar if multiple cards exist
     const cards = this.getAssetCards();
     if (cards.length > 1 || !lastCardElement) {
       const selectPageBtn = document.querySelector(
         'button[data-testid="select-page-button"], button[data-testid="select-all-button"], #bulk-editor button[data-testid="button"], #bulk-editor button'
-      ) || Array.from(document.querySelectorAll('div.MuiGrid-root button, button')).find(
-        (b) => b.textContent && b.textContent.includes('Select page')
-      );
+      ) || Array.from(document.querySelectorAll('div.MuiGrid-root button, button')).find((b) => {
+        const txt = (b.textContent || '').trim().toLowerCase();
+        return txt.includes('select page') || txt.includes('pilih halaman') ||
+               txt.includes('select all') || txt.includes('pilih semua');
+      });
 
       if (selectPageBtn) {
         simulateClick(selectPageBtn);
@@ -618,12 +778,8 @@ export class ShutterstockAdapter extends BaseAdapter {
       }
     }
 
-    // 3. Click "Save" in sidebar
-    const saveBtn = document.querySelector(
-      'button[data-testid="edit-dialog-save-button"]'
-    ) || Array.from(document.querySelectorAll('button')).find(
-      (b) => (b.getAttribute('data-testid') || '').includes('save') || (b.textContent && b.textContent.trim() === 'Save')
-    );
+    // 3. Click "Save" / "Simpan" in sidebar
+    const saveBtn = this._findSaveButton();
 
     if (saveBtn && !saveBtn.disabled) {
       simulateClick(saveBtn);
@@ -631,44 +787,15 @@ export class ShutterstockAdapter extends BaseAdapter {
       await sleep(350);
 
       // 4. Wait for save button spinner to resolve and button to return to normal
-      const isSaveBusy = () => {
-        const currentSaveBtn = document.querySelector('button[data-testid="edit-dialog-save-button"]') || saveBtn;
-        if (!currentSaveBtn || (typeof document.body?.contains === 'function' && !document.body.contains(currentSaveBtn))) {
-          return false;
-        }
-        const hasSpinner = Boolean(
-          currentSaveBtn.querySelector?.('svg.MuiCircularProgress-svg, .MuiCircularProgress-root, [role="progressbar"], .MuiLoadingButton-loadingIndicator') ||
-          document.querySelector?.('div.MuiDialog-root [role="progressbar"], [data-testid="save-loading"]')
-        );
-        const isDisabled = currentSaveBtn.disabled ||
-          currentSaveBtn.classList?.contains?.('Mui-disabled') ||
-          currentSaveBtn.getAttribute?.('aria-busy') === 'true';
-        const isSavingText = currentSaveBtn.textContent && /saving/i.test(currentSaveBtn.textContent);
-
-        return Boolean(hasSpinner || isDisabled || isSavingText);
-      };
-
-      const maxSaveWaitMs = 20000;
-      const saveStartTime = Date.now();
-      let wasBusy = isSaveBusy();
-
-      while (Date.now() - saveStartTime < maxSaveWaitMs) {
-        const busy = isSaveBusy();
-        if (busy) {
-          wasBusy = true;
-        } else if (wasBusy || Date.now() - saveStartTime >= 1000) {
-          break;
-        }
-        await sleep(300);
-      }
+      await this._waitForSaveButtonCompletion(saveBtn, 20000);
 
       (this.logger || logger).step('bulk save', 'Save finished, button back to normal');
       await sleep(400);
 
-      // 5. Click "Deselect page" in toolbar
+      // 5. Click "Deselect page" / "Batal pilih halaman" in toolbar
       const findDeselectButton = () => {
         const direct = document.querySelector(
-          'button[data-testid="deselect-page-button"], button[data-testid="deselect-all-button"]'
+          'button[data-testid="deselect-page-button"], button[data-testid="deselect-all-button"], button[aria-label="Deselect all"], button[aria-label="Batal pilih semua"]'
         );
         if (direct) return direct;
 
@@ -678,14 +805,16 @@ export class ShutterstockAdapter extends BaseAdapter {
         const allButtons = Array.from(document.querySelectorAll('div.MuiGrid-root button, button'));
         const textMatch = allButtons.find((btn) => {
           const txt = btn.textContent?.trim().toLowerCase() || '';
-          return txt.includes('deselect page') || txt.includes('deselect all') || txt === 'deselect';
+          return txt.includes('deselect page') || txt.includes('batal pilih halaman') ||
+                 txt.includes('deselect all') || txt.includes('batal pilih semua') ||
+                 txt === 'deselect' || txt === 'batal pilih';
         });
         if (textMatch) return textMatch;
 
         const selectPageBtn = document.querySelector('button[data-testid="select-page-button"]');
         if (selectPageBtn) {
           const txt = selectPageBtn.textContent?.trim().toLowerCase() || '';
-          if (txt.includes('deselect')) return selectPageBtn;
+          if (txt.includes('deselect') || txt.includes('batal')) return selectPageBtn;
         }
 
         return null;

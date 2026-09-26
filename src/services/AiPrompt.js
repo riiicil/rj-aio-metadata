@@ -39,6 +39,64 @@ export const ADOBE_LANGUAGES = {
 };
 
 /**
+ * Shutterstock Photo Categories (26 Categories with immutable numeric IDs)
+ */
+export const SHUTTERSTOCK_PHOTO_CATEGORY_IDS = {
+  'Transportation': '0',
+  'Animals/Wildlife': '1',
+  'Buildings/Landmarks': '2',
+  'Backgrounds/Textures': '3',
+  'Business/Finance': '4',
+  'Education': '5',
+  'Food and drink': '6',
+  'Healthcare/Medical': '7',
+  'Holidays': '8',
+  'Objects': '9',
+  'Industrial': '10',
+  'The Arts': '11',
+  'Nature': '12',
+  'People': '13',
+  'Religion': '14',
+  'Science': '15',
+  'Technology': '16',
+  'Signs/Symbols': '17',
+  'Sports/Recreation': '18',
+  'Interiors': '21',
+  'Miscellaneous': '22',
+  'Vintage': '24',
+  'Parks/Outdoor': '25',
+  'Abstract': '26',
+  'Beauty/Fashion': '27',
+  'Celebrities': '31'
+};
+
+/**
+ * Shutterstock Video Categories (19 Categories with immutable numeric IDs)
+ * Note: Transportation ID is '19' in Video mode (unlike '0' in Photo mode)
+ */
+export const SHUTTERSTOCK_VIDEO_CATEGORY_IDS = {
+  'Animals/Wildlife': '1',
+  'Buildings/Landmarks': '2',
+  'Backgrounds/Textures': '3',
+  'Business/Finance': '4',
+  'Education': '5',
+  'Food and drink': '6',
+  'Healthcare/Medical': '7',
+  'Holidays': '8',
+  'Objects': '9',
+  'Industrial': '10',
+  'The Arts': '11',
+  'Nature': '12',
+  'People': '13',
+  'Religion': '14',
+  'Science': '15',
+  'Technology': '16',
+  'Signs/Symbols': '17',
+  'Sports/Recreation': '18',
+  'Transportation': '19'
+};
+
+/**
  * Official Category Dictionaries for Supported Microstock Platforms
  */
 export const PLATFORM_CATEGORIES = {
@@ -69,55 +127,8 @@ export const PLATFORM_CATEGORIES = {
 
   // Shutterstock: 26 Image categories vs 19 Video categories
   shutterstock: {
-    image: [
-      'Abstract',
-      'Animals/Wildlife',
-      'The Arts',
-      'Backgrounds/Textures',
-      'Beauty/Fashion',
-      'Buildings/Landmarks',
-      'Business/Finance',
-      'Celebrities',
-      'Education',
-      'Food and drink',
-      'Healthcare/Medical',
-      'Holidays',
-      'Industrial',
-      'Interiors',
-      'Miscellaneous',
-      'Nature',
-      'Objects',
-      'Parks/Outdoor',
-      'People',
-      'Religion',
-      'Science',
-      'Signs/Symbols',
-      'Sports/Recreation',
-      'Technology',
-      'Transportation',
-      'Vintage'
-    ],
-    video: [
-      'Animals/Wildlife',
-      'The Arts',
-      'Backgrounds/Textures',
-      'Buildings/Landmarks',
-      'Business/Finance',
-      'Education',
-      'Food and drink',
-      'Healthcare/Medical',
-      'Holidays',
-      'Industrial',
-      'Nature',
-      'Objects',
-      'People',
-      'Religion',
-      'Science',
-      'Signs/Symbols',
-      'Sports/Recreation',
-      'Technology',
-      'Transportation'
-    ]
+    image: Object.keys(SHUTTERSTOCK_PHOTO_CATEGORY_IDS),
+    video: Object.keys(SHUTTERSTOCK_VIDEO_CATEGORY_IDS)
   },
 
   // Dreamstime: 15 Main categories & hierarchical subcategories
@@ -427,7 +438,7 @@ export function getPlatformOutputSchema(platformId = 'adobestock', { isAiGenerat
 
     case 'shutterstock':
       return {
-        description: 'string, 6-25 words, <=230 characters, detailed description describing subject, setting, context',
+        description: 'string, 10-35 words, <=300 characters, detailed description describing subject, setting, context',
         category_1: 'string, primary category chosen from official Shutterstock category list',
         category_2: 'string, secondary distinct category chosen from official Shutterstock category list',
         keywords: ['string, 80 highly relevant microstock tags ordered from specific to general']
@@ -435,8 +446,8 @@ export function getPlatformOutputSchema(platformId = 'adobestock', { isAiGenerat
 
     case 'dreamstime':
       return {
-        title: 'string, 5-10 words, <=200 characters, concise descriptive title',
-        description: 'string, 15-30 words, <=230 characters, detailed comprehensive description',
+        title: 'string, 5-15 words, <=300 characters, descriptive title without punctuation at end',
+        description: 'string, 15-40 words, <=600 characters, detailed comprehensive description including setting, details, and style',
         categories: isAiGenerated
           ? [
               { main: 'Main Category Name', sub: 'Subcategory Name' },

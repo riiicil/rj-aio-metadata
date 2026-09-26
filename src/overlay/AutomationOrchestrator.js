@@ -423,8 +423,8 @@ export class AutomationOrchestrator {
           await adapter.fillMetadata(sanitizedData, platformOptions, card);
           processedCount++;
 
-          // Step 6: Per-item save (for Freepik)
-          if (this.hud.platformId === 'freepik') {
+          // Step 6: Per-item save (for Freepik and Shutterstock)
+          if (this.hud.platformId === 'freepik' || this.hud.platformId === 'shutterstock') {
             await adapter.saveDraft();
           }
 

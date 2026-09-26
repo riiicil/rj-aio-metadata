@@ -33,14 +33,23 @@ export const PLATFORM_TITLE_LIMITS = {
   freepik: 100,
   adobestock: 200,
   vecteezy: 200,
-  dreamstime: 200,
+  dreamstime: 300,
   default: 200
 };
 
 /**
- * Uniform description character limit across all supported platforms
+ * Uniform description character limit across all supported platforms (default)
  */
 export const DESCRIPTION_CHAR_LIMIT = 250;
+
+/**
+ * Platform-specific description character limits
+ */
+export const PLATFORM_DESCRIPTION_LIMITS = {
+  dreamstime: 600,
+  shutterstock: 300,
+  default: 250
+};
 
 /**
  * Forbidden file formats and media types (strictly prohibited on Vecteezy and general microstock)
@@ -384,7 +393,8 @@ export function sanitizeDescription(rawDescription, {
   }
 
   if (!clean) return '';
-  return smartClamp(clean, DESCRIPTION_CHAR_LIMIT);
+  const maxLimit = PLATFORM_DESCRIPTION_LIMITS[normPlatform] ?? DESCRIPTION_CHAR_LIMIT;
+  return smartClamp(clean, maxLimit);
 }
 
 /**
