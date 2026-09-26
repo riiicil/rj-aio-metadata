@@ -5,17 +5,23 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Version 0.1.1 Maintenance Patch / Gemini Auth & Popup Readiness Fixes
-- **Active Branch**: `task/fix-gemini-auth-header`
-- **Latest Commit**: `2c0992d` (`fix(popup): sync start button readiness with ai provider and overlay hud`)
-- **Working Tree**: Clean (on branch `task/fix-gemini-auth-header`)
-- **Build / Test State**: Verified healthy (4/4 popup readiness tests passed, 88/88 adapter tests passed, 4/4 lock tests passed, zero native emoji clean)
+- **Current Milestone**: Version 0.1.2 Bump & Platform Hardening (Issues 1-5 Complete)
+- **Active Branch**: `task/multilingual-fixes`
+- **Latest Commit**: `7f85388` (`chore(release): bump version to 0.1.2 across extension and docs`)
+- **Working Tree**: Clean (on branch `task/multilingual-fixes`)
+- **Build / Test State**: Verified healthy (116/116 tier 3 adapter tests, 85/85 multilingual & saving tests, 65/65 prompt tests, 11/11 localized sync tests, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **Toolbar Popup Start Button Readiness & HUD Synchronization (`popup.js`)**:
+0. **Popup vs HUD State Synchronization & Depositphotos Locale URL Detection (`popup.js`, `DepositphotosAdapter.js`)**:
+   - **Popup vs HUD State Synchronization Guard (`popup.js`)**: Scoped the `isSavingLocally` guard in `chrome.storage.onChanged` strictly to settings and provider configuration updates (`platformSettings`, `providers`, `activeProvider`, `activePlatform`). Previously, placing `if (isSavingLocally) return;` at the root dropped incoming automation state signals (`changes.rj_automation_state`) and HUD visibility toggles (`changes.rj_overlay_visible`) during local popup auto-saves. Progress updates, start/stop transitions, and overlay visibility events are now guaranteed to process immediately.
+   - **Enforced Tab-Match Start Button Readiness in Toolbar Popup (`popup.js`)**: Added `isCurrentTabMatched()` helper and integrated it into the idle evaluation branch of `updateAutomationButtonUI()`. The Start button is now disabled with title `"Active tab does not match this platform"` whenever the active tab URL does not correspond to the selected platform. Added click guard in `btnToggleAutomation` click listener blocking execution if the tab is not matched. Prevents cross-platform deadlocks where HUD locked with "Busy (Platform)".
+   - **Depositphotos Non-English Locale URL Detection Fix (`DepositphotosAdapter.js`)**: Updated `isMatch(url)` to check `url.includes('depositphotos.com') && url.includes('/files/unfinished')`. Enables seamless detection for non-English localized contributor URLs (such as `https://depositphotos.com/id/files/unfinished.html`, `/de/files/unfinished.html`, `/es/files/unfinished.html`, `/fr/files/unfinished.html`), allowing `getAdapterForUrl` to resolve properly instead of falling back to unknown page.
+   - **Verification**: Verified with `scratch/test_sync_and_depositphotos_locale.mjs` and all existing regression suites (520+ assertions passed).
+
+00. **Toolbar Popup Start Button Readiness & HUD Synchronization (`popup.js`)**:
    - **Discrepancy Diagnosed**: Investigated issue where the Toolbar Popup's "Start Automation" button was enabled immediately upon fresh installation, even when no API key or model was configured, whereas the In-Page Overlay HUD correctly kept the Start button disabled.
    - **Root Cause**: Identified regression originating from commit `6aaf749` where the call to `isCurrentProviderReady()` inside `updateAutomationButtonUI` in `src/popup/popup.js` was accidentally replaced with a hardcoded `btnToggleAutomation.disabled = false;`.
    - **Enforced Provider Readiness in Toolbar Popup**: Re-connected `isCurrentProviderReady()` into `updateAutomationButtonUI` in `src/popup/popup.js`, setting `btnToggleAutomation.disabled = !ready`, toggling `.rj-btn-disabled` class, and updating title. Connected dynamic re-evaluation upon model fetching (`btnFetchModels`), file import (`apiKeyFileInput`), and storage sync (`chrome.storage.onChanged`), plus added defense-in-depth guard in click handler.
@@ -273,6 +279,17 @@ Incoming agents must pay close attention to these hard-learned lessons:
    - `rj_automation_state` in `chrome.storage.local` is broadcast across all open extension contexts. When multiple contributor platform tabs are open simultaneously (e.g. Adobe Stock and Dreamstime in separate tabs):
      - `OverlayHUD.onStorageChanged` and `restoreAutomationState` must strictly enforce `if (state.platformId && state.platformId !== this.platformId) return;`. Without this guard, inactive tabs misinterpret start signals from other platforms, invoke `startAutomation()`, find 0 cards, and broadcast idle signals that kill active batches in a continuous ping-pong collision loop.
      - Background service worker `chrome.tabs.onUpdated` auto-heal must strictly verify `state.tabId === tabId` before resetting state to idle. Unrelated tab navigations or background iframe reloads must never terminate active automation runs.
+9. **Shutterstock Two-Tier Saving Strategy & Mode-Dependent Numeric IDs**:
+   - Unlike other platforms, Shutterstock's asset editing sidebar does **NOT** auto-save on blur or card navigation. Edits remain solely in local React state and are discarded if navigating to another card without clicking the explicit "Save" button (`button[data-testid="edit-dialog-save-button"]`). Therefore, `AutomationOrchestrator.js` must invoke `await adapter.saveDraft()` on every processed card.
+   - Post-loop `bulkSave()` acts as a resilient second-tier backup. Toolbar buttons must be matched bilingually (e.g. `"Select page"` / `"Pilih halaman"`, `"Save"` / `"Simpan"`, `"Deselect page"` / `"Batal pilih halaman"`).
+   - In Shutterstock Contributor, numeric category IDs are mode-dependent: in Photo mode, **Transportation** has ID `'0'`, whereas in Video mode, **Transportation** has ID `'19'` (while all other 18 IDs are shared `'1'` through `'18'`). The adapter determines this dynamically via `window.location.pathname.includes('/video')`.
+10. **Universal Multilingual Category Resolution via Numeric IDs**:
+   - On localized contributor interfaces (e.g. Indonesian `id`, German `de`, French `fr`), category dropdown labels are translated (`"Alam"` instead of `"Nature"`, `"Seni"` instead of `"The Arts"`), causing string comparisons to fail and resetting select elements to empty defaults.
+   - Both Dreamstime and Shutterstock native option elements (`<option value="ID">` and `<li role="option" value="ID">`) possess immutable numeric IDs. Resolving categories to their numeric IDs (`resolveDreamstimeCategoryId` and `resolveShutterstockCategoryId`) completely immunizes the extension against UI localization changes.
+   - For Dreamstime, compound conjunctions (`"dan"` vs `"and"` vs `"&"`) must be normalized to single spaces during lookup to prevent false mismatches.
+11. **Depositphotos Bidirectional Editorial Dropdown Synchronization**:
+   - In Depositphotos Contributor, the editorial dropdown (`select._itemeditor__value_is_editorial`) defaults or retains prior state across unfinished items.
+   - When automation runs with `isEditorial: false` (commercial mode), the adapter MUST explicitly locate `editorialSelect` and switch it to `'no'` / `'0'` if currently truthy or set to `'yes'`. Omitting the `else` branch leaves pre-existing editorial items stuck in Editorial mode with mandatory country/city validation errors.
 
 ---
 
@@ -292,6 +309,9 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 62 | 2026-09-27 | `task/multilingual-fixes` | `cfa8fbb` | Implemented Depositphotos bidirectional editorial dropdown synchronization (explicit reset to 'no' when isEditorial: false) and aligned Shutterstock description character limit to 450 across prompt, sanitizer, and adapter | Complete documentation, user review & merge to dev |
+| 61 | 2026-09-27 | `task/multilingual-fixes` | `fdae7a7` | Implemented Issues 3, 4, 5 from notes.md: Dreamstime limit expansion (Title 300, Desc 600), Shutterstock description limit (300), two-tier save workflow (per-card saveDraft + backup bulkSave), and universal multilingual category resolution via numeric IDs for Dreamstime (15 main + subcategories) and Shutterstock (Photo 26 vs Video 19) | Complete documentation, user review & merge to dev |
+| 60 | 2026-09-27 | `task/multilingual-fixes` | `fb930cd` | Fixed popup vs HUD state sync by scoping isSavingLocally guard, enforced tab-match Start button readiness in popup, and resolved Depositphotos non-English locale URL detection (/id/files/unfinished.html) | Address Items 3, 4, 5 in bahan/notes.md (Dreamstime & Shutterstock) |
 | 59 | 2026-09-22 | `task/fix-gemini-auth-header` | `2c0992d` | Enforced provider readiness validation (isCurrentProviderReady) on toolbar popup Start button with disabled styling, tooltips, and dynamic re-evaluation across models/keys/storage to sync 1:1 with Overlay HUD | Review & merge task/fix-gemini-auth-header to dev, build v0.1.1 |
 | 58 | 2026-09-22 | `task/fix-gemini-auth-header` | `96df8a5` | Added missing Authorization: Bearer header for Google Gemini OpenAI endpoint in service_worker.js, bumped version to 0.1.1 across manifest.json, package.json, and CHANGELOG.md | Popup start button readiness sync & release verification |
 | 57 | 2026-09-17 | `task/e2e-hardening-polish` | `d7ba885` | Comprehensive documentation suite synchronization (README badges/diagram, CHANGELOG Keep-a-Changelog v0.1.0, ARCHITECTURE, DECISIONS ADR-008..013, GIT_POLICY SemVer, DOCS_STYLE template, CURRENT_STATE, HANDOFF), refreshed release archive | Merge task/e2e-hardening-polish into dev & main, tag v0.1.0 |
