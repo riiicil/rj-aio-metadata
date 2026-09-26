@@ -438,7 +438,7 @@ export function getPlatformOutputSchema(platformId = 'adobestock', { isAiGenerat
 
     case 'shutterstock':
       return {
-        description: 'string, 10-35 words, <=300 characters, detailed description describing subject, setting, context',
+        description: 'string, 60-70 words, <=450 characters, detailed description describing subject, setting, context',
         category_1: 'string, primary category chosen from official Shutterstock category list',
         category_2: 'string, secondary distinct category chosen from official Shutterstock category list',
         keywords: ['string, 80 highly relevant microstock tags ordered from specific to general']
@@ -446,18 +446,18 @@ export function getPlatformOutputSchema(platformId = 'adobestock', { isAiGenerat
 
     case 'dreamstime':
       return {
-        title: 'string, 5-15 words, <=300 characters, descriptive title without punctuation at end',
-        description: 'string, 15-40 words, <=600 characters, detailed comprehensive description including setting, details, and style',
+        title: 'string, 20-50 words, <=300 characters, descriptive title without punctuation at end',
+        description: 'string, 60-90 words, <=600 characters, detailed comprehensive description including setting, details, and style',
         categories: isAiGenerated
           ? [
-              { main: 'Main Category Name', sub: 'Subcategory Name' },
-              { main: 'Main Category Name', sub: 'Subcategory Name' }
-            ]
+            { main: 'Main Category Name', sub: 'Subcategory Name' },
+            { main: 'Main Category Name', sub: 'Subcategory Name' }
+          ]
           : [
-              { main: 'Main Category Name', sub: 'Subcategory Name' },
-              { main: 'Main Category Name', sub: 'Subcategory Name' },
-              { main: 'Main Category Name', sub: 'Subcategory Name' }
-            ],
+            { main: 'Main Category Name', sub: 'Subcategory Name' },
+            { main: 'Main Category Name', sub: 'Subcategory Name' },
+            { main: 'Main Category Name', sub: 'Subcategory Name' }
+          ],
         keywords: ['string, 80 highly relevant microstock tags ordered from specific to general']
       };
 
@@ -594,11 +594,10 @@ Universal Microstock Rules:
       })
       .join('\n');
 
-    categorySection = `Official Dreamstime Taxonomy (Main Categories and Subcategories):\n${taxonomyList}\n\nCategory Requirement:\n${
-      isAiGenerated
-        ? 'Since this asset is AI-generated, Dreamstime automatically reserves the 3rd category slot. You must select EXACTLY 2 distinct category pairs from the taxonomy above (e.g. [{"main": "Nature", "sub": "Landscapes"}, {"main": "Abstract", "sub": "Backgrounds"}]).'
-        : 'You must select EXACTLY 3 distinct category pairs from the taxonomy above (e.g. [{"main": "Nature", "sub": "Landscapes"}, {"main": "Abstract", "sub": "Backgrounds"}, {"main": "Transportation", "sub": "Destination scenics"}]).'
-    }`;
+    categorySection = `Official Dreamstime Taxonomy (Main Categories and Subcategories):\n${taxonomyList}\n\nCategory Requirement:\n${isAiGenerated
+      ? 'Since this asset is AI-generated, Dreamstime automatically reserves the 3rd category slot. You must select EXACTLY 2 distinct category pairs from the taxonomy above (e.g. [{"main": "Nature", "sub": "Landscapes"}, {"main": "Abstract", "sub": "Backgrounds"}]).'
+      : 'You must select EXACTLY 3 distinct category pairs from the taxonomy above (e.g. [{"main": "Nature", "sub": "Landscapes"}, {"main": "Abstract", "sub": "Backgrounds"}, {"main": "Transportation", "sub": "Destination scenics"}]).'
+      }`;
     languageSection = 'Language: English (microstock standard).';
   } else {
     // depositphotos, vecteezy, freepik, miricanvas

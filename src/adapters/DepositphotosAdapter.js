@@ -496,34 +496,48 @@ export class DepositphotosAdapter extends BaseAdapter {
     // 6. Defocus keywords: click itemeditor__namerow
     await defocusField();
 
-    // 7. Editorial & Country Location (Only if enabled in preferences)
+    // 7. Editorial & Country Location
     const isEditorial = Boolean(options.isEditorial || options.licenseType === 'editorial');
-    if (isEditorial) {
-      const editorialSelect = this._queryScoped(
-        root,
-        'select._itemeditor__value_is_editorial, div._itemeditor__field_is_editorial select, select[class*="_value_is_editorial"]'
-      );
-      if (editorialSelect) {
+    const editorialSelect = this._queryScoped(
+      root,
+      'select._itemeditor__value_is_editorial, div._itemeditor__field_is_editorial select, select[class*="_value_is_editorial"]'
+    );
+    if (editorialSelect) {
+      if (isEditorial) {
         const targetVal = 'yes';
         const fallbackVal = '1';
         const hasOption = Array.from(editorialSelect.options || []).some((o) => o.value === targetVal);
         const valToSet = hasOption ? targetVal : fallbackVal;
 
-        (this.logger || logger).step('Setting Editorial', 'Yes');
-        editorialSelect.value = valToSet;
-        editorialSelect.dispatchEvent(new Event('change', { bubbles: true }));
-        await sleep(150);
+        if (editorialSelect.value !== valToSet) {
+          (this.logger || logger).step('Setting Editorial', 'Yes');
+          editorialSelect.value = valToSet;
+          editorialSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          await sleep(150);
+        }
 
         const countryCode = options.editorialCountry || options.countryCode || 'US';
         const countrySelect = this._queryScoped(
           root,
           'select._itemeditor__value_location_country_code, div.itemeditor__row_country_select select, select[class*="_value_location_country_code"]'
         );
-        if (countrySelect) {
+        if (countrySelect && countrySelect.value !== countryCode) {
           (this.logger || logger).step('Setting Country', countryCode);
           countrySelect.value = countryCode;
           countrySelect.dispatchEvent(new Event('change', { bubbles: true }));
           await sleep(100);
+        }
+      } else {
+        const targetNoVal = 'no';
+        const fallbackNoVal = '0';
+        const hasNoOption = Array.from(editorialSelect.options || []).some((o) => o.value === targetNoVal);
+        const noValToSet = hasNoOption ? targetNoVal : fallbackNoVal;
+
+        if (editorialSelect.value !== noValToSet) {
+          (this.logger || logger).step('Setting Editorial', 'No');
+          editorialSelect.value = noValToSet;
+          editorialSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          await sleep(150);
         }
       }
     }

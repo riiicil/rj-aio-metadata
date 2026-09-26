@@ -287,6 +287,9 @@ Incoming agents must pay close attention to these hard-learned lessons:
    - On localized contributor interfaces (e.g. Indonesian `id`, German `de`, French `fr`), category dropdown labels are translated (`"Alam"` instead of `"Nature"`, `"Seni"` instead of `"The Arts"`), causing string comparisons to fail and resetting select elements to empty defaults.
    - Both Dreamstime and Shutterstock native option elements (`<option value="ID">` and `<li role="option" value="ID">`) possess immutable numeric IDs. Resolving categories to their numeric IDs (`resolveDreamstimeCategoryId` and `resolveShutterstockCategoryId`) completely immunizes the extension against UI localization changes.
    - For Dreamstime, compound conjunctions (`"dan"` vs `"and"` vs `"&"`) must be normalized to single spaces during lookup to prevent false mismatches.
+11. **Depositphotos Bidirectional Editorial Dropdown Synchronization**:
+   - In Depositphotos Contributor, the editorial dropdown (`select._itemeditor__value_is_editorial`) defaults or retains prior state across unfinished items.
+   - When automation runs with `isEditorial: false` (commercial mode), the adapter MUST explicitly locate `editorialSelect` and switch it to `'no'` / `'0'` if currently truthy or set to `'yes'`. Omitting the `else` branch leaves pre-existing editorial items stuck in Editorial mode with mandatory country/city validation errors.
 
 ---
 
@@ -306,6 +309,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 62 | 2026-09-27 | `task/multilingual-fixes` | `cfa8fbb` | Implemented Depositphotos bidirectional editorial dropdown synchronization (explicit reset to 'no' when isEditorial: false) and aligned Shutterstock description character limit to 450 across prompt, sanitizer, and adapter | Complete documentation, user review & merge to dev |
 | 61 | 2026-09-27 | `task/multilingual-fixes` | `fdae7a7` | Implemented Issues 3, 4, 5 from notes.md: Dreamstime limit expansion (Title 300, Desc 600), Shutterstock description limit (300), two-tier save workflow (per-card saveDraft + backup bulkSave), and universal multilingual category resolution via numeric IDs for Dreamstime (15 main + subcategories) and Shutterstock (Photo 26 vs Video 19) | Complete documentation, user review & merge to dev |
 | 60 | 2026-09-27 | `task/multilingual-fixes` | `fb930cd` | Fixed popup vs HUD state sync by scoping isSavingLocally guard, enforced tab-match Start button readiness in popup, and resolved Depositphotos non-English locale URL detection (/id/files/unfinished.html) | Address Items 3, 4, 5 in bahan/notes.md (Dreamstime & Shutterstock) |
 | 59 | 2026-09-22 | `task/fix-gemini-auth-header` | `2c0992d` | Enforced provider readiness validation (isCurrentProviderReady) on toolbar popup Start button with disabled styling, tooltips, and dynamic re-evaluation across models/keys/storage to sync 1:1 with Overlay HUD | Review & merge task/fix-gemini-auth-header to dev, build v0.1.1 |

@@ -47,7 +47,7 @@ export const DESCRIPTION_CHAR_LIMIT = 250;
  */
 export const PLATFORM_DESCRIPTION_LIMITS = {
   dreamstime: 600,
-  shutterstock: 300,
+  shutterstock: 450,
   default: 250
 };
 

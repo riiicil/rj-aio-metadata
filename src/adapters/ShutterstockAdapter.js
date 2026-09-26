@@ -454,8 +454,8 @@ export class ShutterstockAdapter extends BaseAdapter {
       } catch {
         // Ignore focus errors
       }
-      setNativeValue(descEl, descText.slice(0, 300));
-      (this.logger || logger).step('description', descText.slice(0, 300));
+      setNativeValue(descEl, descText.slice(0, 450));
+      (this.logger || logger).step('description', descText.slice(0, 450));
       await sleep(250);
     }
 
@@ -537,10 +537,10 @@ export class ShutterstockAdapter extends BaseAdapter {
       const editorialInput = document.querySelector(
         'input[name="isEditorial"]'
       ) || (
-        Array.from(document.querySelectorAll('label')).find(
-          (l) => l.textContent && l.textContent.includes('Editorial')
-        )?.querySelector('input')
-      );
+          Array.from(document.querySelectorAll('label')).find(
+            (l) => l.textContent && l.textContent.includes('Editorial')
+          )?.querySelector('input')
+        );
 
       if (editorialInput) {
         if (isEditorial && !editorialInput.checked) {
@@ -769,7 +769,7 @@ export class ShutterstockAdapter extends BaseAdapter {
       ) || Array.from(document.querySelectorAll('div.MuiGrid-root button, button')).find((b) => {
         const txt = (b.textContent || '').trim().toLowerCase();
         return txt.includes('select page') || txt.includes('pilih halaman') ||
-               txt.includes('select all') || txt.includes('pilih semua');
+          txt.includes('select all') || txt.includes('pilih semua');
       });
 
       if (selectPageBtn) {
@@ -806,8 +806,8 @@ export class ShutterstockAdapter extends BaseAdapter {
         const textMatch = allButtons.find((btn) => {
           const txt = btn.textContent?.trim().toLowerCase() || '';
           return txt.includes('deselect page') || txt.includes('batal pilih halaman') ||
-                 txt.includes('deselect all') || txt.includes('batal pilih semua') ||
-                 txt === 'deselect' || txt === 'batal pilih';
+            txt.includes('deselect all') || txt.includes('batal pilih semua') ||
+            txt === 'deselect' || txt === 'batal pilih';
         });
         if (textMatch) return textMatch;
 

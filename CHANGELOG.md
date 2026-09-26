@@ -8,13 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+-
+
+### Changed
+-
+
+### Fixed
+-
+
+---
+
+## [0.1.2] - 2026-09-27
+
+### Added
 - **Dreamstime Character Limits Expansion (`src/services/AiPrompt.js`, `src/services/SanitizerService.js`)**: Expanded Dreamstime title character limit from 200 to 300 and description limit from 250 to 600 across AI generation prompt schemas and `SanitizerService` platform-scoped clamping bounds.
-- **Shutterstock Description Limit Expansion (`src/services/AiPrompt.js`, `src/services/SanitizerService.js`, `src/adapters/ShutterstockAdapter.js`)**: Expanded Shutterstock description limit from 200/250 to 300 characters across `AiPrompt` JSON schemas, `SanitizerService` description limits, and adapter text injection slicing.
+- **Shutterstock Description Limit Expansion (`src/services/AiPrompt.js`, `src/services/SanitizerService.js`, `src/adapters/ShutterstockAdapter.js`)**: Expanded Shutterstock description limit from 200/250 to 450 characters across `AiPrompt` JSON schemas, `SanitizerService` description limits, and adapter text injection slicing.
 - **Universal Multilingual Numeric Category Resolution (`src/services/AiPrompt.js`, `src/adapters/ShutterstockAdapter.js`, `src/adapters/DreamstimeAdapter.js`)**:
   - *Shutterstock*: Exported `SHUTTERSTOCK_PHOTO_CATEGORY_IDS` (26 categories, IDs `'0'`-`'31'`) and `SHUTTERSTOCK_VIDEO_CATEGORY_IDS` (19 categories, IDs `'1'`-`'19'`, with Transportation dynamically resolved to `'19'` in Video vs `'0'` in Photo). Added `resolveShutterstockCategoryId` resolving English names, Indonesian translations, and raw IDs. Updated `_selectMuiCategory` to match `<li role="option">` by numeric ID (`value` / `data-value`) and sync the hidden input, eliminating failed text matches on localized pages.
   - *Dreamstime*: Added `resolveDreamstimeCategoryId` mapping English names, Indonesian translations, and conjunction-normalized strings (`and`/`dan`/`&`) to official numeric IDs across all 15 Main categories and subcategories. Updated `_matchAndSelectOption` and `setCategoryPair` to match options by numeric `value` and dispatch native input/change events, with AI Mode Category 3 directly targeting numeric IDs `172` ("Illustrations & Clipart") and `212` ("Generative AI").
 
 ### Fixed
+- **Depositphotos Commercial vs Editorial Dropdown Sync (`src/adapters/DepositphotosAdapter.js`)**: Updated `DepositphotosAdapter.fillMetadata()` to explicitly set the editorial dropdown `select._itemeditor__value_is_editorial` back to `"no"` / `"0"` when running in commercial mode (`isEditorial: false`). Previously, the adapter only checked `if (isEditorial)` without an `else` branch, causing assets whose dropdown was initially set to `"yes"` / `"1"` to remain stuck in Editorial mode.
 - **Shutterstock Unsaved Metadata Bug & Two-Tier Saving Strategy (`src/overlay/AutomationOrchestrator.js`, `src/adapters/ShutterstockAdapter.js`)**:
   - Orchestrator now calls `adapter.saveDraft()` for `shutterstock` in Step 6 of each asset card iteration, preventing loss of edits when navigating between assets in the sidebar.
   - Implemented `saveDraft()` in `ShutterstockAdapter` to click `button[data-testid="edit-dialog-save-button"]` (or `"Save"` / `"Simpan"` fallback) and wait for the loading spinner (`div[data-testid="loading-spinner"]`, `role="progressbar"`) to disappear.
@@ -23,11 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Popup Start Button Tab Match Readiness (`src/popup/popup.js`)**: Integrated `isCurrentTabMatched()` into the idle state of `updateAutomationButtonUI()`. When the active browser tab does not match the selected platform, the Start button remains disabled with title `"Active tab does not match this platform"`, preventing cross-platform deadlock conditions.
 - **Depositphotos Localized URL Matching (`src/adapters/DepositphotosAdapter.js`)**: Updated `DepositphotosAdapter.isMatch(url)` to match `url.includes('depositphotos.com') && url.includes('/files/unfinished')`, allowing non-English contributor URLs (e.g. `https://depositphotos.com/id/files/unfinished.html`, `/de/`, `/fr/`, `/es/`) to be properly resolved.
 
+---
+
 ## [0.1.1] - 2026-09-22
 
 ### Fixed
 - **Google Gemini OpenAI Endpoint Authorization**: Added required `Authorization: Bearer <API_KEY>` header to `buildProviderRequestParams` in `src/background/service_worker.js`. Previously, Google Gemini requests only transmitted `x-goog-api-key` and query param `?key=...`, causing Google's OpenAI-compatible endpoint (`/v1beta/openai/chat/completions`) to reject requests with `400 Bad Request: Missing or invalid Authorization header`.
 - **Toolbar Popup Start Button Readiness Synchronization**: Restored AI provider credentials and model selection validation (`isCurrentProviderReady`) in `src/popup/popup.js`. Previously, the idle branch in `updateAutomationButtonUI` unconditionally set `disabled = false`, causing the toolbar start button to appear active and clickable on fresh installations before entering an API key or fetching models, whereas the in-page overlay HUD correctly stayed disabled. Connected automatic button readiness re-evaluation across model fetching, file key imports, input typing, and storage synchronization.
+
+---
 
 ## [0.1.0] - 2026-09-17
 
