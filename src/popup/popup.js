@@ -267,40 +267,75 @@ function dismissToast(toastItem) {
 }
 
 /**
- * Checks active tab URL against the currently selected platform.
+ * Checks if the currently active browser tab matches the selected platform.
+ * Returns true if activeTabInfo is not available (e.g. test environment) or if matched.
+ * @returns {boolean}
  */
-function updateTabMatchStatus() {
-  const selectedPlatform = platformSelect.value;
+function isCurrentTabMatched() {
   if (!activeTabInfo || !activeTabInfo.destinations) {
-    platformStatusBadge.className = 'rj-status-badge rj-status-unmatched';
-    statusText.textContent = 'No tab';
-    platformWarningBanner.style.display = 'none';
-    return;
+    return true;
   }
-
+  const selectedPlatform = (platformSelect && platformSelect.value) || currentActivePlatformId;
   const targetPlatform = activeTabInfo.destinations[selectedPlatform];
   const currentUrl = activeTabInfo.url || '';
-  const isMatch = targetPlatform && (
+  if (!targetPlatform) return false;
+
+  return Boolean(
     targetPlatform.hostPatterns
       ? targetPlatform.hostPatterns.some((p) => currentUrl.includes(p))
       : currentUrl.includes(targetPlatform.hostPattern)
   );
+}
+
+/**
+ * Sets activeTabInfo explicitly (useful for testing).
+ * @param {Object|null} info
+ */
+function setActiveTabInfo(info) {
+  activeTabInfo = info;
+}
+
+/**
+ * Checks active tab URL against the currently selected platform.
+ * @returns {boolean}
+ */
+function updateTabMatchStatus() {
+  const selectedPlatform = (platformSelect && platformSelect.value) || currentActivePlatformId;
+  if (!activeTabInfo || !activeTabInfo.destinations) {
+    if (platformStatusBadge) platformStatusBadge.className = 'rj-status-badge rj-status-unmatched';
+    if (statusText) statusText.textContent = 'No tab';
+    if (platformWarningBanner) platformWarningBanner.style.display = 'none';
+    return false;
+  }
+
+  const targetPlatform = activeTabInfo.destinations[selectedPlatform];
+  const currentUrl = activeTabInfo.url || '';
+  const isMatch = Boolean(targetPlatform && (
+    targetPlatform.hostPatterns
+      ? targetPlatform.hostPatterns.some((p) => currentUrl.includes(p))
+      : currentUrl.includes(targetPlatform.hostPattern)
+  ));
 
   if (isMatch) {
-    platformStatusBadge.className = 'rj-status-badge rj-status-matched';
-    platformStatusBadge.title = 'Active browser tab matches this platform';
-    statusText.textContent = 'Ready on Tab';
-    statusIcon.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
-    platformWarningBanner.style.display = 'none';
+    if (platformStatusBadge) {
+      platformStatusBadge.className = 'rj-status-badge rj-status-matched';
+      platformStatusBadge.title = 'Active browser tab matches this platform';
+    }
+    if (statusText) statusText.textContent = 'Ready on Tab';
+    if (statusIcon) statusIcon.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
+    if (platformWarningBanner) platformWarningBanner.style.display = 'none';
   } else {
-    platformStatusBadge.className = 'rj-status-badge rj-status-unmatched';
-    platformStatusBadge.title = 'Active tab is not on this platform';
-    statusText.textContent = 'Not on Tab';
-    statusIcon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
+    if (platformStatusBadge) {
+      platformStatusBadge.className = 'rj-status-badge rj-status-unmatched';
+      platformStatusBadge.title = 'Active tab is not on this platform';
+    }
+    if (statusText) statusText.textContent = 'Not on Tab';
+    if (statusIcon) statusIcon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>';
 
-    warningMessage.textContent = `Active tab is not ${targetPlatform ? targetPlatform.name : 'this platform'}.`;
-    platformWarningBanner.style.display = 'flex';
+    if (warningMessage) warningMessage.textContent = `Active tab is not ${targetPlatform ? targetPlatform.name : 'this platform'}.`;
+    if (platformWarningBanner) platformWarningBanner.style.display = 'flex';
   }
+  return isMatch;
 }
 
 /**
@@ -982,9 +1017,19 @@ function updateAutomationButtonUI(state) {
     btnToggleAutomation.classList.remove('rj-btn-danger', 'rj-btn-running', 'rj-btn-stopping', 'rj-btn-disabled', 'rj-btn-locked');
     btnToggleAutomation.classList.add('rj-btn-accent');
 
-    const ready = isCurrentProviderReady();
+    const tabMatched = isCurrentTabMatched();
+    const providerReady = isCurrentProviderReady();
+    const ready = tabMatched && providerReady;
+
     btnToggleAutomation.disabled = !ready;
-    btnToggleAutomation.title = ready ? 'Start Automation' : 'Please input API key and select an AI model first';
+    if (!tabMatched) {
+      btnToggleAutomation.title = 'Active tab does not match this platform';
+    } else if (!providerReady) {
+      btnToggleAutomation.title = 'Please input API key and select an AI model first';
+    } else {
+      btnToggleAutomation.title = 'Start Automation';
+    }
+
     if (!ready) {
       btnToggleAutomation.classList.add('rj-btn-disabled');
     }
@@ -1052,6 +1097,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         }
         updateTabMatchStatus();
+        updateAutomationButtonUI(isAutomationRunning);
         CustomSelect.enhance(platformSelect);
         CustomSelect.refresh(platformSelect);
         resolve();
@@ -1119,15 +1165,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isAutomationRunning && !btnToggleAutomation.classList.contains('rj-btn-locked')) {
       setFormDisabledState(true);
     }
-    // Dynamically refresh button lock state against active runner
+    // Dynamically refresh button lock and readiness state against active runner and tab match
     if (lastAutomationState) {
       updateAutomationButtonUI(lastAutomationState);
     } else if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       chrome.storage.local.get(['rj_automation_state'], (res) => {
         if (res?.rj_automation_state) {
           updateAutomationButtonUI(res.rj_automation_state);
+        } else {
+          updateAutomationButtonUI(isAutomationRunning);
         }
       });
+    } else {
+      updateAutomationButtonUI(isAutomationRunning);
     }
     autoSaveConfig(true);
   });
@@ -1283,9 +1333,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    if (!isAutomationRunning && !isCurrentProviderReady()) {
-      showToast('Please input API key and select an AI model first', true);
-      return;
+    if (!isAutomationRunning) {
+      if (!isCurrentTabMatched()) {
+        showToast('Active tab does not match this platform', true);
+        return;
+      }
+      if (!isCurrentProviderReady()) {
+        showToast('Please input API key and select an AI model first', true);
+        return;
+      }
     }
 
     if (isAutomationRunning) {
@@ -1322,9 +1378,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Listen to chrome.storage.onChanged for bidirectional sync
   if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, areaName) => {
-      // Guard: Ignore changes originating from this popup's own autoSaveConfig
-      if (isSavingLocally) return;
-
       // 1. Sync automation state from overlay HUD
       if (changes.rj_automation_state) {
         const state = changes.rj_automation_state.newValue;
@@ -1336,7 +1389,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
       // 2. Sync platformSettings / providers / activeProvider / activePlatform changes from overlay HUD or storage
-      if (changes.platformSettings || changes.providers || changes.activeProvider || changes.activePlatform) {
+      // Guard: Ignore settings changes originating from this popup's own autoSaveConfig
+      if (!isSavingLocally && (changes.platformSettings || changes.providers || changes.activeProvider || changes.activePlatform)) {
         isSyncingFromStorage = true;
         try {
           if (changes.activeProvider && changes.activeProvider.newValue) {
@@ -1419,6 +1473,8 @@ export {
   isAutomationRunning,
   isStopping,
   isCurrentProviderReady,
+  isCurrentTabMatched,
+  setActiveTabInfo,
   currentConfig,
   autoSaveConfig,
   saveCurrentSettings,

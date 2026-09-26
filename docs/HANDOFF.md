@@ -5,17 +5,23 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Version 0.1.1 Maintenance Patch / Gemini Auth & Popup Readiness Fixes
-- **Active Branch**: `task/fix-gemini-auth-header`
-- **Latest Commit**: `2c0992d` (`fix(popup): sync start button readiness with ai provider and overlay hud`)
-- **Working Tree**: Clean (on branch `task/fix-gemini-auth-header`)
-- **Build / Test State**: Verified healthy (4/4 popup readiness tests passed, 88/88 adapter tests passed, 4/4 lock tests passed, zero native emoji clean)
+- **Current Milestone**: Multi-Language Architecture & Platform Hardening (Issues 1-5)
+- **Active Branch**: `task/multilingual-fixes`
+- **Latest Commit**: `fb930cd` (`fix(popup): sync start button tab match and depositphotos locale urls`)
+- **Working Tree**: Clean (on branch `task/multilingual-fixes`)
+- **Build / Test State**: Verified healthy (11/11 localized URL and tab match tests passed, 88/88 adapter tests passed, 4/4 lock tests passed, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **Toolbar Popup Start Button Readiness & HUD Synchronization (`popup.js`)**:
+0. **Popup vs HUD State Synchronization & Depositphotos Locale URL Detection (`popup.js`, `DepositphotosAdapter.js`)**:
+   - **Popup vs HUD State Synchronization Guard (`popup.js`)**: Scoped the `isSavingLocally` guard in `chrome.storage.onChanged` strictly to settings and provider configuration updates (`platformSettings`, `providers`, `activeProvider`, `activePlatform`). Previously, placing `if (isSavingLocally) return;` at the root dropped incoming automation state signals (`changes.rj_automation_state`) and HUD visibility toggles (`changes.rj_overlay_visible`) during local popup auto-saves. Progress updates, start/stop transitions, and overlay visibility events are now guaranteed to process immediately.
+   - **Enforced Tab-Match Start Button Readiness in Toolbar Popup (`popup.js`)**: Added `isCurrentTabMatched()` helper and integrated it into the idle evaluation branch of `updateAutomationButtonUI()`. The Start button is now disabled with title `"Active tab does not match this platform"` whenever the active tab URL does not correspond to the selected platform. Added click guard in `btnToggleAutomation` click listener blocking execution if the tab is not matched. Prevents cross-platform deadlocks where HUD locked with "Busy (Platform)".
+   - **Depositphotos Non-English Locale URL Detection Fix (`DepositphotosAdapter.js`)**: Updated `isMatch(url)` to check `url.includes('depositphotos.com') && url.includes('/files/unfinished')`. Enables seamless detection for non-English localized contributor URLs (such as `https://depositphotos.com/id/files/unfinished.html`, `/de/files/unfinished.html`, `/es/files/unfinished.html`, `/fr/files/unfinished.html`), allowing `getAdapterForUrl` to resolve properly instead of falling back to unknown page.
+   - **Verification**: Verified with `scratch/test_sync_and_depositphotos_locale.mjs` and all existing regression suites (520+ assertions passed).
+
+00. **Toolbar Popup Start Button Readiness & HUD Synchronization (`popup.js`)**:
    - **Discrepancy Diagnosed**: Investigated issue where the Toolbar Popup's "Start Automation" button was enabled immediately upon fresh installation, even when no API key or model was configured, whereas the In-Page Overlay HUD correctly kept the Start button disabled.
    - **Root Cause**: Identified regression originating from commit `6aaf749` where the call to `isCurrentProviderReady()` inside `updateAutomationButtonUI` in `src/popup/popup.js` was accidentally replaced with a hardcoded `btnToggleAutomation.disabled = false;`.
    - **Enforced Provider Readiness in Toolbar Popup**: Re-connected `isCurrentProviderReady()` into `updateAutomationButtonUI` in `src/popup/popup.js`, setting `btnToggleAutomation.disabled = !ready`, toggling `.rj-btn-disabled` class, and updating title. Connected dynamic re-evaluation upon model fetching (`btnFetchModels`), file import (`apiKeyFileInput`), and storage sync (`chrome.storage.onChanged`), plus added defense-in-depth guard in click handler.
@@ -292,6 +298,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 60 | 2026-09-27 | `task/multilingual-fixes` | `fb930cd` | Fixed popup vs HUD state sync by scoping isSavingLocally guard, enforced tab-match Start button readiness in popup, and resolved Depositphotos non-English locale URL detection (/id/files/unfinished.html) | Address Items 3, 4, 5 in bahan/notes.md (Dreamstime & Shutterstock) |
 | 59 | 2026-09-22 | `task/fix-gemini-auth-header` | `2c0992d` | Enforced provider readiness validation (isCurrentProviderReady) on toolbar popup Start button with disabled styling, tooltips, and dynamic re-evaluation across models/keys/storage to sync 1:1 with Overlay HUD | Review & merge task/fix-gemini-auth-header to dev, build v0.1.1 |
 | 58 | 2026-09-22 | `task/fix-gemini-auth-header` | `96df8a5` | Added missing Authorization: Bearer header for Google Gemini OpenAI endpoint in service_worker.js, bumped version to 0.1.1 across manifest.json, package.json, and CHANGELOG.md | Popup start button readiness sync & release verification |
 | 57 | 2026-09-17 | `task/e2e-hardening-polish` | `d7ba885` | Comprehensive documentation suite synchronization (README badges/diagram, CHANGELOG Keep-a-Changelog v0.1.0, ARCHITECTURE, DECISIONS ADR-008..013, GIT_POLICY SemVer, DOCS_STYLE template, CURRENT_STATE, HANDOFF), refreshed release archive | Merge task/e2e-hardening-polish into dev & main, tag v0.1.0 |

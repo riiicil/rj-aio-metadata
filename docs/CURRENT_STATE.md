@@ -1,8 +1,8 @@
 # Current Project State — RJ AIO Metadata Extension
 
-*Last Updated: 2026-09-22*<br>
-*Active Branch: `task/fix-gemini-auth-header`*<br>
-*Current Milestone: Version 0.1.1 Maintenance Patch / Gemini OpenAI Auth Header Fix*
+*Last Updated: 2026-09-27*<br>
+*Active Branch: `task/multilingual-fixes`*<br>
+*Current Milestone: Multi-Language Architecture & Platform Hardening (Issues 1-5)*
 
 ---
 
@@ -14,8 +14,8 @@
 - **Phase 3 — Universal Vision Service**: [COMPLETE] (Step 3.1 Prompt Engine, Step 3.2 Sanitizer Engine, Step 3.3 Universal Vision Client & Background Proxy Worker complete, merged to dev)
 - **Phase 4 — Platform Adapters**: [COMPLETE] (Platform adapters and live alignment verified across all 7 platforms: Adobe Stock, Shutterstock, Freepik / Magnific, Vecteezy, Dreamstime, Depositphotos, and MiriCanvas merged to dev)
 - **Phase 5 — End-to-End Testing & Polish**: [COMPLETE] (100% multi-language resilience without English text dependencies across all 7 platforms; Shutterstock precision spelling approval fix; Dreamstime cross-page continuation; Exclusive single-runner automation concurrency lock & multi-tab isolation; Real-time popup auto-save; Dynamic support & progress ticker; Modularized AutomationOrchestrator.js and platform_forms.js; Bundle-first production obfuscation pipeline generating `dist/LOAD THIS FOLDER/` and `releases/v0.1.0.zip`; Documentation suite and CHANGELOG.md fully synchronized)
-- **Post-v0.1.0 Maintenance**: [COMPLETE] (v0.1.1 patch: added missing `Authorization: Bearer` header for Google Gemini's OpenAI-compatible endpoint in `service_worker.js`, and synchronized toolbar popup Start button readiness with AI provider credentials/models in `popup.js`)
-
+- **Post-v0.1.0 Maintenance**: [COMPLETE] (v0.1.1 patch: added missing `Authorization: Bearer` header for Google Gemini's OpenAI-compatible endpoint in `service_worker.js`, and synchronized toolbar popup Start button readiness with AI provider credentials/models in `popup.js` merged to dev)
+- **Post-v0.1.1 Localization & Sync Hardening**: [IN_PROGRESS] (Issues 1 & 2 resolved: fixed popup vs HUD state synchronization, tab-match readiness on popup Start button, and Depositphotos non-English locale URL detection; in-flight: Issues 3-5 Dreamstime & Shutterstock multi-language category & saving workflows)
 
 ---
 
@@ -24,8 +24,9 @@
 | Branch | Status | Purpose |
 | :--- | :--- | :--- |
 | `main` | Clean (1 empty commit) | Stable production releases only |
-| `dev` | Integration (Phase 0-5 merged) | Active development integration branch |
-| `task/fix-gemini-auth-header` | Active | Version 0.1.1: Fix Google Gemini OpenAI endpoint Authorization header & sync popup start button readiness |
+| `dev` | Integration (Phase 0-5 + v0.1.1 merged) | Active development integration branch |
+| `task/multilingual-fixes` | Active | Multi-language architecture & platform hardening (Issues 1-5 from notes.md) |
+| `task/fix-gemini-auth-header` | Merged | Version 0.1.1: Fix Google Gemini OpenAI endpoint Authorization header & sync popup start button readiness |
 | `task/e2e-hardening-polish` | Historical | Phase 5: End-to-End Hardening & Polish (v0.1.0 release preparation) |
 
 ---
@@ -131,7 +132,8 @@
 - Sub-phase 5.2 suite verified with `scratch/test_subphase_5_2.mjs` (69/69 assertions passed: granular `rj_automation_state` schema parsing, legacy boolean compatibility, form locking preservation across re-renders, HUD disabled stopping state, and graceful stop repeated click ignore in `OverlayHUD`).
 - Sub-phase 5.1 suite verified with `scratch/test_subphase_5_1.mjs` (35/35 assertions passed: unified platform detection across all 7 sites + unknown URLs, overlay visibility storage persistence, and stub file deletion).
 - `src/adapters/utils/dom_helpers.js` and `src/adapters/BaseAdapter.js` syntax verified with `node --check` and tested with `scratch/test_base_adapter.mjs` (65/65 assertions passed).
-- Total assertions verified across all active test suites: 500+ passed (100%).
+- Total assertions verified across all active test suites: 520+ passed (100%).
+- Synchronization & Depositphotos locale suite verified with `scratch/test_sync_and_depositphotos_locale.mjs` (11/11 localized URL match cases, tab match Start button readiness transitions, exclusive lock triggers, and storage sync passes).
 - Syntax validation passed for `src/background/service_worker.js`, `src/overlay/AutomationOrchestrator.js`, `src/overlay/overlay.js`, `src/popup/popup.js`, `src/popup/platform_forms.js`, `src/content/content_main.js`, and `src/adapters/index.js` via `node --check`.
 - Zero Native Emoji Policy strictly enforced across all files, code, and documentation.
 - Version 0.1.1 synchronization verified across `src/manifest.json`, `package.json`, and `CHANGELOG.md`.
@@ -140,18 +142,10 @@
 
 ## 7. Immediate Next Step
 
-1. Test Google Gemini request execution in browser HUD/Popup with live API key to verify 200 OK generation.
-2. Manually commit the fix and synchronized version bumps:
+1. Commit or amend changes on `task/multilingual-fixes`:
    ```bash
-   git add src/background/service_worker.js src/manifest.json package.json CHANGELOG.md docs/
-   git commit -m "fix(services): add Authorization Bearer header for Google Gemini OpenAI endpoint"
+   git add src/adapters/DepositphotosAdapter.js src/popup/popup.js docs/
+   git commit -m "fix(popup): sync start button tab match and depositphotos locale urls"
    ```
-3. Merge `task/fix-gemini-auth-header` into `dev` using non-fast-forward:
-   ```bash
-   git checkout dev && git merge --no-ff task/fix-gemini-auth-header
-   ```
-4. Build release bundle:
-   ```bash
-   node build.js
-   ```
+2. Proceed to items 3, 4, 5 from `bahan/notes.md` (Dreamstime limit expansion & numeric category IDs, Shutterstock save workflow).
 

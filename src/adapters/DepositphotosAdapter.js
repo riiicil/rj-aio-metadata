@@ -41,8 +41,8 @@ export class DepositphotosAdapter extends BaseAdapter {
   isMatch(url) {
     if (typeof url !== 'string') return false;
     return (
-      url.includes('depositphotos.com/files/unfinished.html') ||
-      url.includes('depositphotos.com/files/unfinished')
+      url.includes('depositphotos.com') &&
+      url.includes('/files/unfinished')
     );
   }
 

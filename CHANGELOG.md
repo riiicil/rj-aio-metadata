@@ -7,14 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
--
-
-### Changed
--
-
 ### Fixed
--
+- **Popup vs HUD State Synchronization (`src/popup/popup.js`)**: Scoped the `isSavingLocally` guard in `chrome.storage.onChanged` strictly to settings updates (`platformSettings`, `providers`, `activeProvider`, `activePlatform`), ensuring incoming `rj_automation_state` and `rj_overlay_visible` events are never dropped when popup auto-saves occur.
+- **Popup Start Button Tab Match Readiness (`src/popup/popup.js`)**: Integrated `isCurrentTabMatched()` into the idle state of `updateAutomationButtonUI()`. When the active browser tab does not match the selected platform, the Start button remains disabled with title `"Active tab does not match this platform"`, preventing cross-platform deadlock conditions.
+- **Depositphotos Localized URL Matching (`src/adapters/DepositphotosAdapter.js`)**: Updated `DepositphotosAdapter.isMatch(url)` to match `url.includes('depositphotos.com') && url.includes('/files/unfinished')`, allowing non-English contributor URLs (e.g. `https://depositphotos.com/id/files/unfinished.html`, `/de/`, `/fr/`, `/es/`) to be properly resolved.
 
 ## [0.1.1] - 2026-09-22
 
