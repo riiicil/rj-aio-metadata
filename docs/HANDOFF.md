@@ -7,23 +7,32 @@
 ## 1. Immediate Operational State
 - **Current Milestone**: Dreamstime Mode B Submission Auto-Transition & HUD Hardening
 - **Active Branch**: `task/dreamstime-and-hud-fixes`
-- **Latest Commit**: Pending commit (`fix(dreamstime): resolve platformSettings scope error and eliminate next-arrow submit fallback`)
-- **Working Tree**: Changes in progress / ready for commit (on branch `task/dreamstime-and-hud-fixes`)
-- **Build / Test State**: Verified healthy (30/30 Dreamstime suite tests, 116/116 tier 3 adapter tests, 88/88 tier 1, 108/108 tier 2, 85/85 multilingual, 3/3 Mode B orchestrator loop, zero native emoji clean)
+- **Latest Commit**: Pending commit (`fix(dreamstime): eliminate js-submit-message selector bypass and stabilize post-submit transition`)
+- **Working Tree**: Changes ready for commit on `task/dreamstime-and-hud-fixes`
+- **Build / Test State**: Verified healthy (345/345 passing: 30/30 Dreamstime suite tests, 116/116 tier 3 adapter tests, 88/88 tier 1, 108/108 tier 2, 3/3 Mode B orchestrator loop, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **Dreamstime Mode B Submission Auto-Transition Decoupling & Toast Race Condition Resolution (`DreamstimeAdapter.js`, `AutomationOrchestrator.js`, `dom_helpers.js`)**:
-   - **Branch Renamed**: Renamed active branch to `task/dreamstime-and-hud-fixes` per user directive so that both the Dreamstime submit fixes and the subsequent HUD refresh glitch fix are developed on the same branch across cleanly separated commits.
-   - **User Issue & Console Log Analysis (`bahan/logcon_ds.md`)**: In live testing, after metadata was filled and draft was saved, clicking `#submitbutton` successfully displayed and resolved the submit toast. However, the execution abruptly halted with: `Automation error: ReferenceError: platformSettings is not defined at AutomationOrchestrator.start (AutomationOrchestrator.js:288:11)`.
-   - **Root Cause & Fix (`AutomationOrchestrator.js`)**: `const platformSettings` and `const isEditorial` were declared with `const` inside the `try` block at line 243. When Step 7 evaluated `if (platformSettings.mode === 'submit_direct')` outside the `try/finally` block, it triggered a fatal `ReferenceError`, stopping the automation loop and resetting state to idle. Moved `platformSettings` and `isEditorial` declaration outside the `try` block at the start of each carousel iteration, ensuring uniform scope across AI generation, injection, draft saving, submission, and post-submit transition.
-   - **Strict Direct Submission Without Next-Arrow (`DreamstimeAdapter.js`)**: User clarified the exact contributor submit workflow: *"isi metadata -> selesai -> save -> tunggu toast muncul dan ilang -> langsung klik submit tanpa klik next -> tunggu toast submit muncul dan ngilang sambil nunggu pindah page asset selanjutnya -> lanjut looping seerti biasa"*.
-     - Restricted `submitBtn` query strictly to `a#submitbutton, #submitbutton, input#submitbutton, button#submitbutton, .popup-nav__btn--submit`, removing dangerous `#js-next-submit` fallback.
-     - Completely removed the `#js-next-submit` next-arrow click fallback from `handlePostSubmitTransition(submittedAssetId)`: in Mode B, submitting the asset natively advances the modal or navigates to the next page. It now polls up to 8000ms for modal auto-advance (`candId && candId !== submittedAssetId`), detects modal close (`!modalActive` -> `{ done: true }`), and safely checks `window.__rj_is_unloading` during cross-page redirects.
-   - **CSP-Compliant `javascript:` Link Execution (`dom_helpers.js`)**: Handled anchor elements with `href="javascript:..."` inside `simulateClick` by dispatching synthetic `MouseEvent` instead of calling native `element.click()`, completely eliminating the browser CSP console violation warning.
-   - **Verification**: Verified 3/3 assertions in `scratch/test_orchestrator_dreamstime_mode_b.mjs` (Asset 1 -> save -> submit -> auto-advance -> Asset 2 -> save -> submit -> finish 2 assets), 30/30 in `scratch/test_dreamstime_fixes.mjs`, and 116/116 in `scratch/test_tier3_adapters.mjs`.
+0. **Dreamstime Mode B Submission Auto-Transition Decoupling & Selector Bypass Resolution (`DreamstimeAdapter.js`, `AutomationOrchestrator.js`, `dom_helpers.js`)**:
+   - **Branch Renamed**: Renamed active branch to `task/dreamstime-and-hud-fixes` per user directive so both the Dreamstime submit fixes and the subsequent HUD refresh glitch fix are developed on the same branch across cleanly separated commits.
+   - **Empirical Analysis of 3 User Recordings (`dev-tools/recordings/`)**:
+     - `rekaman-dreamstime (manuallll)-20260930_124753.json`: Manual recording of submitting 3 assets. Showed save toast takes 3.7s - 7.7s to appear, submit toast takes 4.8s - 6.4s to appear, and new asset modal arrives ~1.3s - 1.8s after submit toast.
+     - `rekaman-dreamstime (save only ext)-20260930_124406.json`: Worked because save-only clicked next arrow (`#js-next-submit`) directly.
+     - `rekaman-dreamstime (submit imm ext)-20260930_124544.json`: Showed submit clicked only 303ms after save, and extension stopped after 250ms mistaking the 1.2s AJAX modal unmount gap for batch completion.
+   - **Root Cause 1 — `#js-submit-message` Selector Bypass (`DreamstimeAdapter.js`)**:
+     - `#js-submit-message:not([style*="none"])` matched permanently rendered element with `data-state="hidden"` on tick 1 (at 0ms).
+     - Stage 2 queried `.noty_bar`, which was `null` (server request takes 3-7s), breaking out in 0ms!
+     - `saveDraft()` and `submitForReview()` exited instantaneously without waiting for either toast.
+     - **Fix**: Removed `#js-submit-message` completely. Polling now strictly targets `#noty_layout__bottomRight .noty_bar, .noty_bar` with 12000ms max appearance and 10000ms max disappearance.
+   - **Root Cause 2 — Transient DOM Unmount Window (`DreamstimeAdapter.js`)**:
+     - Dreamstime removes old modal (`$('#<id>').remove()`) and inserts new modal 1.2s - 2.5s later.
+     - `handlePostSubmitTransition()` checked `!modalActive` immediately at 250ms, falsely concluding batch was finished.
+     - **Fix**: Removed immediate absence check; now polls up to 15000ms specifically for `candId && candId !== submittedAssetId` before verifying if modal is truly gone.
+   - **Orchestrator Counter Tracking (`AutomationOrchestrator.js`)**: Added `processedCount++; this.processedCount = processedCount;` after asset completion in Dreamstime loop.
+   - **CSP Console Warning Elimination (`dom_helpers.js`)**: Temporarily detaches `href` for `javascript:` links during synthetic click.
+   - **Verification**: Verified with 345/345 passing tests across all platform test suites.
 
 00. **Popup vs HUD State Synchronization & Depositphotos Locale URL Detection (`popup.js`, `DepositphotosAdapter.js`)**:
    - **Popup vs HUD State Synchronization Guard (`popup.js`)**: Scoped the `isSavingLocally` guard in `chrome.storage.onChanged` strictly to settings and provider configuration updates (`platformSettings`, `providers`, `activeProvider`, `activePlatform`). Previously, placing `if (isSavingLocally) return;` at the root dropped incoming automation state signals (`changes.rj_automation_state`) and HUD visibility toggles (`changes.rj_overlay_visible`) during local popup auto-saves. Progress updates, start/stop transitions, and overlay visibility events are now guaranteed to process immediately.

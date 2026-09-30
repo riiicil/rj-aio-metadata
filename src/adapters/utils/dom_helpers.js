@@ -449,7 +449,9 @@ export function simulateClick(element) {
   let clickTriggered = false;
   if (typeof element.click === 'function') {
     if (element.tagName === 'A' && element.getAttribute('href')?.toLowerCase().startsWith('javascript:')) {
+      const origHref = element.getAttribute('href');
       try {
+        element.removeAttribute('href');
         const clickEvt = new MouseEvent('click', {
           bubbles: true,
           cancelable: true,
@@ -464,6 +466,10 @@ export function simulateClick(element) {
       } catch {
         element.click();
         clickTriggered = true;
+      } finally {
+        if (origHref) {
+          element.setAttribute('href', origHref);
+        }
       }
     } else {
       element.click();

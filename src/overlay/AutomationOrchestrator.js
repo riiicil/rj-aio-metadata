@@ -272,6 +272,8 @@ export class AutomationOrchestrator {
               await adapter.submitForReview(isEditorial);
             }
 
+            processedCount++;
+            this.processedCount = processedCount;
             logger.success(`Completed asset ${assetIdx + 1}${currentId ? ` (ID: ${currentId})` : ''}`);
           } catch (assetErr) {
             if (signal.aborted || assetErr?.message === 'ABORTED') break;
