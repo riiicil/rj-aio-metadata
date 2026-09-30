@@ -845,7 +845,7 @@ export class DreamstimeAdapter extends BaseAdapter {
     }
 
     const submitBtn = document.querySelector(
-      'a#submitbutton, #submitbutton, a#js-next-submit, #js-next-submit'
+      'a#submitbutton, #submitbutton, input#submitbutton, button#submitbutton, .popup-nav__btn--submit'
     );
     if (!submitBtn) {
       logger.warn('Submit button (#submitbutton) not found.');
@@ -909,7 +909,7 @@ export class DreamstimeAdapter extends BaseAdapter {
    * Handles post-submission transition for Mode B (Submit Immediately).
    * In Dreamstime, clicking submit automatically consumes the file and advances the modal
    * to the next unfinished asset or closes the modal if the batch is complete.
-   * This handler detects that auto-transition without clicking the next arrow twice.
+   * This handler detects that auto-transition without clicking the next arrow.
    * @param {string|null} [submittedAssetId=null]
    * @returns {Promise<{ done: boolean, nextAssetId: string|null }>}
    */
@@ -931,8 +931,14 @@ export class DreamstimeAdapter extends BaseAdapter {
     logger.step('Waiting for next asset to load after submission...');
     let nextId = null;
     const pollStart = Date.now();
-    while ((Date.now() - pollStart) < 5000) {
-      await sleep(200);
+    while ((Date.now() - pollStart) < 8000) {
+      await sleep(250);
+
+      // Check if page navigation / redirect is happening
+      if (typeof window !== 'undefined' && window.__rj_is_unloading) {
+        logger.info('Page navigation detected during post-submit. Awaiting new page load...');
+        return { done: false, nextAssetId: null };
+      }
 
       const modalStillActive = document.querySelector('div.popup-upload.popup-upload--submit, div.popup-upload');
       if (!modalStillActive) {
@@ -947,27 +953,7 @@ export class DreamstimeAdapter extends BaseAdapter {
       }
     }
 
-    // 3. Fallback: If modal is still open and ID unchanged after 5000ms, click next arrow once
-    if (!nextId || nextId === submittedAssetId) {
-      const nextArrow = document.querySelector(
-        'a#js-next-submit.popup-nav__btn--next, #js-next-submit'
-      );
-      if (nextArrow) {
-        logger.step('Auto-advance not detected, attempting next arrow (#js-next-submit)...');
-        simulateClick(nextArrow);
-        const fbStart = Date.now();
-        while ((Date.now() - fbStart) < 3500) {
-          await sleep(200);
-          const candId = this.getCurrentAssetId();
-          if (candId && candId !== submittedAssetId) {
-            nextId = candId;
-            break;
-          }
-        }
-      }
-    }
-
-    // 4. Evaluate cycle completion or next asset readiness
+    // 3. Evaluate cycle completion or next asset readiness
     if (nextId && nextId !== submittedAssetId) {
       if (this.processedAssetIds.has(nextId) || (this.firstAssetId && nextId === this.firstAssetId)) {
         logger.banner(`Carousel loop cycle complete. Returned to processed asset (ID: ${nextId}).`);

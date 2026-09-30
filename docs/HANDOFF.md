@@ -5,29 +5,25 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Dreamstime Mode B Submission Auto-Transition & Toast Hardening
-- **Active Branch**: `task/dreamstime-mode-b-submit-fix`
-- **Latest Commit**: `8e5268c` (`fix(dreamstime): decouple mode b submission auto-transition and resolve toast race condition`)
-- **Working Tree**: Clean (on branch `task/dreamstime-mode-b-submit-fix`)
-- **Build / Test State**: Verified healthy (30/30 Dreamstime suite tests, 116/116 tier 3 adapter tests, 85/85 multilingual & saving tests, zero native emoji clean)
+- **Current Milestone**: Dreamstime Mode B Submission Auto-Transition & HUD Hardening
+- **Active Branch**: `task/dreamstime-and-hud-fixes`
+- **Latest Commit**: Pending commit (`fix(dreamstime): resolve platformSettings scope error and eliminate next-arrow submit fallback`)
+- **Working Tree**: Changes in progress / ready for commit (on branch `task/dreamstime-and-hud-fixes`)
+- **Build / Test State**: Verified healthy (30/30 Dreamstime suite tests, 116/116 tier 3 adapter tests, 88/88 tier 1, 108/108 tier 2, 85/85 multilingual, 3/3 Mode B orchestrator loop, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **Dreamstime Mode B Submission Auto-Transition Decoupling & Toast Race Condition Resolution (`DreamstimeAdapter.js`, `AutomationOrchestrator.js`)**:
-   - **User Issue Diagnosed**: In Dreamstime Mode B ("Submit Immediately"), automation failed to advance past the first asset and prematurely displayed "Finished 1 assets" / "Completed", requiring the user to manually click Start repeatedly.
-   - **Root Cause 1 (Modal Auto-Advance Collision & Premature Infinite Loop Guard)**: Dreamstime's backend AJAX automatically advances the open edit modal to the next pending asset upon clicking `#submitbutton` (or closes the modal if all assets are submitted). `AutomationOrchestrator.js` previously called `adapter.navigateToNext()` in Step 7 for both Mode A and Mode B. In Mode B, `navigateToNext()` ran after the modal had already auto-loaded the next asset, re-adding it to `processedAssetIds` and clicking the `#js-next-submit` arrow a second time. This skipped assets and immediately triggered the Infinite Carousel Guard (`processedAssetIds.has(nextId) === true`), terminating the loop after 1 asset.
-   - **Root Cause 2 (Toast Monitoring Race Condition)**: `saveDraft()` and `submitForReview()` both monitored `.noty_bar` toast notifications inside `#noty_layout__bottomRight`. When `saveDraft()` completed, the closing toast element remained briefly in the DOM during fade-out animation. `submitForReview()` immediately matched this lingering toast node and resolved prematurely before Dreamstime even initiated the submit request.
-   - **Decoupled Mode A vs Mode B Navigation Flow (`AutomationOrchestrator.js`)**: Mode B now delegates post-submission progression directly to `adapter.handlePostSubmitTransition(currentId)` while Mode A retains standard `adapter.navigateToNext()`.
-   - **Post-Submit Auto-Transition Engine (`DreamstimeAdapter.js`)**: Implemented `handlePostSubmitTransition(submittedAssetId)`:
-     1. Registers `submittedAssetId` in `processedAssetIds`.
-     2. Checks if the edit modal closed (`!modalActive`), cleanly returning `{ done: true, nextAssetId: null }` when all items are submitted.
-     3. Polls (up to 5000ms) for the modal to display the next asset ID (`candId && candId !== submittedAssetId`).
-     4. Falls back to clicking `#js-next-submit` only if Dreamstime auto-advance does not trigger within the timeout period.
-     5. Returns `{ done: false, nextAssetId }` when the next asset is ready, continuing the loop seamlessly.
-   - **Toast Watcher Hardening (`DreamstimeAdapter.js`)**: Added pre-submit and post-save DOM purging of lingering `.noty_bar` elements, guaranteeing clean toast isolation between save and submit operations.
-   - **Verification**: Verified with `scratch/test_dreamstime_fixes.mjs` (30/30 passed), Tier 1-3 suites (312/312 passed), multilingual suite (85/85 passed), and `node --check`.
+0. **Dreamstime Mode B Submission Auto-Transition Decoupling & Toast Race Condition Resolution (`DreamstimeAdapter.js`, `AutomationOrchestrator.js`, `dom_helpers.js`)**:
+   - **Branch Renamed**: Renamed active branch to `task/dreamstime-and-hud-fixes` per user directive so that both the Dreamstime submit fixes and the subsequent HUD refresh glitch fix are developed on the same branch across cleanly separated commits.
+   - **User Issue & Console Log Analysis (`bahan/logcon_ds.md`)**: In live testing, after metadata was filled and draft was saved, clicking `#submitbutton` successfully displayed and resolved the submit toast. However, the execution abruptly halted with: `Automation error: ReferenceError: platformSettings is not defined at AutomationOrchestrator.start (AutomationOrchestrator.js:288:11)`.
+   - **Root Cause & Fix (`AutomationOrchestrator.js`)**: `const platformSettings` and `const isEditorial` were declared with `const` inside the `try` block at line 243. When Step 7 evaluated `if (platformSettings.mode === 'submit_direct')` outside the `try/finally` block, it triggered a fatal `ReferenceError`, stopping the automation loop and resetting state to idle. Moved `platformSettings` and `isEditorial` declaration outside the `try` block at the start of each carousel iteration, ensuring uniform scope across AI generation, injection, draft saving, submission, and post-submit transition.
+   - **Strict Direct Submission Without Next-Arrow (`DreamstimeAdapter.js`)**: User clarified the exact contributor submit workflow: *"isi metadata -> selesai -> save -> tunggu toast muncul dan ilang -> langsung klik submit tanpa klik next -> tunggu toast submit muncul dan ngilang sambil nunggu pindah page asset selanjutnya -> lanjut looping seerti biasa"*.
+     - Restricted `submitBtn` query strictly to `a#submitbutton, #submitbutton, input#submitbutton, button#submitbutton, .popup-nav__btn--submit`, removing dangerous `#js-next-submit` fallback.
+     - Completely removed the `#js-next-submit` next-arrow click fallback from `handlePostSubmitTransition(submittedAssetId)`: in Mode B, submitting the asset natively advances the modal or navigates to the next page. It now polls up to 8000ms for modal auto-advance (`candId && candId !== submittedAssetId`), detects modal close (`!modalActive` -> `{ done: true }`), and safely checks `window.__rj_is_unloading` during cross-page redirects.
+   - **CSP-Compliant `javascript:` Link Execution (`dom_helpers.js`)**: Handled anchor elements with `href="javascript:..."` inside `simulateClick` by dispatching synthetic `MouseEvent` instead of calling native `element.click()`, completely eliminating the browser CSP console violation warning.
+   - **Verification**: Verified 3/3 assertions in `scratch/test_orchestrator_dreamstime_mode_b.mjs` (Asset 1 -> save -> submit -> auto-advance -> Asset 2 -> save -> submit -> finish 2 assets), 30/30 in `scratch/test_dreamstime_fixes.mjs`, and 116/116 in `scratch/test_tier3_adapters.mjs`.
 
 00. **Popup vs HUD State Synchronization & Depositphotos Locale URL Detection (`popup.js`, `DepositphotosAdapter.js`)**:
    - **Popup vs HUD State Synchronization Guard (`popup.js`)**: Scoped the `isSavingLocally` guard in `chrome.storage.onChanged` strictly to settings and provider configuration updates (`platformSettings`, `providers`, `activeProvider`, `activePlatform`). Previously, placing `if (isSavingLocally) return;` at the root dropped incoming automation state signals (`changes.rj_automation_state`) and HUD visibility toggles (`changes.rj_overlay_visible`) during local popup auto-saves. Progress updates, start/stop transitions, and overlay visibility events are now guaranteed to process immediately.
@@ -241,16 +237,16 @@ Sub-phase 5.6 has modularized the in-page overlay controller by extracting the m
 
 ## 3. Actionable Next Steps for Incoming Agent
 
-1. **Step 1 (Live Contributor Testing)**:
-   - User verifies Dreamstime Mode B ("Submit Immediately") on a live contributor queue. Confirm that submitting an asset allows Dreamstime's backend to auto-advance to the next unfinished asset and continue processing without clicking the next arrow twice or prematurely halting.
-2. **Step 2 (Branch Integration & Merge to `dev`)**:
-   - Merge `task/dreamstime-mode-b-submit-fix` into `dev` using non-fast-forward merge upon user confirmation:
+1. **Step 1 (Dreamstime Mode B Live Verification)**:
+   - User verifies Dreamstime Mode B ("Submit Immediately") on a live contributor queue. Confirm that metadata is injected, draft is saved, save toast disappears, `#submitbutton` is clicked directly (without next arrow), submit toast appears and disappears, modal auto-advances to the next asset, and the loop proceeds sequentially without `ReferenceError` or skipping.
+2. **Step 2 (HUD White Element Glitch / FOUC Investigation & Fix)**:
+   - Investigate and resolve the white element/form flicker (FOUC) on the In-Page Overlay HUD during page refresh across all platforms. Work will be performed directly on `task/dreamstime-and-hud-fixes` as a separate subsequent commit.
+3. **Step 3 (Branch Integration & Merge to `dev`)**:
+   - Once both Dreamstime Mode B submit and HUD flicker fixes are complete and verified, merge `task/dreamstime-and-hud-fixes` into `dev` using non-fast-forward merge upon explicit user confirmation:
      ```bash
      git checkout dev
-     git merge --no-ff task/dreamstime-mode-b-submit-fix -m "merge branch 'task/dreamstime-mode-b-submit-fix' into dev"
+     git merge --no-ff task/dreamstime-and-hud-fixes -m "merge branch 'task/dreamstime-and-hud-fixes' into dev"
      ```
-3. **Step 3 (HUD Glitch Investigation)**:
-   - Address the HUD white element flicker / FOUC on page refresh across platforms on a new dedicated task branch as instructed by the user.
 
 
 ---
@@ -317,7 +313,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| 63 | 2026-09-30 | `task/dreamstime-mode-b-submit-fix` | `8e5268c` | Decoupled Dreamstime Mode B post-submit auto-transition from manual next-arrow clicking, eliminated toast race condition between save and submit, verified 30/30 suite | Live user testing of Dreamstime Mode B & HUD glitch investigation |
+| 63 | 2026-09-30 | `task/dreamstime-and-hud-fixes` | Pending | Resolved platformSettings scoping error in AutomationOrchestrator, eliminated next-arrow submit fallback in DreamstimeAdapter, decoupled Mode B post-submit auto-transition | Live user testing of Dreamstime Mode B & HUD glitch investigation |
 | 62 | 2026-09-27 | `task/multilingual-fixes` | `cfa8fbb` | Implemented Depositphotos bidirectional editorial dropdown synchronization (explicit reset to 'no' when isEditorial: false) and aligned Shutterstock description character limit to 450 across prompt, sanitizer, and adapter | Complete documentation, user review & merge to dev |
 | 61 | 2026-09-27 | `task/multilingual-fixes` | `fdae7a7` | Implemented Issues 3, 4, 5 from notes.md: Dreamstime limit expansion (Title 300, Desc 600), Shutterstock description limit (300), two-tier save workflow (per-card saveDraft + backup bulkSave), and universal multilingual category resolution via numeric IDs for Dreamstime (15 main + subcategories) and Shutterstock (Photo 26 vs Video 19) | Complete documentation, user review & merge to dev |
 | 60 | 2026-09-27 | `task/multilingual-fixes` | `fb930cd` | Fixed popup vs HUD state sync by scoping isSavingLocally guard, enforced tab-match Start button readiness in popup, and resolved Depositphotos non-English locale URL detection (/id/files/unfinished.html) | Address Items 3, 4, 5 in bahan/notes.md (Dreamstime & Shutterstock) |
