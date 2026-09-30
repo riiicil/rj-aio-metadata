@@ -25,6 +25,12 @@
   filter: drop-shadow(0 14px 34px rgba(0, 0, 0, 0.65)) drop-shadow(0 4px 14px rgba(0, 0, 0, 0.45));
 }
 
+.rj-hud-wrapper.rj-css-ready {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
 .rj-hud-wrapper * {
   box-sizing: border-box;
 }

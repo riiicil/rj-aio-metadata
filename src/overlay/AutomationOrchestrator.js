@@ -197,6 +197,9 @@ export class AutomationOrchestrator {
 
           logger.asset(assetIdx + 1, 'Carousel');
 
+          const platformSettings = this.hud.currentConfig?.platformSettings?.dreamstime || {};
+          const isEditorial = Boolean(platformSettings.isEditorial);
+
           this.hud.isCardProcessing = true;
           this.isCardProcessing = true;
           try {
@@ -219,7 +222,7 @@ export class AutomationOrchestrator {
             const specificKeywordsRaw = this.hud.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
             const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
             const isAiGenerated = Boolean(this.hud.shadow?.querySelector('#rjToggleAiDeclaration')?.checked);
-            const language = this.hud.currentConfig?.platformSettings?.dreamstime?.language || 'en';
+            const language = platformSettings.language || 'en';
 
             const sanitizedData = await generateMetadata({
               image: thumb,
@@ -240,8 +243,6 @@ export class AutomationOrchestrator {
             // Step 4: Inject sanitized metadata
             setStatusBadge(this.hud.isStopping ? 'Stopping...' : 'Injecting...', this.hud.isStopping ? 'Stopping automation (saving work)...' : 'Injecting metadata...');
 
-            const platformSettings = this.hud.currentConfig?.platformSettings?.dreamstime || {};
-            const isEditorial = Boolean(platformSettings.isEditorial);
             const platformOptions = {
               ...platformSettings,
               isAiGenerated,
@@ -263,6 +264,7 @@ export class AutomationOrchestrator {
             // Step 5: Save edits (waits for toast appear & disappear)
             setStatusBadge('Saving...', 'Saving edits...');
             await adapter.saveDraft();
+            if (signal.aborted || this.hud.isStopping) break;
 
             // Step 6: If Mode B (submit_direct), submit for review
             if (platformSettings.mode === 'submit_direct') {
@@ -270,6 +272,8 @@ export class AutomationOrchestrator {
               await adapter.submitForReview(isEditorial);
             }
 
+            processedCount++;
+            this.processedCount = processedCount;
             logger.success(`Completed asset ${assetIdx + 1}${currentId ? ` (ID: ${currentId})` : ''}`);
           } catch (assetErr) {
             if (signal.aborted || assetErr?.message === 'ABORTED') break;
@@ -283,7 +287,13 @@ export class AutomationOrchestrator {
 
           // Step 7: Navigate to Next Asset
           setStatusBadge('Next asset...');
-          const navResult = await adapter.navigateToNext();
+          let navResult;
+          if (platformSettings.mode === 'submit_direct' && typeof adapter.handlePostSubmitTransition === 'function') {
+            navResult = await adapter.handlePostSubmitTransition(currentId);
+          } else {
+            navResult = await adapter.navigateToNext();
+          }
+
           if (navResult?.done) {
             break;
           }

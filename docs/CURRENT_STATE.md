@@ -1,8 +1,8 @@
 # Current Project State — RJ AIO Metadata Extension
 
-*Last Updated: 2026-09-27*<br>
-*Active Branch: `task/multilingual-fixes`*<br>
-*Current Milestone: Multi-Language Architecture & Platform Hardening (Issues 1-5 Complete)*
+*Last Updated: 2026-09-30*<br>
+*Active Branch: `task/dreamstime-and-hud-fixes`*<br>
+*Current Milestone: Version 0.1.3 Release: Dreamstime Mode B & HUD Anti-FOUC Hardening*
 
 ---
 
@@ -15,7 +15,8 @@
 - **Phase 4 — Platform Adapters**: [COMPLETE] (Platform adapters and live alignment verified across all 7 platforms: Adobe Stock, Shutterstock, Freepik / Magnific, Vecteezy, Dreamstime, Depositphotos, and MiriCanvas merged to dev)
 - **Phase 5 — End-to-End Testing & Polish**: [COMPLETE] (100% multi-language resilience without English text dependencies across all 7 platforms; Shutterstock precision spelling approval fix; Dreamstime cross-page continuation; Exclusive single-runner automation concurrency lock & multi-tab isolation; Real-time popup auto-save; Dynamic support & progress ticker; Modularized AutomationOrchestrator.js and platform_forms.js; Bundle-first production obfuscation pipeline generating `dist/LOAD THIS FOLDER/` and `releases/v0.1.0.zip`; Documentation suite and CHANGELOG.md fully synchronized)
 - **Post-v0.1.0 Maintenance**: [COMPLETE] (v0.1.1 patch: added missing `Authorization: Bearer` header for Google Gemini's OpenAI-compatible endpoint in `service_worker.js`, and synchronized toolbar popup Start button readiness with AI provider credentials/models in `popup.js` merged to dev)
-- **Post-v0.1.1 Localization & Platform Hardening**: [COMPLETE] (Issues 1-5 from `bahan/notes.md` resolved: fixed popup vs HUD state synchronization, tab-match Start button readiness, Depositphotos non-English locale URL detection, Depositphotos commercial vs editorial dropdown sync [explicit reset to 'no'], Dreamstime title [300] & description [600] limit expansion, Shutterstock description [450] limit expansion, two-tier per-card + backup bulk saving flow for Shutterstock, and universal non-English numeric category ID resolution across Dreamstime and Shutterstock Photo/Video)
+- **Post-v0.1.1 Localization & Platform Hardening**: [COMPLETE] (v0.1.2 release: Depositphotos commercial vs editorial dropdown sync [explicit reset to 'no'], Dreamstime title [300] & description [600] limit expansion, Shutterstock description [450] limit expansion, two-tier per-card + backup bulk saving flow for Shutterstock, and universal non-English numeric category ID resolution across Dreamstime and Shutterstock Photo/Video merged to dev)
+- **Post-v0.1.2 Platform Bugfixes (v0.1.3)**: [COMPLETE] (v0.1.3 release: Dreamstime Mode B [Submit Immediately] verified working with auto-transition decoupling, toast race condition resolution, and selector bypass elimination; In-Page Overlay HUD Shadow DOM anti-FOUC white glitch fix applied; all 345 test assertions pass 100%)
 
 ---
 
@@ -23,9 +24,10 @@
 
 | Branch | Status | Purpose |
 | :--- | :--- | :--- |
-| `main` | Clean (1 empty commit) | Stable production releases only |
-| `dev` | Integration (Phase 0-5 + v0.1.1 merged) | Active development integration branch |
-| `task/multilingual-fixes` | Active | Multi-language architecture & platform hardening (Issues 1-5 from notes.md) |
+| `main` | Clean (v0.1.2 tagged) | Stable production releases only |
+| `dev` | Integration (Phase 0-5 + v0.1.2 merged) | Active development integration branch |
+| `task/dreamstime-and-hud-fixes` | Active | Dreamstime Mode B auto-transition and HUD refresh glitch resolution |
+| `task/multilingual-fixes` | Merged | Version 0.1.2: Multi-language architecture & platform hardening |
 | `task/fix-gemini-auth-header` | Merged | Version 0.1.1: Fix Google Gemini OpenAI endpoint Authorization header & sync popup start button readiness |
 | `task/e2e-hardening-polish` | Historical | Phase 5: End-to-End Hardening & Polish (v0.1.0 release preparation) |
 
@@ -137,12 +139,13 @@
 - Synchronization & Depositphotos locale suite verified with `scratch/test_sync_and_depositphotos_locale.mjs` (11/11 localized URL match cases, tab match Start button readiness transitions, exclusive lock triggers, and storage sync passes).
 - Syntax validation passed for `src/background/service_worker.js`, `src/overlay/AutomationOrchestrator.js`, `src/overlay/overlay.js`, `src/popup/popup.js`, `src/popup/platform_forms.js`, `src/content/content_main.js`, `src/services/AiPrompt.js`, `src/services/SanitizerService.js`, `src/adapters/ShutterstockAdapter.js`, `src/adapters/DreamstimeAdapter.js`, and `src/adapters/index.js` via `node --check`.
 - Zero Native Emoji Policy strictly enforced across all files, code, and documentation.
-- Version 0.1.2 synchronization verified across `src/manifest.json`, `package.json`, `package-lock.json`, `src/popup/popup.html`, `build.js`, `README.md`, and `CHANGELOG.md`.
+- Version 0.1.3 synchronization verified across `src/manifest.json`, `package.json`, `package-lock.json`, `src/popup/popup.html`, `build.js`, `README.md`, and `CHANGELOG.md`.
 
 ---
 
 ## 7. Immediate Next Step
 
-1. Complete verification and present summary to user.
-2. Await user confirmation before merging `task/multilingual-fixes` into `dev` or building release assets.
+1. Complete handoff documentation and commit changes on `task/dreamstime-and-hud-fixes`.
+2. User verifies Dreamstime Mode B on live contributor page.
+3. Investigate and resolve HUD white element/form glitch on page refresh on this branch as instructed by user.
 

@@ -18,6 +18,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.3] - 2026-09-30
+
+### Fixed
+- **Dreamstime Mode B (Submit Immediately) Auto-Advance & Toast Lifecycle (`src/adapters/DreamstimeAdapter.js`, `src/overlay/AutomationOrchestrator.js`)**:
+  - *Eliminated `#js-submit-message` Selector Bypass*: Removed query on `#js-submit-message:not([style*="none"])` which matched permanently rendered hidden inline containers in 0ms, bypassing toast waiting in both `saveDraft()` and `submitForReview()`. Polling now strictly monitors real Noty notifications (`#noty_layout__bottomRight .noty_bar, .noty_bar`) for text content (`saved`/`success` for draft, `submitted`/`success`/`id:` for submit) with extended 12000ms appearance and 10000ms disappearance timeouts.
+  - *Stabilized Post-Submit Transition & Eliminated Premature Batch Stop*: Resolved issue where `handlePostSubmitTransition()` checked `!modalActive` on tick 1 (at 250ms), mistaking Dreamstime's normal 1.2s - 2.5s AJAX DOM unmount window for batch completion. Decoupled Mode B progression from `#js-next-submit` next-arrow clicks and implemented dedicated polling (up to 15000ms) for newly loaded asset IDs (`candId && candId !== submittedAssetId`) with wrap-around cycle detection.
+  - *Accurate Asset Counter Tracking*: Added `processedCount++` and `this.processedCount` synchronization after each completed asset in Dreamstime carousel loop, ensuring HUD counters and completion summaries reflect true progress.
+  - *Eliminated Browser CSP Warning on `javascript:` Links (`src/adapters/utils/dom_helpers.js`)*: Updated `simulateClick` to temporarily detach `href` on `javascript:` links during synthetic `MouseEvent` dispatch, preventing Chromium Content Security Policy console violations while firing click handlers.
+
+- **In-Page Overlay HUD Shadow DOM Anti-FOUC White Glitch Elimination (`src/overlay/overlay.js`, `src/overlay/overlay.css`)**:
+  - *Root Cause Resolution*: Fixed Flash of Unstyled Content (FOUC) where `<link rel="stylesheet">` loaded asynchronously in the Shadow DOM, causing Chromium's User-Agent stylesheet to render buttons with white/light-grey `buttonface` styling for 20ms - 100ms on page refresh.
+  - *Inline Anti-FOUC Dark Reset*: Injected critical synchronous `<style id="rjAntiFoucStyle">` directly into Shadow Root resetting `button, input, select, textarea` to transparent dark baselines (`.rj-hud-card { background-color: #0d0d0d; }`, `.rj-btn-start { background-color: #079183 !important; }`).
+  - *Visibility Guard*: Kept `.rj-hud-wrapper` initially at `opacity: 0; visibility: hidden;` until `linkEl.onload` / `linkEl.sheet` triggers `.rj-css-ready`, smoothly fading in the HUD without any white element flash.
+
+---
+
 ## [0.1.2] - 2026-09-27
 
 ### Added

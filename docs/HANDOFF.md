@@ -5,17 +5,42 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Version 0.1.2 Bump & Platform Hardening (Issues 1-5 Complete)
-- **Active Branch**: `task/multilingual-fixes`
-- **Latest Commit**: `7f85388` (`chore(release): bump version to 0.1.2 across extension and docs`)
-- **Working Tree**: Clean (on branch `task/multilingual-fixes`)
-- **Build / Test State**: Verified healthy (116/116 tier 3 adapter tests, 85/85 multilingual & saving tests, 65/65 prompt tests, 11/11 localized sync tests, zero native emoji clean)
+- **Current Milestone**: Version 0.1.3 Release: Dreamstime Mode B & HUD Anti-FOUC Hardening
+- **Active Branch**: `task/dreamstime-and-hud-fixes`
+- **Latest Commit**: `b2ad407` (`fix(dreamstime): eliminate js-submit-message selector bypass and stabilize post-submit transition`)
+- **Working Tree**: Changes ready for commit on `task/dreamstime-and-hud-fixes`
+- **Build / Test State**: Verified healthy (345/345 passing: 30/30 Dreamstime suite tests, 116/116 tier 3 adapter tests, 88/88 tier 1, 108/108 tier 2, 3/3 Mode B orchestrator loop, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **Popup vs HUD State Synchronization & Depositphotos Locale URL Detection (`popup.js`, `DepositphotosAdapter.js`)**:
+0. **In-Page Overlay HUD Anti-FOUC White Glitch Elimination (`overlay.js`, `overlay.css`)**:
+   - **Root Cause**: On page refresh, `<link rel="stylesheet">` inside Shadow DOM loaded `overlay.css` asynchronously. In the 20ms - 100ms window before the CSS parsed, Chromium's User-Agent stylesheet rendered `<button>` elements with `background-color: buttonface; border: 2px outset;`, causing white/light-grey buttons to flash in the HUD (`media_1790741918868.png`).
+   - **Fix Applied**:
+     1. Injected synchronous `<style id="rjAntiFoucStyle">` into Shadow Root resetting `button, input, select, textarea` to transparent dark baselines.
+     2. Kept `.rj-hud-wrapper` at `opacity: 0; visibility: hidden;` until `linkEl.onload` / `linkEl.sheet` fires, adding `.rj-css-ready` for a smooth fade-in without white flash.
+
+0. **Dreamstime Mode B Submission Auto-Transition Decoupling & Selector Bypass Resolution (`DreamstimeAdapter.js`, `AutomationOrchestrator.js`, `dom_helpers.js`)**:
+   - **Branch Renamed**: Renamed active branch to `task/dreamstime-and-hud-fixes` per user directive so both the Dreamstime submit fixes and the subsequent HUD refresh glitch fix are developed on the same branch across cleanly separated commits.
+   - **Empirical Analysis of 3 User Recordings (`dev-tools/recordings/`)**:
+     - `rekaman-dreamstime (manuallll)-20260930_124753.json`: Manual recording of submitting 3 assets. Showed save toast takes 3.7s - 7.7s to appear, submit toast takes 4.8s - 6.4s to appear, and new asset modal arrives ~1.3s - 1.8s after submit toast.
+     - `rekaman-dreamstime (save only ext)-20260930_124406.json`: Worked because save-only clicked next arrow (`#js-next-submit`) directly.
+     - `rekaman-dreamstime (submit imm ext)-20260930_124544.json`: Showed submit clicked only 303ms after save, and extension stopped after 250ms mistaking the 1.2s AJAX modal unmount gap for batch completion.
+   - **Root Cause 1 — `#js-submit-message` Selector Bypass (`DreamstimeAdapter.js`)**:
+     - `#js-submit-message:not([style*="none"])` matched permanently rendered element with `data-state="hidden"` on tick 1 (at 0ms).
+     - Stage 2 queried `.noty_bar`, which was `null` (server request takes 3-7s), breaking out in 0ms!
+     - `saveDraft()` and `submitForReview()` exited instantaneously without waiting for either toast.
+     - **Fix**: Removed `#js-submit-message` completely. Polling now strictly targets `#noty_layout__bottomRight .noty_bar, .noty_bar` with 12000ms max appearance and 10000ms max disappearance.
+   - **Root Cause 2 — Transient DOM Unmount Window (`DreamstimeAdapter.js`)**:
+     - Dreamstime removes old modal (`$('#<id>').remove()`) and inserts new modal 1.2s - 2.5s later.
+     - `handlePostSubmitTransition()` checked `!modalActive` immediately at 250ms, falsely concluding batch was finished.
+     - **Fix**: Removed immediate absence check; now polls up to 15000ms specifically for `candId && candId !== submittedAssetId` before verifying if modal is truly gone.
+   - **Orchestrator Counter Tracking (`AutomationOrchestrator.js`)**: Added `processedCount++; this.processedCount = processedCount;` after asset completion in Dreamstime loop.
+   - **CSP Console Warning Elimination (`dom_helpers.js`)**: Temporarily detaches `href` for `javascript:` links during synthetic click.
+   - **Verification**: Verified with 345/345 passing tests across all platform test suites.
+
+00. **Popup vs HUD State Synchronization & Depositphotos Locale URL Detection (`popup.js`, `DepositphotosAdapter.js`)**:
    - **Popup vs HUD State Synchronization Guard (`popup.js`)**: Scoped the `isSavingLocally` guard in `chrome.storage.onChanged` strictly to settings and provider configuration updates (`platformSettings`, `providers`, `activeProvider`, `activePlatform`). Previously, placing `if (isSavingLocally) return;` at the root dropped incoming automation state signals (`changes.rj_automation_state`) and HUD visibility toggles (`changes.rj_overlay_visible`) during local popup auto-saves. Progress updates, start/stop transitions, and overlay visibility events are now guaranteed to process immediately.
    - **Enforced Tab-Match Start Button Readiness in Toolbar Popup (`popup.js`)**: Added `isCurrentTabMatched()` helper and integrated it into the idle evaluation branch of `updateAutomationButtonUI()`. The Start button is now disabled with title `"Active tab does not match this platform"` whenever the active tab URL does not correspond to the selected platform. Added click guard in `btnToggleAutomation` click listener blocking execution if the tab is not matched. Prevents cross-platform deadlocks where HUD locked with "Busy (Platform)".
    - **Depositphotos Non-English Locale URL Detection Fix (`DepositphotosAdapter.js`)**: Updated `isMatch(url)` to check `url.includes('depositphotos.com') && url.includes('/files/unfinished')`. Enables seamless detection for non-English localized contributor URLs (such as `https://depositphotos.com/id/files/unfinished.html`, `/de/files/unfinished.html`, `/es/files/unfinished.html`, `/fr/files/unfinished.html`), allowing `getAdapterForUrl` to resolve properly instead of falling back to unknown page.
@@ -227,25 +252,16 @@ Sub-phase 5.6 has modularized the in-page overlay controller by extracting the m
 
 ## 3. Actionable Next Steps for Incoming Agent
 
-1. **Step 1 (Branch Integration & Merge to `dev`)**:
-   - Merge `task/e2e-hardening-polish` into `dev` using non-fast-forward merge:
+1. **Step 1 (Dreamstime Mode B Live Verification)**:
+   - User verifies Dreamstime Mode B ("Submit Immediately") on a live contributor queue. Confirm that metadata is injected, draft is saved, save toast disappears, `#submitbutton` is clicked directly (without next arrow), submit toast appears and disappears, modal auto-advances to the next asset, and the loop proceeds sequentially without `ReferenceError` or skipping.
+2. **Step 2 (HUD White Element Glitch / FOUC Investigation & Fix)**:
+   - Investigate and resolve the white element/form flicker (FOUC) on the In-Page Overlay HUD during page refresh across all platforms. Work will be performed directly on `task/dreamstime-and-hud-fixes` as a separate subsequent commit.
+3. **Step 3 (Branch Integration & Merge to `dev`)**:
+   - Once both Dreamstime Mode B submit and HUD flicker fixes are complete and verified, merge `task/dreamstime-and-hud-fixes` into `dev` using non-fast-forward merge upon explicit user confirmation:
      ```bash
      git checkout dev
-     git merge --no-ff task/e2e-hardening-polish -m "merge branch 'task/e2e-hardening-polish' into dev"
+     git merge --no-ff task/dreamstime-and-hud-fixes -m "merge branch 'task/dreamstime-and-hud-fixes' into dev"
      ```
-2. **Step 2 (Production Merge to `main` & Release Tagging)**:
-   - Merge `dev` into `main`:
-     ```bash
-     git checkout main
-     git merge --no-ff dev -m "chore(release): v0.1.0"
-     git tag -a v0.1.0 -m "Release v0.1.0"
-     ```
-3. **Step 3 (Remote Push & Archive Distribution)**:
-   - Push branches and tags to GitHub upon user confirmation:
-     ```bash
-     git push origin main dev --tags
-     ```
-   - Publish `releases/v0.1.0.zip` to GitHub Releases, Ko-fi, and Lynk.id.
 
 
 ---
@@ -290,6 +306,9 @@ Incoming agents must pay close attention to these hard-learned lessons:
 11. **Depositphotos Bidirectional Editorial Dropdown Synchronization**:
    - In Depositphotos Contributor, the editorial dropdown (`select._itemeditor__value_is_editorial`) defaults or retains prior state across unfinished items.
    - When automation runs with `isEditorial: false` (commercial mode), the adapter MUST explicitly locate `editorialSelect` and switch it to `'no'` / `'0'` if currently truthy or set to `'yes'`. Omitting the `else` branch leaves pre-existing editorial items stuck in Editorial mode with mandatory country/city validation errors.
+12. **Dreamstime Mode B Native Modal Auto-Advance vs Explicit Carousel Navigation**:
+   - In Dreamstime Contributor (`/upload/edit*`), clicking `#submitbutton` triggers the server-side review submission and Dreamstime's backend automatically loads the next asset into the open modal (or closes the modal if the pending batch is finished).
+   - In Mode B ("Submit Immediately"), the automation loop must NOT invoke `adapter.navigateToNext()`. Clicking `#js-next-submit` when the modal has already auto-advanced causes asset skipping and immediately trips the Infinite Carousel Guard. Always delegate post-submit progression to `adapter.handlePostSubmitTransition(submittedAssetId)` which awaits modal auto-advance and detects modal closure cleanly.
 
 ---
 
@@ -309,6 +328,7 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
+| 63 | 2026-09-30 | `task/dreamstime-and-hud-fixes` | Pending | Resolved platformSettings scoping error in AutomationOrchestrator, eliminated next-arrow submit fallback in DreamstimeAdapter, decoupled Mode B post-submit auto-transition | Live user testing of Dreamstime Mode B & HUD glitch investigation |
 | 62 | 2026-09-27 | `task/multilingual-fixes` | `cfa8fbb` | Implemented Depositphotos bidirectional editorial dropdown synchronization (explicit reset to 'no' when isEditorial: false) and aligned Shutterstock description character limit to 450 across prompt, sanitizer, and adapter | Complete documentation, user review & merge to dev |
 | 61 | 2026-09-27 | `task/multilingual-fixes` | `fdae7a7` | Implemented Issues 3, 4, 5 from notes.md: Dreamstime limit expansion (Title 300, Desc 600), Shutterstock description limit (300), two-tier save workflow (per-card saveDraft + backup bulkSave), and universal multilingual category resolution via numeric IDs for Dreamstime (15 main + subcategories) and Shutterstock (Photo 26 vs Video 19) | Complete documentation, user review & merge to dev |
 | 60 | 2026-09-27 | `task/multilingual-fixes` | `fb930cd` | Fixed popup vs HUD state sync by scoping isSavingLocally guard, enforced tab-match Start button readiness in popup, and resolved Depositphotos non-English locale URL detection (/id/files/unfinished.html) | Address Items 3, 4, 5 in bahan/notes.md (Dreamstime & Shutterstock) |
