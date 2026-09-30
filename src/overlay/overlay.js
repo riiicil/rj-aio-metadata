@@ -513,11 +513,37 @@ export class OverlayHUD {
     // 2. Attach Isolated Shadow DOM
     this.shadow = this.host.attachShadow({ mode: 'open' });
 
-    // 3. Inject Scoped CSS
+    // 3. Inject Anti-FOUC Baseline Reset & Scoped CSS
+    const antiFoucStyle = document.createElement('style');
+    antiFoucStyle.id = 'rjAntiFoucStyle';
+    antiFoucStyle.textContent = [
+      ':host{all:initial;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:12px;color:#cdcdcd;z-index:2147483647;position:fixed;top:0;left:0;pointer-events:none;}',
+      '.rj-hud-wrapper{opacity:0 !important;visibility:hidden !important;pointer-events:none !important;}',
+      '.rj-hud-wrapper.rj-css-ready{opacity:1 !important;visibility:visible !important;pointer-events:auto !important;transition:opacity 0.12s ease-out;}',
+      'button,input,select,textarea{background:transparent !important;color:#cdcdcd;border:none;box-sizing:border-box;font-family:inherit;font-size:inherit;}',
+      '.rj-hud-card{width:270px;background-color:#0d0d0d;color:#cdcdcd;border:1px solid #242728;border-radius:10px;overflow:hidden;}',
+      '.rj-hud-header{height:38px;background-color:#101111;border-bottom:1px solid #242728;}',
+      '.rj-hud-body{background-color:#07080a;}',
+      '.rj-hud-stepper-btn,.rj-hud-btn-icon{background:transparent !important;border:none !important;}',
+      '.rj-hud-btn-action.rj-btn-start{background-color:#079183 !important;color:#ffffff !important;}',
+      '.rj-hud-pill{background-color:#0d0d0d;color:#cdcdcd;border:1px solid #242728;border-radius:9999px;}',
+      '.rj-hidden{display:none !important;}'
+    ].join('\n');
+    this.shadow.appendChild(antiFoucStyle);
+
     const cssUrl = chrome.runtime.getURL('overlay/overlay.css');
     const linkEl = document.createElement('link');
     linkEl.rel = 'stylesheet';
     linkEl.href = cssUrl;
+
+    const markCssReady = () => {
+      if (this.wrapper) {
+        this.wrapper.classList.add('rj-css-ready');
+      }
+    };
+
+    linkEl.onload = markCssReady;
+    linkEl.onerror = markCssReady;
     this.shadow.appendChild(linkEl);
 
     // 4. Render HUD Template
@@ -644,6 +670,13 @@ export class OverlayHUD {
     this.wrapper = this.shadow.querySelector('#rjHudWrapper');
     this.cardEl = this.shadow.querySelector('#rjHudCard');
     this.pillEl = this.shadow.querySelector('#rjHudPill');
+
+    // Anti-FOUC: Reveal HUD once external stylesheet is parsed or ready in cache
+    if (typeof process !== 'undefined' || linkEl.sheet) {
+      markCssReady();
+    } else {
+      setTimeout(markCssReady, 100);
+    }
 
     if (!this.isVisible && this.wrapper) {
       this.wrapper.classList.add('rj-hidden');

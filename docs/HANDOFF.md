@@ -5,15 +5,21 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Dreamstime Mode B Submission Auto-Transition & HUD Hardening
+- **Current Milestone**: Version 0.1.3 Release: Dreamstime Mode B & HUD Anti-FOUC Hardening
 - **Active Branch**: `task/dreamstime-and-hud-fixes`
-- **Latest Commit**: Pending commit (`fix(dreamstime): eliminate js-submit-message selector bypass and stabilize post-submit transition`)
+- **Latest Commit**: `b2ad407` (`fix(dreamstime): eliminate js-submit-message selector bypass and stabilize post-submit transition`)
 - **Working Tree**: Changes ready for commit on `task/dreamstime-and-hud-fixes`
 - **Build / Test State**: Verified healthy (345/345 passing: 30/30 Dreamstime suite tests, 116/116 tier 3 adapter tests, 88/88 tier 1, 108/108 tier 2, 3/3 Mode B orchestrator loop, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
+
+0. **In-Page Overlay HUD Anti-FOUC White Glitch Elimination (`overlay.js`, `overlay.css`)**:
+   - **Root Cause**: On page refresh, `<link rel="stylesheet">` inside Shadow DOM loaded `overlay.css` asynchronously. In the 20ms - 100ms window before the CSS parsed, Chromium's User-Agent stylesheet rendered `<button>` elements with `background-color: buttonface; border: 2px outset;`, causing white/light-grey buttons to flash in the HUD (`media_1790741918868.png`).
+   - **Fix Applied**:
+     1. Injected synchronous `<style id="rjAntiFoucStyle">` into Shadow Root resetting `button, input, select, textarea` to transparent dark baselines.
+     2. Kept `.rj-hud-wrapper` at `opacity: 0; visibility: hidden;` until `linkEl.onload` / `linkEl.sheet` fires, adding `.rj-css-ready` for a smooth fade-in without white flash.
 
 0. **Dreamstime Mode B Submission Auto-Transition Decoupling & Selector Bypass Resolution (`DreamstimeAdapter.js`, `AutomationOrchestrator.js`, `dom_helpers.js`)**:
    - **Branch Renamed**: Renamed active branch to `task/dreamstime-and-hud-fixes` per user directive so both the Dreamstime submit fixes and the subsequent HUD refresh glitch fix are developed on the same branch across cleanly separated commits.
