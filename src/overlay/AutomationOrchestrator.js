@@ -263,6 +263,7 @@ export class AutomationOrchestrator {
             // Step 5: Save edits (waits for toast appear & disappear)
             setStatusBadge('Saving...', 'Saving edits...');
             await adapter.saveDraft();
+            if (signal.aborted || this.hud.isStopping) break;
 
             // Step 6: If Mode B (submit_direct), submit for review
             if (platformSettings.mode === 'submit_direct') {
@@ -283,7 +284,13 @@ export class AutomationOrchestrator {
 
           // Step 7: Navigate to Next Asset
           setStatusBadge('Next asset...');
-          const navResult = await adapter.navigateToNext();
+          let navResult;
+          if (platformSettings.mode === 'submit_direct' && typeof adapter.handlePostSubmitTransition === 'function') {
+            navResult = await adapter.handlePostSubmitTransition(currentId);
+          } else {
+            navResult = await adapter.navigateToNext();
+          }
+
           if (navResult?.done) {
             break;
           }

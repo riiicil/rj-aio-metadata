@@ -762,6 +762,9 @@ export class DreamstimeAdapter extends BaseAdapter {
 
   /**
    * Saves current edits as draft and awaits toast appearance AND disappearance.
+  /**
+   * Saves current edits as draft and awaits toast appearance AND disappearance.
+   * Ensures toast DOM elements are completely resolved before returning.
    * @returns {Promise<boolean>} True if draft saved.
    */
   async saveDraft() {
@@ -784,7 +787,7 @@ export class DreamstimeAdapter extends BaseAdapter {
       toast = document.querySelector(
         '.noty_bar.noty_type__dt-success, #noty_layout__bottomRight .noty_bar, #js-submit-message:not([style*="none"])'
       );
-      if (toast && !toast.getAttribute('style')?.includes('display: none')) {
+      if (toast && !toast.getAttribute('style')?.includes('display: none') && !toast.classList.contains('noty_effects_close')) {
         break;
       }
       await sleep(150);
@@ -808,17 +811,38 @@ export class DreamstimeAdapter extends BaseAdapter {
       logger.info('No toast detected or status updated immediately.');
     }
 
+    // Clean up lingering toast elements in #noty_layout__bottomRight to eliminate race conditions
+    try {
+      const lingering = document.querySelectorAll('#noty_layout__bottomRight .noty_bar');
+      lingering.forEach((el) => {
+        if (el.classList.contains('noty_effects_close') || typeof el.remove === 'function') {
+          el.remove();
+        }
+      });
+    } catch {
+      // Ignore DOM cleanup error
+    }
+
     await sleep(300);
     return true;
   }
 
   /**
    * Submits active file for curator review (Mode B: Submit Immediately) and waits for toast disappearance.
+   * Cleans stale toast nodes before clicking to prevent race condition with preceding saveDraft().
    * @param {boolean} [isEditorial=false]
    * @returns {Promise<boolean>} True if submitted.
    */
   async submitForReview(isEditorial = false) {
     if (typeof document === 'undefined') return false;
+
+    // Pre-check: purge any lingering toast elements from preceding saveDraft
+    try {
+      const staleToasts = document.querySelectorAll('#noty_layout__bottomRight .noty_bar');
+      staleToasts.forEach((el) => el.remove?.());
+    } catch {
+      // Ignore cleanup error
+    }
 
     const submitBtn = document.querySelector(
       'a#submitbutton, #submitbutton, a#js-next-submit, #js-next-submit'
@@ -836,11 +860,11 @@ export class DreamstimeAdapter extends BaseAdapter {
     logger.step('Waiting for submit toast notification to appear...');
     let toast = null;
     const appearStart = Date.now();
-    while ((Date.now() - appearStart) < 3000) {
+    while ((Date.now() - appearStart) < 4000) {
       toast = document.querySelector(
         '.noty_bar, #noty_layout__bottomRight .noty_bar, #js-submit-message:not([style*="none"])'
       );
-      if (toast && !toast.getAttribute('style')?.includes('display: none')) {
+      if (toast && !toast.getAttribute('style')?.includes('display: none') && !toast.classList.contains('noty_effects_close')) {
         break;
       }
       if (typeof process !== 'undefined' && !document.querySelector('#noty_layout__bottomRight, .noty_bar, #js-submit-message')) {
@@ -865,8 +889,103 @@ export class DreamstimeAdapter extends BaseAdapter {
       logger.success('Submit notification resolved.');
     }
 
+    // Post-submit toast cleanup
+    try {
+      const lingering = document.querySelectorAll('#noty_layout__bottomRight .noty_bar');
+      lingering.forEach((el) => {
+        if (el.classList.contains('noty_effects_close') || typeof el.remove === 'function') {
+          el.remove();
+        }
+      });
+    } catch {
+      // Ignore cleanup error
+    }
+
     await sleep(400);
     return true;
+  }
+
+  /**
+   * Handles post-submission transition for Mode B (Submit Immediately).
+   * In Dreamstime, clicking submit automatically consumes the file and advances the modal
+   * to the next unfinished asset or closes the modal if the batch is complete.
+   * This handler detects that auto-transition without clicking the next arrow twice.
+   * @param {string|null} [submittedAssetId=null]
+   * @returns {Promise<{ done: boolean, nextAssetId: string|null }>}
+   */
+  async handlePostSubmitTransition(submittedAssetId = null) {
+    if (typeof document === 'undefined') return { done: true, nextAssetId: null };
+
+    if (submittedAssetId) {
+      this.processedAssetIds.add(submittedAssetId);
+    }
+
+    // 1. Check if edit modal closed immediately upon submit (all assets finished)
+    const modalActive = document.querySelector('div.popup-upload.popup-upload--submit, div.popup-upload');
+    if (!modalActive) {
+      logger.info('Edit modal closed after submission. All assets completed.');
+      return { done: true, nextAssetId: null };
+    }
+
+    // 2. Poll for Dreamstime auto-transitioning modal to the next asset
+    logger.step('Waiting for next asset to load after submission...');
+    let nextId = null;
+    const pollStart = Date.now();
+    while ((Date.now() - pollStart) < 5000) {
+      await sleep(200);
+
+      const modalStillActive = document.querySelector('div.popup-upload.popup-upload--submit, div.popup-upload');
+      if (!modalStillActive) {
+        logger.info('Edit modal closed after submission. All assets completed.');
+        return { done: true, nextAssetId: null };
+      }
+
+      const candId = this.getCurrentAssetId();
+      if (candId && candId !== submittedAssetId) {
+        nextId = candId;
+        break;
+      }
+    }
+
+    // 3. Fallback: If modal is still open and ID unchanged after 5000ms, click next arrow once
+    if (!nextId || nextId === submittedAssetId) {
+      const nextArrow = document.querySelector(
+        'a#js-next-submit.popup-nav__btn--next, #js-next-submit'
+      );
+      if (nextArrow) {
+        logger.step('Auto-advance not detected, attempting next arrow (#js-next-submit)...');
+        simulateClick(nextArrow);
+        const fbStart = Date.now();
+        while ((Date.now() - fbStart) < 3500) {
+          await sleep(200);
+          const candId = this.getCurrentAssetId();
+          if (candId && candId !== submittedAssetId) {
+            nextId = candId;
+            break;
+          }
+        }
+      }
+    }
+
+    // 4. Evaluate cycle completion or next asset readiness
+    if (nextId && nextId !== submittedAssetId) {
+      if (this.processedAssetIds.has(nextId) || (this.firstAssetId && nextId === this.firstAssetId)) {
+        logger.banner(`Carousel loop cycle complete. Returned to processed asset (ID: ${nextId}).`);
+        return { done: true, nextAssetId: nextId };
+      }
+      logger.info(`Advanced to next asset after submission (ID: ${nextId}).`);
+      return { done: false, nextAssetId: nextId };
+    }
+
+    // If modal closed or no new asset detected
+    const finalModalCheck = document.querySelector('div.popup-upload.popup-upload--submit, div.popup-upload');
+    if (!finalModalCheck) {
+      logger.info('Edit modal closed. Automation complete.');
+      return { done: true, nextAssetId: null };
+    }
+
+    logger.info('No further unfinished assets detected after submission.');
+    return { done: true, nextAssetId: null };
   }
 
   /**
@@ -930,3 +1049,4 @@ export class DreamstimeAdapter extends BaseAdapter {
     return { done: false, nextAssetId: nextId };
   }
 }
+
