@@ -448,8 +448,33 @@ export function simulateClick(element) {
   // Trigger the click: prefer native element.click() in browser, fallback to dispatchEvent('click')
   let clickTriggered = false;
   if (typeof element.click === 'function') {
-    element.click();
-    clickTriggered = true;
+    if (element.tagName === 'A' && element.getAttribute('href')?.toLowerCase().startsWith('javascript:')) {
+      const origHref = element.getAttribute('href');
+      try {
+        element.removeAttribute('href');
+        const clickEvt = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          view: typeof window !== 'undefined' ? window : null,
+          button: 0,
+          buttons: 0,
+          clientX,
+          clientY
+        });
+        element.dispatchEvent(clickEvt);
+        clickTriggered = true;
+      } catch {
+        element.click();
+        clickTriggered = true;
+      } finally {
+        if (origHref) {
+          element.setAttribute('href', origHref);
+        }
+      }
+    } else {
+      element.click();
+      clickTriggered = true;
+    }
   }
 
   // In test mocks or non-browser environments, dispatch synthetic click MouseEvent for compatibility

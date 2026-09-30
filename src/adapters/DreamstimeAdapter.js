@@ -401,8 +401,8 @@ export class DreamstimeAdapter extends BaseAdapter {
     const cat3Btn = document.querySelector('#js-remove-cat3, a#js-remove-cat3');
 
     const isAnySet = (c1 && c1.value && c1.value !== '0') ||
-                     (c2 && c2.value && c2.value !== '0') ||
-                     (c3 && c3.value && c3.value !== '0');
+      (c2 && c2.value && c2.value !== '0') ||
+      (c3 && c3.value && c3.value !== '0');
     const isBtnVisible = Boolean(
       (clearAllBtn && clearAllBtn.getAttribute('data-state') !== 'hidden') ||
       (cat1Btn && cat1Btn.getAttribute('data-state') !== 'hidden') ||
@@ -595,7 +595,7 @@ export class DreamstimeAdapter extends BaseAdapter {
 
     if (targetBtn) {
       const isActive = targetBtn.getAttribute?.('data-state') === 'active' ||
-                       Boolean(targetBtn.classList?.contains?.('active'));
+        Boolean(targetBtn.classList?.contains?.('active'));
       if (!isActive) {
         logger.step(`Setting License Type to ${targetLabel}...`);
         simulateClick(targetBtn);
@@ -762,6 +762,9 @@ export class DreamstimeAdapter extends BaseAdapter {
 
   /**
    * Saves current edits as draft and awaits toast appearance AND disappearance.
+  /**
+   * Saves current edits as draft and awaits toast appearance AND disappearance.
+   * Ensures toast DOM elements are completely resolved before returning.
    * @returns {Promise<boolean>} True if draft saved.
    */
   async saveDraft() {
@@ -776,52 +779,93 @@ export class DreamstimeAdapter extends BaseAdapter {
     logger.step('Clicking "Save edits" button (#js-savededits)...');
     simulateClick(saveBtn);
 
-    // 1. Wait for noty toast or success message to appear (up to 4000ms)
+    // 1. Wait for noty save toast to appear (up to 12000ms)
     logger.step('Waiting for save confirmation toast to appear...');
-    let toast = null;
+    let saveToast = null;
     const appearStart = Date.now();
-    while ((Date.now() - appearStart) < 4000) {
-      toast = document.querySelector(
-        '.noty_bar.noty_type__dt-success, #noty_layout__bottomRight .noty_bar, #js-submit-message:not([style*="none"])'
+    const maxAppearTime = typeof process !== 'undefined' ? 500 : 12000;
+    while ((Date.now() - appearStart) < maxAppearTime) {
+      const candidates = document.querySelectorAll(
+        '#noty_layout__bottomRight .noty_bar, .noty_bar'
       );
-      if (toast && !toast.getAttribute('style')?.includes('display: none')) {
+      for (const el of candidates) {
+        if (!el.classList.contains('noty_effects_close') && !el.getAttribute('style')?.includes('display: none')) {
+          const txt = (el.textContent || '').toLowerCase();
+          if (txt.includes('saved') || txt.includes('success')) {
+            saveToast = el;
+            break;
+          }
+        }
+      }
+      if (saveToast) break;
+      if (typeof process !== 'undefined' && !document.querySelector('#noty_layout__bottomRight, .noty_bar')) {
         break;
       }
       await sleep(150);
     }
 
-    // 2. Wait for noty toast to disappear completely from DOM (up to 8000ms)
-    if (toast) {
+    // 2. Wait for save toast to disappear completely from DOM (up to 10000ms)
+    if (saveToast) {
       logger.step('Save toast appeared. Waiting for toast to disappear...');
       const disappearStart = Date.now();
-      while ((Date.now() - disappearStart) < 8000) {
-        const activeToast = document.querySelector(
-          '.noty_bar.noty_type__dt-success, #noty_layout__bottomRight .noty_bar'
+      const maxDisappearTime = typeof process !== 'undefined' ? 500 : 10000;
+      while ((Date.now() - disappearStart) < maxDisappearTime) {
+        let stillVisible = false;
+        const candidates = document.querySelectorAll(
+          '#noty_layout__bottomRight .noty_bar, .noty_bar'
         );
-        if (!activeToast || activeToast.classList.contains('noty_effects_close') || activeToast.getAttribute('style')?.includes('display: none')) {
-          break;
+        for (const el of candidates) {
+          if (!el.classList.contains('noty_effects_close') && !el.getAttribute('style')?.includes('display: none')) {
+            const txt = (el.textContent || '').toLowerCase();
+            if (txt.includes('saved') || txt.includes('success')) {
+              stillVisible = true;
+              break;
+            }
+          }
         }
+        if (!stillVisible) break;
         await sleep(200);
       }
       logger.success('Save toast resolved. Edits saved successfully.');
     } else {
-      logger.info('No toast detected or status updated immediately.');
+      logger.info('No save toast detected or status updated immediately.');
     }
 
-    await sleep(300);
+    // Clean up lingering toast elements in #noty_layout__bottomRight to eliminate race conditions
+    try {
+      const lingering = document.querySelectorAll('#noty_layout__bottomRight .noty_bar');
+      lingering.forEach((el) => {
+        if (el.classList.contains('noty_effects_close') || typeof el.remove === 'function') {
+          el.remove();
+        }
+      });
+    } catch {
+      // Ignore DOM cleanup error
+    }
+
+    await sleep(400);
     return true;
   }
 
   /**
    * Submits active file for curator review (Mode B: Submit Immediately) and waits for toast disappearance.
+   * Cleans stale toast nodes before clicking to prevent race condition with preceding saveDraft().
    * @param {boolean} [isEditorial=false]
    * @returns {Promise<boolean>} True if submitted.
    */
   async submitForReview(isEditorial = false) {
     if (typeof document === 'undefined') return false;
 
+    // Pre-check: purge any lingering toast elements from preceding saveDraft
+    try {
+      const staleToasts = document.querySelectorAll('#noty_layout__bottomRight .noty_bar');
+      staleToasts.forEach((el) => el.remove?.());
+    } catch {
+      // Ignore cleanup error
+    }
+
     const submitBtn = document.querySelector(
-      'a#submitbutton, #submitbutton, a#js-next-submit, #js-next-submit'
+      'a#submitbutton, #submitbutton, input#submitbutton, button#submitbutton, .popup-nav__btn--submit'
     );
     if (!submitBtn) {
       logger.warn('Submit button (#submitbutton) not found.');
@@ -832,37 +876,68 @@ export class DreamstimeAdapter extends BaseAdapter {
     logger.step(`Clicking "${label}" button (#submitbutton)...`);
     simulateClick(submitBtn);
 
-    // 1. Wait for submit toast / notification to appear
+    // 1. Wait for submit toast / notification to appear (up to 12000ms)
     logger.step('Waiting for submit toast notification to appear...');
-    let toast = null;
+    let submitToast = null;
     const appearStart = Date.now();
-    while ((Date.now() - appearStart) < 3000) {
-      toast = document.querySelector(
-        '.noty_bar, #noty_layout__bottomRight .noty_bar, #js-submit-message:not([style*="none"])'
+    const maxAppearTime = typeof process !== 'undefined' ? 500 : 12000;
+    while ((Date.now() - appearStart) < maxAppearTime) {
+      const candidates = document.querySelectorAll(
+        '#noty_layout__bottomRight .noty_bar, .noty_bar'
       );
-      if (toast && !toast.getAttribute('style')?.includes('display: none')) {
-        break;
+      for (const el of candidates) {
+        if (!el.classList.contains('noty_effects_close') && !el.getAttribute('style')?.includes('display: none')) {
+          const txt = (el.textContent || '').toLowerCase();
+          if (txt.includes('submitted') || txt.includes('success') || txt.includes('id:')) {
+            submitToast = el;
+            break;
+          }
+        }
       }
-      if (typeof process !== 'undefined' && !document.querySelector('#noty_layout__bottomRight, .noty_bar, #js-submit-message')) {
+      if (submitToast) break;
+      if (typeof process !== 'undefined' && !document.querySelector('#noty_layout__bottomRight, .noty_bar')) {
         break;
       }
       await sleep(150);
     }
 
-    // 2. Wait for toast to disappear
-    if (toast) {
+    // 2. Wait for submit toast to disappear completely from DOM (up to 10000ms)
+    if (submitToast) {
       logger.step('Submit toast appeared. Waiting for toast to disappear...');
       const disappearStart = Date.now();
-      while ((Date.now() - disappearStart) < 8000) {
-        const activeToast = document.querySelector(
-          '.noty_bar, #noty_layout__bottomRight .noty_bar'
+      const maxDisappearTime = typeof process !== 'undefined' ? 500 : 10000;
+      while ((Date.now() - disappearStart) < maxDisappearTime) {
+        let stillVisible = false;
+        const candidates = document.querySelectorAll(
+          '#noty_layout__bottomRight .noty_bar, .noty_bar'
         );
-        if (!activeToast || activeToast.classList.contains('noty_effects_close') || activeToast.getAttribute('style')?.includes('display: none')) {
-          break;
+        for (const el of candidates) {
+          if (!el.classList.contains('noty_effects_close') && !el.getAttribute('style')?.includes('display: none')) {
+            const txt = (el.textContent || '').toLowerCase();
+            if (txt.includes('submitted') || txt.includes('success') || txt.includes('id:')) {
+              stillVisible = true;
+              break;
+            }
+          }
         }
+        if (!stillVisible) break;
         await sleep(200);
       }
       logger.success('Submit notification resolved.');
+    } else {
+      logger.info('No submit toast detected or status updated immediately.');
+    }
+
+    // Post-submit toast cleanup
+    try {
+      const lingering = document.querySelectorAll('#noty_layout__bottomRight .noty_bar');
+      lingering.forEach((el) => {
+        if (el.classList.contains('noty_effects_close') || typeof el.remove === 'function') {
+          el.remove();
+        }
+      });
+    } catch {
+      // Ignore cleanup error
     }
 
     await sleep(400);
@@ -870,10 +945,64 @@ export class DreamstimeAdapter extends BaseAdapter {
   }
 
   /**
-   * Navigates to next asset in draft mode with Infinite Carousel Loop Guard.
-   * Returns { done: boolean, nextAssetId: string|null }.
+   * Handles post-submission transition for Mode B (Submit Immediately).
+   * In Dreamstime, clicking submit automatically consumes the file and advances the modal
+   * to the next unfinished asset or closes the modal if the batch is complete.
+   * This handler detects that auto-transition without clicking the next arrow.
+   * @param {string|null} [submittedAssetId=null]
    * @returns {Promise<{ done: boolean, nextAssetId: string|null }>}
    */
+  async handlePostSubmitTransition(submittedAssetId = null) {
+    if (typeof document === 'undefined') return { done: true, nextAssetId: null };
+
+    if (submittedAssetId) {
+      this.processedAssetIds.add(submittedAssetId);
+    }
+
+    // Poll for Dreamstime auto-transitioning modal to the next asset (up to 15000ms)
+    // NOTE: Do NOT check for modal absence immediately, because Dreamstime removes the old item
+    // before inserting the new item via AJAX, creating a 1.2s - 2.5s transient DOM unmount window.
+    logger.step('Waiting for next asset to load after submission...');
+    let nextId = null;
+    const pollStart = Date.now();
+    const maxPollTime = typeof process !== 'undefined' ? 800 : 15000;
+    while ((Date.now() - pollStart) < maxPollTime) {
+      await sleep(300);
+
+      // Check if page navigation / redirect is happening
+      if (typeof window !== 'undefined' && window.__rj_is_unloading) {
+        logger.info('Page navigation detected during post-submit. Awaiting new page load...');
+        return { done: false, nextAssetId: null };
+      }
+
+      const candId = this.getCurrentAssetId();
+      if (candId && candId !== submittedAssetId) {
+        nextId = candId;
+        break;
+      }
+    }
+
+    // Evaluate cycle completion or next asset readiness
+    if (nextId && nextId !== submittedAssetId) {
+      if (this.processedAssetIds.has(nextId) || (this.firstAssetId && nextId === this.firstAssetId)) {
+        logger.banner(`Carousel loop cycle complete. Returned to processed asset (ID: ${nextId}).`);
+        return { done: true, nextAssetId: nextId };
+      }
+      logger.info(`Advanced to next asset after submission (ID: ${nextId}).`);
+      return { done: false, nextAssetId: nextId };
+    }
+
+    // If no new asset ID loaded after polling, verify whether the edit modal has truly closed
+    const finalModalCheck = document.querySelector('div.popup-upload.popup-upload--submit, div.popup-upload');
+    if (!finalModalCheck) {
+      logger.info('Edit modal closed after submission. All assets completed.');
+      return { done: true, nextAssetId: null };
+    }
+
+    logger.info('No further unfinished assets detected after submission.');
+    return { done: true, nextAssetId: null };
+  }
+
   async navigateToNext() {
     if (typeof document === 'undefined') return { done: true, nextAssetId: null };
 
@@ -930,3 +1059,4 @@ export class DreamstimeAdapter extends BaseAdapter {
     return { done: false, nextAssetId: nextId };
   }
 }
+
