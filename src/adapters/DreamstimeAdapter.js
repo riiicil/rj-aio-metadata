@@ -8,7 +8,7 @@
  * - Granular condition-checked metadata clearing (#js-remove-title, #js-remove-all-description, #js-remove-cat*, #js-remove-all-key).
  * - Category pairs interaction with asynchronous subcategory option polling (select#M_Category_1/2/3 -> select#M_Subcategory_1/2/3).
  *   AI Mode Special Rule: Category 3 is hardcoded to "Illustration & Clipart" and "Generative AI".
- * - Keywords single-word per tag splitting, deduplication, and chip injection (clamped <= 70 tags).
+ * - Keywords single-word per tag splitting, deduplication, and chip injection (clamped <= 80 tags).
  * - License type selection: Commercial (RF) vs Editorial (ED) in #licensesubmissiontype.
  * - Save Draft with Toast Confirmation: clicks #js-savededits, awaits toast appearance AND disappearance.
  * - Submit for Review: clicks #submitbutton, awaits toast appearance AND disappearance.
@@ -615,7 +615,7 @@ export class DreamstimeAdapter extends BaseAdapter {
    * - Step 5: Fill Main Cat 2 & Subcat 2 (with option polling).
    * - Step 6: Fill Main Cat 3 & Subcat 3 (AI Mode: "Illustration & Clipart" / "Generative AI").
    * - Step 7: Clear old keywords.
-   * - Step 8: Fill Keywords (split multi-words into single words, clamped <= 70 tags).
+   * - Step 8: Fill Keywords (split multi-words into single words, clamped <= 80 tags).
    * - Step 9: Set License Type (Commercial RF vs Editorial ED).
    *
    * @param {Object} metadata - Sanitized metadata payload.
@@ -633,11 +633,12 @@ export class DreamstimeAdapter extends BaseAdapter {
       await sleep(150);
     }
 
-    // 2. Fill Title
+    // 2. Fill Title (safe bounds <= 125 chars)
     const titleInput = document.querySelector('input#title, input[name="M_title"]');
     if (titleInput && metadata.title) {
-      logger.step(`Injecting title: "${metadata.title.slice(0, 40)}..."`);
-      setNativeValue(titleInput, metadata.title);
+      const cleanTitle = String(metadata.title).slice(0, 125);
+      logger.step(`Injecting title: "${cleanTitle.slice(0, 40)}..."`);
+      setNativeValue(titleInput, cleanTitle);
       titleInput.dispatchEvent(new Event('input', { bubbles: true }));
       titleInput.dispatchEvent(new Event('change', { bubbles: true }));
       await sleep(250);
@@ -741,8 +742,10 @@ export class DreamstimeAdapter extends BaseAdapter {
           }
         }
 
-        const finalTags = cleanSingleWords.slice(0, 70).join(', ');
-        logger.step(`Injecting ${cleanSingleWords.slice(0, 70).length} single-word keywords...`);
+        const tagLimit = Number(options.keywordCount) || 80;
+        const targetWords = cleanSingleWords.slice(0, Math.min(tagLimit, 80));
+        const finalTags = targetWords.join(', ');
+        logger.step(`Injecting ${targetWords.length} single-word keywords...`);
         kwInput.focus();
         setNativeValue(kwInput, finalTags);
         simulateEnterKey(kwInput);

@@ -136,7 +136,7 @@ export const DEFAULT_CONFIG = {
       customAiSoftware: ''
     },
     dreamstime: {
-      keywordCount: 70,
+      keywordCount: 80,
       specificKeywords: '',
       mode: 'save_draft',
       isEditorial: false,
@@ -242,7 +242,7 @@ export class StorageService {
       const obsoleteKeys = ['autoSaveDraft', 'mediaType', 'contentType', 'cityName'];
       const limits = {
         adobestock: { min: 8, max: 49 },
-        dreamstime: { min: 8, max: 70 },
+        dreamstime: { min: 8, max: 80 },
         miricanvas: { min: 8, max: 25 },
         shutterstock: { min: 8, max: 50 },
         freepik: { min: 8, max: 50 },

@@ -446,7 +446,7 @@ export function getPlatformOutputSchema(platformId = 'adobestock', { isAiGenerat
 
     case 'dreamstime':
       return {
-        title: 'string, 20-50 words, <=300 characters, descriptive title without punctuation at end',
+        title: 'string, 12-25 words, <=125 characters, concise descriptive title without punctuation at end',
         description: 'string, 60-90 words, <=600 characters, detailed comprehensive description including setting, details, and style',
         categories: isAiGenerated
           ? [
@@ -458,7 +458,7 @@ export function getPlatformOutputSchema(platformId = 'adobestock', { isAiGenerat
             { main: 'Main Category Name', sub: 'Subcategory Name' },
             { main: 'Main Category Name', sub: 'Subcategory Name' }
           ],
-        keywords: ['string, 80 highly relevant microstock tags ordered from specific to general']
+        keywords: ['string, 90-100 highly relevant microstock tags ordered from specific to general']
       };
 
     case 'depositphotos':
@@ -535,13 +535,17 @@ export function buildPrompt({
     ? `\n6. TARGET LANGUAGE: All title and keyword fields MUST be strictly generated in ${resolvedLang.name} (${resolvedLang.code}). Do not use English.`
     : '';
 
+  const keywordCountRule = normPlatform === 'dreamstime'
+    ? '2. KEYWORDS COUNT: For Dreamstime, you MUST generate between 90 and 100 keywords (aim for 95-100 tags). Order keywords strictly by relevance from most specific primary subject to broader contextual and atmospheric tags. This ensures that after single-word splitting and deduplication, the platform limit of 80 tags is completely fulfilled.'
+    : '2. KEYWORDS COUNT: You MUST generate EXACTLY 80 keywords. Order keywords strictly by relevance from most specific primary subject (first 10 tags) to broader contextual, atmospheric, and conceptual tags (tags 11-80).';
+
   // 1. Universal System Prompt
   const systemPrompt = `You are a world-class microstock contributor SEO specialist and commercial metadata optimizer.
 Your objective is to generate accurate, commercially viable, and high-converting metadata for microstock contributor platforms.
 
 Universal Microstock Rules:
 1. COMMERCIAL VIABILITY: Focus on commercial buyers, searchable concepts, and industry-standard stock photography terminology.
-2. KEYWORDS COUNT: You MUST generate EXACTLY 80 keywords. Order keywords strictly by relevance from most specific primary subject (first 10 tags) to broader contextual, atmospheric, and conceptual tags (tags 11-80).
+${keywordCountRule}
 3. KEYWORD STRUCTURE: Each keyword must be a single word or a maximum 2-word phrase (e.g. "coffee cup", "digital nomad"). No full sentences, no special characters, and no punctuation inside tags.
 4. FORBIDDEN KEYWORDS: NEVER include spammy or prohibited terms such as: "best", "top", "isolated", "white background", "no people", "copy space", "copyspace", or registered trademarks and brand names.
 5. FORMATTING: Return strictly valid JSON matching the requested schema. Do not enclose the output in markdown code blocks (\`\`\`json ... \`\`\`), do not provide explanations, notes, or commentary.${langPromptRule}`;

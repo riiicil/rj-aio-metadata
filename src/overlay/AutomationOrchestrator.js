@@ -218,7 +218,7 @@ export class AutomationOrchestrator {
             // Step 3: AI Metadata Generation
             setStatusBadge(this.hud.isStopping ? 'Stopping...' : 'Generating...', this.hud.isStopping ? 'Stopping automation (saving work)...' : 'Generating AI metadata...');
 
-            let keywordCount = Number(this.hud.shadow?.querySelector('#rjInputKeywordCount')?.value) || 70;
+            let keywordCount = Number(this.hud.shadow?.querySelector('#rjInputKeywordCount')?.value) || 80;
             const specificKeywordsRaw = this.hud.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
             const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
             const isAiGenerated = Boolean(this.hud.shadow?.querySelector('#rjToggleAiDeclaration')?.checked);

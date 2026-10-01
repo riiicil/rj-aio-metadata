@@ -17,7 +17,7 @@ import { PLATFORM_CATEGORIES } from './AiPrompt.js';
 export const PLATFORM_KEYWORD_LIMITS = {
   adobestock: 49,
   miricanvas: 25,
-  dreamstime: 70,
+  dreamstime: 80,
   shutterstock: 50,
   vecteezy: 50,
   freepik: 50,
@@ -33,7 +33,7 @@ export const PLATFORM_TITLE_LIMITS = {
   freepik: 100,
   adobestock: 200,
   vecteezy: 200,
-  dreamstime: 300,
+  dreamstime: 125,
   default: 200
 };
 

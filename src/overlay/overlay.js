@@ -11,7 +11,7 @@ import { AutomationOrchestrator } from './AutomationOrchestrator.js';
 // Platform Keyword Count Constraints & Hints
 const PLATFORM_LIMITS = {
   adobestock: { min: 8, max: 49, hint: 'Min 8, Max 49' },
-  dreamstime: { min: 8, max: 70, hint: 'Min 8, Max 70' },
+  dreamstime: { min: 8, max: 80, hint: 'Min 8, Max 80' },
   miricanvas: { min: 8, max: 25, hint: 'Min 8, Max 25' },
   shutterstock: { min: 8, max: 50, hint: 'Min 8, Max 50' },
   freepik: { min: 8, max: 50, hint: 'Min 8, Max 50' },
