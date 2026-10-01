@@ -433,8 +433,9 @@ export class AutomationOrchestrator {
           await adapter.fillMetadata(sanitizedData, platformOptions, card);
           processedCount++;
 
-          // Step 6: Per-item save (for Freepik and Shutterstock)
-          if (this.hud.platformId === 'freepik' || this.hud.platformId === 'shutterstock') {
+          // Step 6: Per-item save (for Freepik, Shutterstock, and Vecteezy)
+          if (this.hud.platformId === 'freepik' || this.hud.platformId === 'shutterstock' || this.hud.platformId === 'vecteezy') {
+            setStatusBadge(this.hud.isStopping ? 'Stopping...' : 'Saving...', this.hud.isStopping ? 'Stopping automation (saving work)...' : 'Saving draft metadata...');
             await adapter.saveDraft();
           }
 

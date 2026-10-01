@@ -5,15 +5,26 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Multi-Platform Tab Isolation & Dreamstime Limit Calibration
-- **Active Branch**: `task/multitab-and-dreamstime-fixes`
-- **Latest Commit**: `a5735f4` (`feat(dreamstime): calibrate title limit to 125 chars and expand keywords to 80`)
+- **Current Milestone**: Multi-Platform Tab Isolation, Dreamstime Limit Calibration & Vecteezy Per-Card Saving
+- **Active Branch**: `task/multitab-and-platform-fixes`
+- **Latest Commit**: `1861459` (`feat(vecteezy): integrate per-card draft saving in automation loop`)
 - **Working Tree**: Clean
-- **Build / Test State**: Verified healthy (160+ passing: 9/9 multi-tab isolation, 30/30 Dreamstime limits, 66/66 AI prompt, 88/88 sanitizer, 87/87 multilingual, 116/116 Tier 3 adapters)
+- **Build / Test State**: Verified healthy (160+ passing: test_vecteezy_per_card_saving, 9/9 multi-tab isolation, 30/30 Dreamstime limits, 66/66 AI prompt, 88/88 sanitizer, 87/87 multilingual, 116/116 Tier 3 adapters)
 
 ---
 
 ## 2. Active In-Flight Context
+
+000. **Vecteezy Per-Card Save Draft Integration (`VecteezyAdapter.js`, `AutomationOrchestrator.js`)**:
+   - **Root Cause & Rationale**:
+     - User reported missed metadata on Vecteezy and provided two session recordings (`rekaman-vecteezy-20261001_213351.json` & `213629.json`).
+     - Analysis revealed Vecteezy previously had no per-card saveDraft execution in the automation loop; it only relied on an end-of-batch `bulkSave()` strategy (`Deselect all` -> `Select all` -> `Save changes`).
+     - If automation was interrupted or stopped prematurely (e.g. stopped at card 10 of 100), all processed cards remained unsaved drafts and risked data loss upon navigation or browser closure.
+     - When individual cards are selected in Vecteezy's sidebar (`(1) Files selected`), `div[data-testid="save-changes-icon"]` is permanently available in the right-hand panel header.
+   - **Fix Applied**:
+     1. In `VecteezyAdapter.js:saveDraft()`, scoped element resolution to `this.getEditorForm() || document`, added logger step reporting, and integrated progress spinner polling (`[role="progressbar"]`, `.MuiCircularProgress-svg`) with a 3-second ceiling.
+     2. In `AutomationOrchestrator.js`, added `this.hud.platformId === 'vecteezy'` to the per-item save branch (`if (this.hud.platformId === 'freepik' || this.hud.platformId === 'shutterstock' || this.hud.platformId === 'vecteezy')`), updating status badge to `Saving...` while persisting changes.
+   - **Verification**: Verified with `scratch/test_vecteezy_per_card_saving.mjs` (100% passed) and verified production bundle build via `node build.js`.
 
 0. **Dreamstime Title Limit Calibration (125 Chars) & Keyword Expansion (80 Tags) (`AiPrompt.js`, `SanitizerService.js`, `StorageService.js`, `platform_forms.js`, `overlay.js`, `AutomationOrchestrator.js`, `DreamstimeAdapter.js`)**:
    - **Root Cause & Platform Constraints**:

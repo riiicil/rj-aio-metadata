@@ -1,8 +1,8 @@
 # Current Project State — RJ AIO Metadata Extension
 
 *Last Updated: 2026-10-01*<br>
-*Active Branch: `task/multitab-and-dreamstime-fixes`*<br>
-*Current Milestone: Multi-Platform Tab Isolation & Dreamstime Limit Calibration*
+*Active Branch: `task/multitab-and-platform-fixes`*<br>
+*Current Milestone: Multi-Platform Tab Isolation, Dreamstime Limit Calibration & Vecteezy Per-Card Saving*
 
 ---
 
@@ -19,6 +19,7 @@
 - **Post-v0.1.2 Platform Bugfixes (v0.1.3)**: [COMPLETE] (v0.1.3 release: Dreamstime Mode B [Submit Immediately] verified working with auto-transition decoupling, toast race condition resolution, and selector bypass elimination; In-Page Overlay HUD Shadow DOM anti-FOUC white glitch fix applied; all 345 test assertions pass 100%)
 - **Multi-Tab Isolation & Freeze Elimination**: [COMPLETE] (Fixed cross-tab ping-pong loop, promisified GET_SENDER_TAB_ID, enforced same-platform tabId scoping with 'Busy (another tab)', and added background tab scanner throttling; 9/9 unit tests passed)
 - **Dreamstime Title & Keyword Limit Calibration**: [COMPLETE] (Calibrated Dreamstime title limit to <= 125 chars to prevent platform 130-char truncation, expanded keywords to 80 tags across full stack, and tuned AI prompt schema to generate 90-100 keywords to guarantee reaching 80 after whitespace single-word splitting; 30/30 unit tests passed)
+- **Vecteezy Per-Card Save Draft Integration**: [COMPLETE] (Integrated per-card saveDraft execution in AutomationOrchestrator loop for Vecteezy with saveIcon spinner polling and editorForm scoping)
 
 ---
 
@@ -28,7 +29,7 @@
 | :--- | :--- | :--- |
 | `main` | Clean (v0.1.3 tagged) | Stable production releases only |
 | `dev` | Integration (v0.1.3 merged) | Active development integration branch |
-| `task/multitab-and-dreamstime-fixes` | Active | Multi-platform tab isolation, freeze elimination, and Dreamstime limits calibration |
+| `task/multitab-and-platform-fixes` | Active | Multi-platform tab isolation, Dreamstime limit calibration, and Vecteezy per-card saving |
 | `task/dreamstime-and-hud-fixes` | Merged | Version 0.1.3: Dreamstime Mode B auto-transition and HUD refresh glitch resolution |
 | `task/multilingual-fixes` | Merged | Version 0.1.2: Multi-language architecture & platform hardening |
 | `task/fix-gemini-auth-header` | Merged | Version 0.1.1: Fix Google Gemini OpenAI endpoint Authorization header & sync popup start button readiness |
