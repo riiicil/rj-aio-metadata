@@ -5,17 +5,66 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Version 0.1.3 Release: Dreamstime Mode B & HUD Anti-FOUC Hardening
-- **Active Branch**: `task/dreamstime-and-hud-fixes`
-- **Latest Commit**: `b2ad407` (`fix(dreamstime): eliminate js-submit-message selector bypass and stabilize post-submit transition`)
-- **Working Tree**: Changes ready for commit on `task/dreamstime-and-hud-fixes`
-- **Build / Test State**: Verified healthy (345/345 passing: 30/30 Dreamstime suite tests, 116/116 tier 3 adapter tests, 88/88 tier 1, 108/108 tier 2, 3/3 Mode B orchestrator loop, zero native emoji clean)
+- **Current Milestone**: Platform Resilience, Dreamstime Calibration & Universal AI Auto-Retry (v0.1.4 Release)
+- **Active Branch**: `task/multitab-and-platform-fixes`
+- **Latest Commit**: `e4a8e72` (`chore(release): bump version to v0.1.4 and synchronize release documentation`)
+- **Working Tree**: Clean
+- **Build / Test State**: Verified healthy (160+ passing: test_ai_retry, test_vecteezy_per_card_saving, 9/9 multi-tab isolation, 30/30 Dreamstime limits, 66/66 AI prompt, 88/88 sanitizer, 87/87 multilingual, 116/116 Tier 3 adapters)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **In-Page Overlay HUD Anti-FOUC White Glitch Elimination (`overlay.js`, `overlay.css`)**:
+0000. **Universal AI Generation Auto-Retry (`AutomationOrchestrator.js`)**:
+   - **Root Cause & Rationale**:
+     - Transient Vision API failures (HTTP 429 rate limits, socket timeouts, 502/503/504 provider gateway errors) caused entire assets to be silently skipped in `AutomationOrchestrator` when processing batches.
+     - User requested a single-retry fallback across all platforms, displaying `"Retrying AI..."` without count numbers on the HUD badge, while leaving the completion summary unchanged.
+   - **Fix Applied**:
+     1. Implemented `async _generateMetadataWithRetry(params, signal, setStatusBadge)` on `AutomationOrchestrator`:
+        - Catches initial failure, logs warning, displays `Retrying AI...` on HUD badge.
+        - Waits 1500ms backoff before retrying `generateMetadata(params)` once.
+        - If retry succeeds, execution proceeds seamlessly; if retry fails, propagates error to outer handler.
+     2. Integrated `this._generateMetadataWithRetry()` into both `runDreamstimeLoop` and `processLoop`.
+   - **Verification**: Verified with `scratch/test_ai_retry.mjs` (100% passed) and regression suites.
+
+000. **Vecteezy Per-Card Save Draft Integration (`VecteezyAdapter.js`, `AutomationOrchestrator.js`)**:
+   - **Root Cause & Rationale**:
+     - User reported missed metadata on Vecteezy and provided two session recordings (`rekaman-vecteezy-20261001_213351.json` & `213629.json`).
+     - Analysis revealed Vecteezy previously had no per-card saveDraft execution in the automation loop; it only relied on an end-of-batch `bulkSave()` strategy (`Deselect all` -> `Select all` -> `Save changes`).
+     - If automation was interrupted or stopped prematurely (e.g. stopped at card 10 of 100), all processed cards remained unsaved drafts and risked data loss upon navigation or browser closure.
+     - When individual cards are selected in Vecteezy's sidebar (`(1) Files selected`), `div[data-testid="save-changes-icon"]` is permanently available in the right-hand panel header.
+   - **Fix Applied**:
+     1. In `VecteezyAdapter.js:saveDraft()`, scoped element resolution to `this.getEditorForm() || document`, added logger step reporting, and integrated progress spinner polling (`[role="progressbar"]`, `.MuiCircularProgress-svg`) with a 3-second ceiling.
+     2. In `AutomationOrchestrator.js`, added `this.hud.platformId === 'vecteezy'` to the per-item save branch (`if (this.hud.platformId === 'freepik' || this.hud.platformId === 'shutterstock' || this.hud.platformId === 'vecteezy')`), updating status badge to `Saving...` while persisting changes.
+   - **Verification**: Verified with `scratch/test_vecteezy_per_card_saving.mjs` (100% passed) and verified production bundle build via `node build.js`.
+
+0. **Dreamstime Title Limit Calibration (125 Chars) & Keyword Expansion (80 Tags) (`AiPrompt.js`, `SanitizerService.js`, `StorageService.js`, `platform_forms.js`, `overlay.js`, `AutomationOrchestrator.js`, `DreamstimeAdapter.js`)**:
+   - **Root Cause & Platform Constraints**:
+     - User discovered that titles on Dreamstime's contributor upload portal (`input#title`) were truncated because Dreamstime enforces a hard character ceiling of 130 characters (not 300+ as previously assumed).
+     - User requested calibrating Dreamstime title limit down to a safe bound of 125 characters to leave an ample safety buffer against platform truncation.
+     - User requested expanding the keyword count limit to 80 tags (Dreamstime's official platform ceiling).
+     - Dreamstime strictly requires single-word tags (`/\s+/` split in `SanitizerService.js`). When multi-word tags are split into single words and deduplicated, generating only 80 raw tags from AI frequently left fewer than 80 clean unique tags.
+   - **Fix Applied**:
+     1. In `SanitizerService.js`, updated `PLATFORM_KEYWORD_LIMITS.dreamstime = 80` and `PLATFORM_TITLE_LIMITS.dreamstime = 125`.
+     2. In `StorageService.js`, updated `DEFAULT_CONFIG.platformSettings.dreamstime.keywordCount = 80` and migration limits `{ min: 8, max: 80 }`.
+     3. In `platform_forms.js`, updated `PLATFORM_LIMITS.dreamstime` to `{ min: 8, max: 80, hint: 'Min 8, Max 80 (Dreamstime limit)' }`.
+     4. In `overlay.js`, updated `PLATFORM_LIMITS.dreamstime = { min: 8, max: 80 }` for the Quick Form stepper.
+     5. In `AutomationOrchestrator.js`, updated Dreamstime fallback keyword count to `80`.
+     6. In `DreamstimeAdapter.js`, clamped injected title to `<= 125 chars` and made keyword tag slicing dynamic up to `options?.keywordCount || 80` (clamped to 80).
+     7. In `AiPrompt.js`, updated schema to specify `<=125 characters` title and `90-100` keywords array, and added explicit system prompt instruction: `"For Dreamstime, generate between 90 and 100 keywords to ensure ample single-word tags after deduplication."`.
+   - **Verification**: Verified with `scratch/test_dreamstime_fixes.mjs` (30/30 passed), `scratch/test_sanitizer_service.mjs` (88/88 passed), `scratch/test_multilingual_categories_and_saving.mjs` (87/87 passed), `scratch/test_ai_prompt.mjs` (66/66 passed), and `scratch/test_tier3_adapters.mjs` (116/116 passed).
+
+00. **Multi-Platform Cross-Tab Isolation & Freeze Elimination (`overlay.js`, `popup.js`, `service_worker.js`)**:
+   - **Root Cause**: Opening platforms in parallel or duplicate tabs triggered an unawaited `GET_SENDER_TAB_ID` (`this.tabId === null`), same-platform storage event ping-pongs (`onStorageChanged` calling `startAutomation`/`stopAutomation` at 60fps), and sibling tab mounting auto-heals wiping storage `isRunning: false`.
+   - **Fix Applied**:
+     1. Promisified and awaited `GET_SENDER_TAB_ID` in `overlay.js:init()`.
+     2. Scoped `onStorageChanged` to check `isAnotherTab = Boolean(state.tabId && this.tabId && state.tabId !== this.tabId)`. If running on another tab (even same platform), lock HUD with `Busy (another tab)` and do not trigger `startAutomation`/`stopAutomation`.
+     3. Scoped `restoreAutomationState()` so newly mounted tabs do not wipe storage if another tab owns the automation.
+     4. Populated `tabId: activeTabInfo?.tabId || null` in `popup.js`.
+     5. Throttled DOM scanning in `startAssetScanner()` for background tabs (`document.hidden`).
+   - **Verification**: Verified with `scratch/test_multi_tab_isolation.mjs` (9/9 passed).
+
+1. **In-Page Overlay HUD Anti-FOUC White Glitch Elimination (`overlay.js`, `overlay.css`)**:
    - **Root Cause**: On page refresh, `<link rel="stylesheet">` inside Shadow DOM loaded `overlay.css` asynchronously. In the 20ms - 100ms window before the CSS parsed, Chromium's User-Agent stylesheet rendered `<button>` elements with `background-color: buttonface; border: 2px outset;`, causing white/light-grey buttons to flash in the HUD (`media_1790741918868.png`).
    - **Fix Applied**:
      1. Injected synchronous `<style id="rjAntiFoucStyle">` into Shadow Root resetting `button, input, select, textarea` to transparent dark baselines.
@@ -252,17 +301,17 @@ Sub-phase 5.6 has modularized the in-page overlay controller by extracting the m
 
 ## 3. Actionable Next Steps for Incoming Agent
 
-1. **Step 1 (Dreamstime Mode B Live Verification)**:
-   - User verifies Dreamstime Mode B ("Submit Immediately") on a live contributor queue. Confirm that metadata is injected, draft is saved, save toast disappears, `#submitbutton` is clicked directly (without next arrow), submit toast appears and disappears, modal auto-advances to the next asset, and the loop proceeds sequentially without `ReferenceError` or skipping.
-2. **Step 2 (HUD White Element Glitch / FOUC Investigation & Fix)**:
-   - Investigate and resolve the white element/form flicker (FOUC) on the In-Page Overlay HUD during page refresh across all platforms. Work will be performed directly on `task/dreamstime-and-hud-fixes` as a separate subsequent commit.
+1. **Step 1 (Dreamstime Limit Calibration Commit)**:
+   - Commit staged changes on `task/multitab-and-dreamstime-fixes` with commit message `feat(dreamstime): calibrate title limit to 125 chars and expand keywords to 80`.
+2. **Step 2 (Live User Verification)**:
+   - User tests simultaneous multi-tab opening across platforms, verifying no CPU lockup or infinite ping-pong loops, with non-runner tabs displaying `Busy (another tab)`.
+   - User tests Dreamstime title injection, verifying titles do not exceed 125 characters (preventing platform 130-char truncation), and keywords populate up to 80 single-word tags.
 3. **Step 3 (Branch Integration & Merge to `dev`)**:
-   - Once both Dreamstime Mode B submit and HUD flicker fixes are complete and verified, merge `task/dreamstime-and-hud-fixes` into `dev` using non-fast-forward merge upon explicit user confirmation:
+   - Once verified, merge `task/multitab-and-dreamstime-fixes` into `dev` using non-fast-forward merge upon explicit user confirmation:
      ```bash
      git checkout dev
-     git merge --no-ff task/dreamstime-and-hud-fixes -m "merge branch 'task/dreamstime-and-hud-fixes' into dev"
+     git merge --no-ff task/multitab-and-dreamstime-fixes -m "merge branch 'task/multitab-and-dreamstime-fixes' into dev"
      ```
-
 
 ---
 
@@ -309,6 +358,9 @@ Incoming agents must pay close attention to these hard-learned lessons:
 12. **Dreamstime Mode B Native Modal Auto-Advance vs Explicit Carousel Navigation**:
    - In Dreamstime Contributor (`/upload/edit*`), clicking `#submitbutton` triggers the server-side review submission and Dreamstime's backend automatically loads the next asset into the open modal (or closes the modal if the pending batch is finished).
    - In Mode B ("Submit Immediately"), the automation loop must NOT invoke `adapter.navigateToNext()`. Clicking `#js-next-submit` when the modal has already auto-advanced causes asset skipping and immediately trips the Infinite Carousel Guard. Always delegate post-submit progression to `adapter.handlePostSubmitTransition(submittedAssetId)` which awaits modal auto-advance and detects modal closure cleanly.
+13. **Dreamstime 130-Char Title Ceiling & 90-100 Keyword AI Prompt Target**:
+   - Dreamstime's title input (`input#title`) enforces a hard platform limit of 130 characters. The extension sets a safe upper bound of 125 characters across `SanitizerService.js`, `AiPrompt.js`, and `DreamstimeAdapter.js`.
+   - Dreamstime mandates single-word keyword tags. Multi-word phrases are split into individual words and deduplicated. To guarantee reaching the full 80-keyword quota after single-word splitting, `AiPrompt.js` instructs the AI model to generate 90 to 100 keywords for Dreamstime.
 
 ---
 
@@ -328,7 +380,9 @@ Incoming agents must pay close attention to these hard-learned lessons:
 
 | Session | Date | Branch | Commit | Summary | Next Focus |
 | :---: | :---: | :--- | :--- | :--- | :--- |
-| 63 | 2026-09-30 | `task/dreamstime-and-hud-fixes` | Pending | Resolved platformSettings scoping error in AutomationOrchestrator, eliminated next-arrow submit fallback in DreamstimeAdapter, decoupled Mode B post-submit auto-transition | Live user testing of Dreamstime Mode B & HUD glitch investigation |
+| 65 | 2026-10-01 | `task/multitab-and-dreamstime-fixes` | `a5735f4` | Calibrated Dreamstime title limit to 125 chars (preventing 130-char truncation), expanded keyword quota to 80 tags across full stack, and tuned AI prompt to generate 90-100 keywords | User live verification & merge to dev |
+| 64 | 2026-10-01 | `task/multitab-and-dreamstime-fixes` | `b6c660f` | Isolated cross-tab automation state, promisified sender tab ID, added same-platform tab lock with Busy (another tab), and throttled background tab scanners | Dreamstime limits calibration |
+| 63 | 2026-09-30 | `task/dreamstime-and-hud-fixes` | `7a72c28` | Resolved platformSettings scoping error in AutomationOrchestrator, decoupled Mode B post-submit auto-transition, eliminated Shadow DOM white button FOUC glitch | Multi-tab isolation & freeze elimination |
 | 62 | 2026-09-27 | `task/multilingual-fixes` | `cfa8fbb` | Implemented Depositphotos bidirectional editorial dropdown synchronization (explicit reset to 'no' when isEditorial: false) and aligned Shutterstock description character limit to 450 across prompt, sanitizer, and adapter | Complete documentation, user review & merge to dev |
 | 61 | 2026-09-27 | `task/multilingual-fixes` | `fdae7a7` | Implemented Issues 3, 4, 5 from notes.md: Dreamstime limit expansion (Title 300, Desc 600), Shutterstock description limit (300), two-tier save workflow (per-card saveDraft + backup bulkSave), and universal multilingual category resolution via numeric IDs for Dreamstime (15 main + subcategories) and Shutterstock (Photo 26 vs Video 19) | Complete documentation, user review & merge to dev |
 | 60 | 2026-09-27 | `task/multilingual-fixes` | `fb930cd` | Fixed popup vs HUD state sync by scoping isSavingLocally guard, enforced tab-match Start button readiness in popup, and resolved Depositphotos non-English locale URL detection (/id/files/unfinished.html) | Address Items 3, 4, 5 in bahan/notes.md (Dreamstime & Shutterstock) |

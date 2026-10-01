@@ -18,6 +18,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.4] - 2026-10-01
+
+### Added
+- **Universal AI Generation Auto-Retry Fallback (`src/overlay/AutomationOrchestrator.js`)**:
+  - Implemented `_generateMetadataWithRetry(params, signal, setStatusBadge)`: provides an automated single-fallback retry with a 1500ms backoff when any Vision AI completion call encounters transient socket drops, network latency spikes, HTTP 429 rate limits, or 502/503/504 gateway timeouts.
+  - Dynamically updates HUD status badge to `Retrying AI...` (`Retrying AI metadata generation...`) during retry attempts.
+  - Universally protects all 7 supported microstock platforms across both carousel (`runDreamstimeLoop`) and standard grid batch loops (`processLoop`).
+- **Vecteezy Per-Card Save Draft Integration (`src/adapters/VecteezyAdapter.js`, `src/overlay/AutomationOrchestrator.js`)**:
+  - Enhanced `VecteezyAdapter.saveDraft()` with editor form scoping, step logger reporting, and progress spinner polling (`[role="progressbar"]`, `.MuiCircularProgress-svg`) with a 3-second ceiling.
+  - Integrated per-card `adapter.saveDraft()` calls in `AutomationOrchestrator` batch loop for Vecteezy (matching Shutterstock and Freepik), preventing metadata loss if automation is stopped midway or the browser tab is closed.
+
+### Changed
+- **Dreamstime Title Limit Calibration & Keyword Quota Expansion (`src/services/AiPrompt.js`, `src/services/SanitizerService.js`, `src/services/StorageService.js`, `src/popup/platform_forms.js`, `src/overlay/overlay.js`, `src/overlay/AutomationOrchestrator.js`, `src/adapters/DreamstimeAdapter.js`)**:
+  - Calibrated Dreamstime title limit from 300 to <= 125 characters across AI prompt schemas, sanitizer clamping, and adapter input setters, leaving an ample safety margin against Dreamstime's hard platform ceiling of 130 characters and completely preventing platform truncation.
+  - Expanded Dreamstime keyword limit to 80 tags across full stack (`SanitizerService`, `StorageService`, popup limits, HUD Quick Form stepper, and `DreamstimeAdapter`).
+  - Tuned Dreamstime AI prompt instructions to generate 90-100 keywords to guarantee reaching 80 single-word tags after deduplication and whitespace splitting.
+
+### Fixed
+- **Multi-Platform Cross-Tab Automation Isolation & Freeze Elimination (`src/overlay/overlay.js`, `src/popup/popup.js`, `src/background/service_worker.js`)**:
+  - *Promisified Tab ID Resolution*: Wrapped `GET_SENDER_TAB_ID` in a Promise and awaited it in `overlay.js:init()`, preventing race conditions where unawaited `this.tabId` remained `null` on mount.
+  - *Strict Tab Scoping in Storage Listener*: Scoped `onStorageChanged` to check `isAnotherTab = Boolean(state.tabId && this.tabId && state.tabId !== this.tabId)`. If another tab runs automation (even for the same platform), the HUD locks with `Busy (another tab)` instead of ping-ponging `startAutomation`/`stopAutomation` at 60fps, eliminating Chromium main thread freezing ("Not Responding").
+  - *Sibling Tab Mount Auto-Heal Guard*: Scoped `restoreAutomationState()` so newly mounted tabs do not wipe active automation state in storage (`isRunning: false`).
+  - *Background Tab Scanner Throttling*: Added `document.hidden` guards in `startAssetScanner()` skipping DOM card scans when tabs are in the background, raising debounce to 500ms to conserve CPU cycles.
+
+---
+
 ## [0.1.3] - 2026-09-30
 
 ### Fixed
