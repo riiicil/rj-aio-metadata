@@ -9,7 +9,7 @@ import { DEPOSITPHOTOS_COUNTRIES } from './depositphotos_countries.js';
 // Platform Keyword Count Constraints & Hints
 export const PLATFORM_LIMITS = {
   adobestock: { min: 8, max: 49, hint: 'Min 8, Max 49 (Adobe limit)' },
-  dreamstime: { min: 8, max: 70, hint: 'Min 8, Max 70 (Dreamstime limit)' },
+  dreamstime: { min: 8, max: 80, hint: 'Min 8, Max 80 (Dreamstime limit)' },
   miricanvas: { min: 8, max: 25, hint: 'Min 8, Max 25 (MiriCanvas limit)' },
   shutterstock: { min: 8, max: 50, hint: 'Min 8, Max 50' },
   freepik: { min: 8, max: 50, hint: 'Min 8, Max 50' },

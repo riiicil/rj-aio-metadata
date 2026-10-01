@@ -777,17 +777,39 @@ export class VecteezyAdapter extends BaseAdapter {
 
   /**
    * Saves draft changes for currently selected asset.
+   * Scopes search to the editor form container and handles saving spinner.
    * @returns {Promise<boolean>} True if save clicked.
    */
   async saveDraft() {
     if (typeof document === 'undefined') return true;
-    const saveIcon = document.querySelector(
+    this.logger.step('Save Draft', 'Vecteezy: Saving changes for current asset');
+
+    const editorForm = this.getEditorForm() || document;
+    const saveIcon = editorForm.querySelector(
+      'div[data-testid="save-changes-icon"], button[data-testid="save-changes-icon"], [data-testid="save-changes-icon"]'
+    ) || document.querySelector(
       'div[data-testid="save-changes-icon"], button[data-testid="save-changes-icon"], [data-testid="save-changes-icon"]'
     );
+
     if (saveIcon) {
       simulateClick(saveIcon);
+      await sleep(350);
+
+      // Wait if a progress spinner appears inside or adjacent to the save button
+      let waitCount = 0;
+      while (
+        document.querySelector('div[data-testid="save-changes-icon"] [role="progressbar"], div[data-testid="save-changes-icon"] svg.MuiCircularProgress-svg') &&
+        waitCount < 20
+      ) {
+        await sleep(150);
+        waitCount++;
+      }
+
+      this.logger.info('Vecteezy: Asset draft saved');
       return true;
     }
+
+    this.logger.warn('Vecteezy: save-changes-icon not found in editor header');
     return false;
   }
 

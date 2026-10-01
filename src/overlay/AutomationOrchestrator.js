@@ -76,6 +76,40 @@ export class AutomationOrchestrator {
   }
 
   /**
+   * Generates AI metadata with a single auto-retry fallback on failure.
+   * If initial attempt fails, displays 'Retrying AI...' on the HUD badge,
+   * waits 1500ms, and retries once before throwing.
+   *
+   * @param {Object} params - Arguments for generateMetadata
+   * @param {AbortSignal} signal - Cancellation signal
+   * @param {Function} setStatusBadge - Badge updater function
+   * @returns {Promise<Object>} Sanitized metadata
+   */
+  async _generateMetadataWithRetry(params, signal, setStatusBadge) {
+    try {
+      return await generateMetadata(params);
+    } catch (firstErr) {
+      if (signal?.aborted || firstErr?.message === 'ABORTED') {
+        throw firstErr;
+      }
+      logger.warn(`AI generation attempt 1 failed (${firstErr?.message || firstErr}), retrying in 1.5s...`);
+      if (typeof setStatusBadge === 'function') {
+        setStatusBadge(
+          this.hud?.isStopping ? 'Stopping...' : 'Retrying AI...',
+          this.hud?.isStopping ? 'Stopping automation (saving work)...' : 'Retrying AI metadata generation...'
+        );
+      }
+      await sleep(1500);
+      if (signal?.aborted) {
+        const abortErr = new Error('ABORTED');
+        abortErr.code = 'ABORTED';
+        throw abortErr;
+      }
+      return await generateMetadata(params);
+    }
+  }
+
+  /**
    * Main automation entry point.
    * Executes provider verification, card scanning, batch loop iteration, and bulk saving.
    * @param {number} [initialCount=0] - Initial processed asset counter for cross-page continuations.
@@ -218,13 +252,13 @@ export class AutomationOrchestrator {
             // Step 3: AI Metadata Generation
             setStatusBadge(this.hud.isStopping ? 'Stopping...' : 'Generating...', this.hud.isStopping ? 'Stopping automation (saving work)...' : 'Generating AI metadata...');
 
-            let keywordCount = Number(this.hud.shadow?.querySelector('#rjInputKeywordCount')?.value) || 70;
+            let keywordCount = Number(this.hud.shadow?.querySelector('#rjInputKeywordCount')?.value) || 80;
             const specificKeywordsRaw = this.hud.shadow?.querySelector('#rjInputSpecificKeywords')?.value || '';
             const customKeywords = specificKeywordsRaw.split(',').map(s => s.trim()).filter(Boolean);
             const isAiGenerated = Boolean(this.hud.shadow?.querySelector('#rjToggleAiDeclaration')?.checked);
             const language = platformSettings.language || 'en';
 
-            const sanitizedData = await generateMetadata({
+            const sanitizedData = await this._generateMetadataWithRetry({
               image: thumb,
               platformId: 'dreamstime',
               assetType: 'image',
@@ -235,7 +269,7 @@ export class AutomationOrchestrator {
               language,
               assetIndex: assetIdx,
               providerConfig: this.hud.currentConfig
-            });
+            }, signal, setStatusBadge);
 
             if (signal.aborted) break;
             await sleep(400);
@@ -404,7 +438,7 @@ export class AutomationOrchestrator {
           const isVideo = this.hud.platformId === 'shutterstock' && typeof window !== 'undefined' && window.location?.pathname?.includes('/video');
           const assetType = isVideo ? 'video' : 'image';
 
-          const sanitizedData = await generateMetadata({
+          const sanitizedData = await this._generateMetadataWithRetry({
             image: thumb,
             platformId: this.hud.platformId,
             assetType,
@@ -415,7 +449,7 @@ export class AutomationOrchestrator {
             language,
             assetIndex: i,
             providerConfig: this.hud.currentConfig
-          });
+          }, signal, setStatusBadge);
 
           if (signal.aborted) break;
           await sleep(500);
@@ -433,8 +467,9 @@ export class AutomationOrchestrator {
           await adapter.fillMetadata(sanitizedData, platformOptions, card);
           processedCount++;
 
-          // Step 6: Per-item save (for Freepik and Shutterstock)
-          if (this.hud.platformId === 'freepik' || this.hud.platformId === 'shutterstock') {
+          // Step 6: Per-item save (for Freepik, Shutterstock, and Vecteezy)
+          if (this.hud.platformId === 'freepik' || this.hud.platformId === 'shutterstock' || this.hud.platformId === 'vecteezy') {
+            setStatusBadge(this.hud.isStopping ? 'Stopping...' : 'Saving...', this.hud.isStopping ? 'Stopping automation (saving work)...' : 'Saving draft metadata...');
             await adapter.saveDraft();
           }
 

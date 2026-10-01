@@ -1352,6 +1352,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             isStopping: true,
             status: 'stopping',
             platformId: currentActivePlatformId,
+            tabId: activeTabInfo?.tabId || null,
             timestamp: Date.now()
           }
         });
@@ -1366,6 +1367,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             isStopping: false,
             status: 'running',
             platformId: currentActivePlatformId,
+            tabId: activeTabInfo?.tabId || null,
             timestamp: Date.now()
           }
         });
