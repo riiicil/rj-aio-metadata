@@ -2,7 +2,7 @@
 
 *Last Updated: 2026-10-01*<br>
 *Active Branch: `task/multitab-and-platform-fixes`*<br>
-*Current Milestone: Multi-Platform Tab Isolation, Dreamstime Limit Calibration, Vecteezy Saving & Universal AI Auto-Retry*
+*Current Milestone: Platform Resilience, Dreamstime Calibration & Universal AI Auto-Retry (v0.1.4 Release)*
 
 ---
 
@@ -17,10 +17,7 @@
 - **Post-v0.1.0 Maintenance**: [COMPLETE] (v0.1.1 patch: added missing `Authorization: Bearer` header for Google Gemini's OpenAI-compatible endpoint in `service_worker.js`, and synchronized toolbar popup Start button readiness with AI provider credentials/models in `popup.js` merged to dev)
 - **Post-v0.1.1 Localization & Platform Hardening**: [COMPLETE] (v0.1.2 release: Depositphotos commercial vs editorial dropdown sync [explicit reset to 'no'], Dreamstime title [300] & description [600] limit expansion, Shutterstock description [450] limit expansion, two-tier per-card + backup bulk saving flow for Shutterstock, and universal non-English numeric category ID resolution across Dreamstime and Shutterstock Photo/Video merged to dev)
 - **Post-v0.1.2 Platform Bugfixes (v0.1.3)**: [COMPLETE] (v0.1.3 release: Dreamstime Mode B [Submit Immediately] verified working with auto-transition decoupling, toast race condition resolution, and selector bypass elimination; In-Page Overlay HUD Shadow DOM anti-FOUC white glitch fix applied; all 345 test assertions pass 100%)
-- **Multi-Tab Isolation & Freeze Elimination**: [COMPLETE] (Fixed cross-tab ping-pong loop, promisified GET_SENDER_TAB_ID, enforced same-platform tabId scoping with 'Busy (another tab)', and added background tab scanner throttling; 9/9 unit tests passed)
-- **Dreamstime Title & Keyword Limit Calibration**: [COMPLETE] (Calibrated Dreamstime title limit to <= 125 chars to prevent platform 130-char truncation, expanded keywords to 80 tags across full stack, and tuned AI prompt schema to generate 90-100 keywords to guarantee reaching 80 after whitespace single-word splitting; 30/30 unit tests passed)
-- **Vecteezy Per-Card Save Draft Integration**: [COMPLETE] (Integrated per-card saveDraft execution in AutomationOrchestrator loop for Vecteezy with saveIcon spinner polling and editorForm scoping)
-- **Universal AI Generation Auto-Retry**: [COMPLETE] (Added single-fallback auto-retry with 1.5s backoff and 'Retrying AI...' HUD status badge across all platforms in AutomationOrchestrator)
+- **Platform Resilience, Dreamstime Calibration & Universal AI Auto-Retry (v0.1.4)**: [COMPLETE] (v0.1.4 release: Universal AI generation single-fallback auto-retry with 1.5s backoff; Vecteezy per-card draft save integration; Dreamstime title <= 125 chars and 80 keywords full-stack calibration; Multi-platform cross-tab freeze elimination and isolation; all tests passed)
 
 ---
 
@@ -30,7 +27,7 @@
 | :--- | :--- | :--- |
 | `main` | Clean (v0.1.3 tagged) | Stable production releases only |
 | `dev` | Integration (v0.1.3 merged) | Active development integration branch |
-| `task/multitab-and-platform-fixes` | Active | Multi-platform tab isolation, Dreamstime limit calibration, Vecteezy saving, and universal AI auto-retry |
+| `task/multitab-and-platform-fixes` | Active (v0.1.4 ready) | Multi-platform tab isolation, Dreamstime limit calibration, Vecteezy saving, universal AI auto-retry, and v0.1.4 release |
 | `task/dreamstime-and-hud-fixes` | Merged | Version 0.1.3: Dreamstime Mode B auto-transition and HUD refresh glitch resolution |
 | `task/multilingual-fixes` | Merged | Version 0.1.2: Multi-language architecture & platform hardening |
 | `task/fix-gemini-auth-header` | Merged | Version 0.1.1: Fix Google Gemini OpenAI endpoint Authorization header & sync popup start button readiness |
@@ -147,14 +144,14 @@
 - Sanitizer service suite verified with `scratch/test_sanitizer_service.mjs` (88/88 assertions passed: single-word tag splitting, Dreamstime 125 char title and 80 keywords, character boundary clamping).
 - Syntax validation passed for `src/background/service_worker.js`, `src/overlay/AutomationOrchestrator.js`, `src/overlay/overlay.js`, `src/popup/popup.js`, `src/popup/platform_forms.js`, `src/content/content_main.js`, `src/services/AiPrompt.js`, `src/services/SanitizerService.js`, `src/adapters/ShutterstockAdapter.js`, `src/adapters/DreamstimeAdapter.js`, and `src/adapters/index.js` via `node --check`.
 - Zero Native Emoji Policy strictly enforced across all files, code, and documentation.
-- Version 0.1.3 synchronization verified across `src/manifest.json`, `package.json`, `package-lock.json`, `src/popup/popup.html`, `build.js`, `README.md`, and `CHANGELOG.md`.
+- Version 0.1.4 synchronization verified across `src/manifest.json`, `package.json`, `package-lock.json`, `src/popup/popup.html`, `build.js`, `README.md`, and `CHANGELOG.md`.
 
 ---
 
 ## 7. Immediate Next Step
 
-1. Complete commit for Dreamstime title and keyword limit calibration on `task/multitab-and-dreamstime-fixes`.
-2. Await user verification on live contributor pages (multi-tab simultaneous usage and Dreamstime submission).
-3. Upon user confirmation, merge `task/multitab-and-dreamstime-fixes` into `dev` using `git merge --no-ff`.
+1. Complete release commit for version 0.1.4 on `task/multitab-and-platform-fixes`.
+2. Await user confirmation for merging `task/multitab-and-platform-fixes` into `dev` and tagging `v0.1.4`.
+3. Provide built release archive (`releases/v0.1.4.zip`) and unpacked load folder (`dist/LOAD THIS FOLDER/`).
 
 

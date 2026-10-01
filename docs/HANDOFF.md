@@ -5,9 +5,9 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Multi-Platform Tab Isolation, Dreamstime Limit Calibration, Vecteezy Saving & Universal AI Auto-Retry
+- **Current Milestone**: Platform Resilience, Dreamstime Calibration & Universal AI Auto-Retry (v0.1.4 Release)
 - **Active Branch**: `task/multitab-and-platform-fixes`
-- **Latest Commit**: `c27e5af` (`feat(orchestrator): add universal AI generation auto-retry fallback`)
+- **Latest Commit**: `e4a8e72` (`chore(release): bump version to v0.1.4 and synchronize release documentation`)
 - **Working Tree**: Clean
 - **Build / Test State**: Verified healthy (160+ passing: test_ai_retry, test_vecteezy_per_card_saving, 9/9 multi-tab isolation, 30/30 Dreamstime limits, 66/66 AI prompt, 88/88 sanitizer, 87/87 multilingual, 116/116 Tier 3 adapters)
 
