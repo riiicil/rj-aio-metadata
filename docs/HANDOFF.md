@@ -5,17 +5,27 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Version 0.1.3 Release: Dreamstime Mode B & HUD Anti-FOUC Hardening
-- **Active Branch**: `task/dreamstime-and-hud-fixes`
-- **Latest Commit**: `b2ad407` (`fix(dreamstime): eliminate js-submit-message selector bypass and stabilize post-submit transition`)
-- **Working Tree**: Changes ready for commit on `task/dreamstime-and-hud-fixes`
-- **Build / Test State**: Verified healthy (345/345 passing: 30/30 Dreamstime suite tests, 116/116 tier 3 adapter tests, 88/88 tier 1, 108/108 tier 2, 3/3 Mode B orchestrator loop, zero native emoji clean)
+- **Current Milestone**: Multi-Platform Tab Isolation & Dreamstime Limit Calibration
+- **Active Branch**: `task/multitab-and-dreamstime-fixes`
+- **Latest Commit**: `6f25cce` (`chore(release): v0.1.3`)
+- **Working Tree**: Multi-platform tab isolation ready for commit on `task/multitab-and-dreamstime-fixes`
+- **Build / Test State**: Verified healthy (125/125 passing: 9/9 multi-tab isolation tests, 116/116 tier 1-3 adapter tests, zero native emoji clean)
 
 ---
 
 ## 2. Active In-Flight Context
 
-0. **In-Page Overlay HUD Anti-FOUC White Glitch Elimination (`overlay.js`, `overlay.css`)**:
+0. **Multi-Platform Cross-Tab Isolation & Freeze Elimination (`overlay.js`, `popup.js`, `service_worker.js`)**:
+   - **Root Cause**: Opening platforms in parallel or duplicate tabs triggered an unawaited `GET_SENDER_TAB_ID` (`this.tabId === null`), same-platform storage event ping-pongs (`onStorageChanged` calling `startAutomation`/`stopAutomation` at 60fps), and sibling tab mounting auto-heals wiping storage `isRunning: false`.
+   - **Fix Applied**:
+     1. Promisified and awaited `GET_SENDER_TAB_ID` in `overlay.js:init()`.
+     2. Scoped `onStorageChanged` to check `isAnotherTab = Boolean(state.tabId && this.tabId && state.tabId !== this.tabId)`. If running on another tab (even same platform), lock HUD with `Busy (another tab)` and do not trigger `startAutomation`/`stopAutomation`.
+     3. Scoped `restoreAutomationState()` so newly mounted tabs do not wipe storage if another tab owns the automation.
+     4. Populated `tabId: activeTabInfo?.tabId || null` in `popup.js`.
+     5. Throttled DOM scanning in `startAssetScanner()` for background tabs (`document.hidden`).
+   - **Verification**: Verified with `scratch/test_multi_tab_isolation.mjs` (9/9 passed).
+
+1. **In-Page Overlay HUD Anti-FOUC White Glitch Elimination (`overlay.js`, `overlay.css`)**:
    - **Root Cause**: On page refresh, `<link rel="stylesheet">` inside Shadow DOM loaded `overlay.css` asynchronously. In the 20ms - 100ms window before the CSS parsed, Chromium's User-Agent stylesheet rendered `<button>` elements with `background-color: buttonface; border: 2px outset;`, causing white/light-grey buttons to flash in the HUD (`media_1790741918868.png`).
    - **Fix Applied**:
      1. Injected synchronous `<style id="rjAntiFoucStyle">` into Shadow Root resetting `button, input, select, textarea` to transparent dark baselines.

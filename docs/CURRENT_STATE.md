@@ -1,8 +1,8 @@
 # Current Project State — RJ AIO Metadata Extension
 
-*Last Updated: 2026-09-30*<br>
-*Active Branch: `task/dreamstime-and-hud-fixes`*<br>
-*Current Milestone: Version 0.1.3 Release: Dreamstime Mode B & HUD Anti-FOUC Hardening*
+*Last Updated: 2026-10-01*<br>
+*Active Branch: `task/multitab-and-dreamstime-fixes`*<br>
+*Current Milestone: Multi-Platform Tab Isolation & Dreamstime Limit Calibration*
 
 ---
 
@@ -17,6 +17,7 @@
 - **Post-v0.1.0 Maintenance**: [COMPLETE] (v0.1.1 patch: added missing `Authorization: Bearer` header for Google Gemini's OpenAI-compatible endpoint in `service_worker.js`, and synchronized toolbar popup Start button readiness with AI provider credentials/models in `popup.js` merged to dev)
 - **Post-v0.1.1 Localization & Platform Hardening**: [COMPLETE] (v0.1.2 release: Depositphotos commercial vs editorial dropdown sync [explicit reset to 'no'], Dreamstime title [300] & description [600] limit expansion, Shutterstock description [450] limit expansion, two-tier per-card + backup bulk saving flow for Shutterstock, and universal non-English numeric category ID resolution across Dreamstime and Shutterstock Photo/Video merged to dev)
 - **Post-v0.1.2 Platform Bugfixes (v0.1.3)**: [COMPLETE] (v0.1.3 release: Dreamstime Mode B [Submit Immediately] verified working with auto-transition decoupling, toast race condition resolution, and selector bypass elimination; In-Page Overlay HUD Shadow DOM anti-FOUC white glitch fix applied; all 345 test assertions pass 100%)
+- **Multi-Tab Isolation & Freeze Elimination**: [IN_PROGRESS] (Fixed cross-tab ping-pong loop, promisified GET_SENDER_TAB_ID, enforced same-platform tabId scoping with 'Busy (another tab)', and added background tab scanner throttling)
 
 ---
 
@@ -24,9 +25,10 @@
 
 | Branch | Status | Purpose |
 | :--- | :--- | :--- |
-| `main` | Clean (v0.1.2 tagged) | Stable production releases only |
-| `dev` | Integration (Phase 0-5 + v0.1.2 merged) | Active development integration branch |
-| `task/dreamstime-and-hud-fixes` | Active | Dreamstime Mode B auto-transition and HUD refresh glitch resolution |
+| `main` | Clean (v0.1.3 tagged) | Stable production releases only |
+| `dev` | Integration (v0.1.3 merged) | Active development integration branch |
+| `task/multitab-and-dreamstime-fixes` | Active | Multi-platform tab isolation, freeze elimination, and Dreamstime limits calibration |
+| `task/dreamstime-and-hud-fixes` | Merged | Version 0.1.3: Dreamstime Mode B auto-transition and HUD refresh glitch resolution |
 | `task/multilingual-fixes` | Merged | Version 0.1.2: Multi-language architecture & platform hardening |
 | `task/fix-gemini-auth-header` | Merged | Version 0.1.1: Fix Google Gemini OpenAI endpoint Authorization header & sync popup start button readiness |
 | `task/e2e-hardening-polish` | Historical | Phase 5: End-to-End Hardening & Polish (v0.1.0 release preparation) |

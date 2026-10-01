@@ -142,11 +142,18 @@ export class OverlayHUD {
     if (this.mounted) return;
     if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
       try {
-        chrome.runtime.sendMessage({ action: 'GET_SENDER_TAB_ID' }, (res) => {
-          if (res && res.tabId) {
-            this.tabId = res.tabId;
-          }
+        const res = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ action: 'GET_SENDER_TAB_ID' }, (r) => {
+            if (chrome.runtime?.lastError) {
+              resolve(null);
+            } else {
+              resolve(r);
+            }
+          });
         });
+        if (res && res.tabId) {
+          this.tabId = res.tabId;
+        }
       } catch {
         // Non-fatal if runtime message fails
       }
@@ -466,20 +473,20 @@ export class OverlayHUD {
 
     if (!this.scanInterval) {
       this.scanInterval = setInterval(() => {
-        if (!this.isAutomationRunning) {
+        if (!this.isAutomationRunning && (typeof document === 'undefined' || !document.hidden)) {
           this.updateAssetCounter();
         }
-      }, 2500);
+      }, 3000);
     }
 
     if (!this.mutationObserver && document.body) {
       let debounceTimer = null;
       this.mutationObserver = new MutationObserver(() => {
-        if (this.isAutomationRunning) return;
+        if (this.isAutomationRunning || (typeof document !== 'undefined' && document.hidden)) return;
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           this.updateAssetCounter();
-        }, 300);
+        }, 500);
       });
       this.mutationObserver.observe(document.body, {
         childList: true,
@@ -910,7 +917,11 @@ export class OverlayHUD {
       btnSupport.style.display = 'none';
     }
 
-    const runnerName = PLATFORM_NAMES[runnerPlatformId] || runnerPlatformId || 'another platform';
+    const isSamePlatformAnotherTab = runnerPlatformId === this.platformId;
+    const runnerName = isSamePlatformAnotherTab
+      ? 'another tab'
+      : (PLATFORM_NAMES[runnerPlatformId] || runnerPlatformId || 'another platform');
+
     const btn = this.shadow.querySelector('#rjBtnToggleAutomation');
     const btnText = this.shadow.querySelector('#rjAutomationBtnText');
     const icon = this.shadow.querySelector('#rjAutomationIcon');
@@ -920,10 +931,14 @@ export class OverlayHUD {
       btn.classList.remove('rj-btn-start', 'rj-btn-stop', 'rj-btn-stopping', 'rj-btn-accent');
       btn.classList.add('rj-btn-disabled', 'rj-btn-locked');
       btn.disabled = true;
-      btn.title = `Automation is currently running on ${runnerName}. Stop it on that tab or wait until finished.`;
+      btn.title = isSamePlatformAnotherTab
+        ? 'Automation is currently running on another tab. Stop it on that tab or wait until finished.'
+        : `Automation is currently running on ${runnerName}. Stop it on that tab or wait until finished.`;
     }
     if (btnText) {
-      btnText.textContent = `Running on ${runnerName}`;
+      btnText.textContent = isSamePlatformAnotherTab
+        ? 'Running on another tab'
+        : `Running on ${runnerName}`;
     }
     if (icon) {
       // SVG Lock icon (Phosphor / Lucide 14x14)
@@ -932,7 +947,11 @@ export class OverlayHUD {
     if (badge) {
       badge.classList.remove('rj-running');
     }
-    this.setStatusBadge(`Busy (${runnerName})`, `Automation is currently running on ${runnerName}. Only one platform can run at a time.`);
+    const badgeText = isSamePlatformAnotherTab ? 'Busy (another tab)' : `Busy (${runnerName})`;
+    const badgeTooltip = isSamePlatformAnotherTab
+      ? 'Automation is currently running on another tab. Only one platform can run at a time.'
+      : `Automation is currently running on ${runnerName}. Only one platform can run at a time.`;
+    this.setStatusBadge(badgeText, badgeTooltip);
   }
 
   /**
@@ -1005,17 +1024,20 @@ export class OverlayHUD {
         const isRunning = Boolean(state.isRunning);
         const isStopping = Boolean(state.isStopping || state.status === 'stopping');
 
-        // Exclusive automation lock: check if state belongs to another platform
-        if (state.platformId && state.platformId !== this.platformId) {
+        // Check if state belongs to another tab or another platform
+        const isAnotherTab = Boolean(state.tabId && this.tabId && state.tabId !== this.tabId);
+        const isAnotherPlatform = Boolean(state.platformId && state.platformId !== this.platformId);
+
+        if (isAnotherPlatform || isAnotherTab) {
           if (isRunning || isStopping) {
-            this.setLockedByOtherPlatformUI(state.platformId);
+            this.setLockedByOtherPlatformUI(state.platformId || this.platformId);
           } else if (this.isLockedByOtherPlatform) {
             this.clearLockedByOtherPlatformUI();
           }
           return;
         }
 
-        // State belongs to this platform (or global reset)
+        // State belongs to this tab & platform (or global reset)
         if (this.isLockedByOtherPlatform) {
           this.clearLockedByOtherPlatformUI();
         }
@@ -1410,11 +1432,12 @@ export class OverlayHUD {
         if (res && res.rj_automation_state) {
           const state = res.rj_automation_state;
 
-          // Exclusive lock check on page load: If another platform is actively running, lock this HUD
-          if (state.platformId && state.platformId !== this.platformId) {
-            if (state.isRunning || state.isStopping) {
-              this.setLockedByOtherPlatformUI(state.platformId);
-            }
+          const isAnotherTab = Boolean(state.tabId && this.tabId && state.tabId !== this.tabId);
+          const isAnotherPlatform = Boolean(state.platformId && state.platformId !== this.platformId);
+
+          // Exclusive lock check on page load: If another tab or platform is actively running, lock this HUD
+          if ((isAnotherPlatform || isAnotherTab) && (state.isRunning || state.isStopping)) {
+            this.setLockedByOtherPlatformUI(state.platformId || this.platformId);
             resolve();
             return;
           }
@@ -1424,12 +1447,13 @@ export class OverlayHUD {
 
           // Cross-page continuation for Dreamstime:
           // Dreamstime redirects/reloads between assets (/upload/edit?item_id=...).
-          // If the batch was running on Dreamstime and not stopping, maintain running UI
-          // and auto-resume orchestrator with the persisted processedCount after DOM settles.
+          // If the batch was running on Dreamstime in THIS exact tab (or tabId not recorded yet)
+          // and not stopping, maintain running UI and auto-resume orchestrator with the persisted processedCount.
           const isDreamstimeContinuation = this.platformId === 'dreamstime' &&
             state.platformId === 'dreamstime' &&
             isRunning &&
-            !isStopping;
+            !isStopping &&
+            (!state.tabId || !this.tabId || state.tabId === this.tabId);
 
           if (isDreamstimeContinuation) {
             this.isAutomationRunning = true;
@@ -1449,7 +1473,9 @@ export class OverlayHUD {
 
           // Auto-heal on page mount: A newly mounted overlay instance on page reload is never
           // actively stopping an old batch from a dead JS execution context.
-          if (isStopping || (isRunning && !this.orchestrator?.isProcessing)) {
+          // BUT only auto-heal if this state belonged to this tab or this tab is the runner tab!
+          const isMyTabState = !state.tabId || !this.tabId || state.tabId === this.tabId;
+          if (isMyTabState && (isStopping || (isRunning && !this.orchestrator?.isProcessing))) {
             this.isAutomationRunning = false;
             this.isStopping = false;
             this.updateAutomationUI(false);
