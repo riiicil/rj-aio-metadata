@@ -76,6 +76,40 @@ export class AutomationOrchestrator {
   }
 
   /**
+   * Generates AI metadata with a single auto-retry fallback on failure.
+   * If initial attempt fails, displays 'Retrying AI...' on the HUD badge,
+   * waits 1500ms, and retries once before throwing.
+   *
+   * @param {Object} params - Arguments for generateMetadata
+   * @param {AbortSignal} signal - Cancellation signal
+   * @param {Function} setStatusBadge - Badge updater function
+   * @returns {Promise<Object>} Sanitized metadata
+   */
+  async _generateMetadataWithRetry(params, signal, setStatusBadge) {
+    try {
+      return await generateMetadata(params);
+    } catch (firstErr) {
+      if (signal?.aborted || firstErr?.message === 'ABORTED') {
+        throw firstErr;
+      }
+      logger.warn(`AI generation attempt 1 failed (${firstErr?.message || firstErr}), retrying in 1.5s...`);
+      if (typeof setStatusBadge === 'function') {
+        setStatusBadge(
+          this.hud?.isStopping ? 'Stopping...' : 'Retrying AI...',
+          this.hud?.isStopping ? 'Stopping automation (saving work)...' : 'Retrying AI metadata generation...'
+        );
+      }
+      await sleep(1500);
+      if (signal?.aborted) {
+        const abortErr = new Error('ABORTED');
+        abortErr.code = 'ABORTED';
+        throw abortErr;
+      }
+      return await generateMetadata(params);
+    }
+  }
+
+  /**
    * Main automation entry point.
    * Executes provider verification, card scanning, batch loop iteration, and bulk saving.
    * @param {number} [initialCount=0] - Initial processed asset counter for cross-page continuations.
@@ -224,7 +258,7 @@ export class AutomationOrchestrator {
             const isAiGenerated = Boolean(this.hud.shadow?.querySelector('#rjToggleAiDeclaration')?.checked);
             const language = platformSettings.language || 'en';
 
-            const sanitizedData = await generateMetadata({
+            const sanitizedData = await this._generateMetadataWithRetry({
               image: thumb,
               platformId: 'dreamstime',
               assetType: 'image',
@@ -235,7 +269,7 @@ export class AutomationOrchestrator {
               language,
               assetIndex: assetIdx,
               providerConfig: this.hud.currentConfig
-            });
+            }, signal, setStatusBadge);
 
             if (signal.aborted) break;
             await sleep(400);
@@ -404,7 +438,7 @@ export class AutomationOrchestrator {
           const isVideo = this.hud.platformId === 'shutterstock' && typeof window !== 'undefined' && window.location?.pathname?.includes('/video');
           const assetType = isVideo ? 'video' : 'image';
 
-          const sanitizedData = await generateMetadata({
+          const sanitizedData = await this._generateMetadataWithRetry({
             image: thumb,
             platformId: this.hud.platformId,
             assetType,
@@ -415,7 +449,7 @@ export class AutomationOrchestrator {
             language,
             assetIndex: i,
             providerConfig: this.hud.currentConfig
-          });
+          }, signal, setStatusBadge);
 
           if (signal.aborted) break;
           await sleep(500);

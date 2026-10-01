@@ -5,15 +5,27 @@
 ---
 
 ## 1. Immediate Operational State
-- **Current Milestone**: Multi-Platform Tab Isolation, Dreamstime Limit Calibration & Vecteezy Per-Card Saving
+- **Current Milestone**: Multi-Platform Tab Isolation, Dreamstime Limit Calibration, Vecteezy Saving & Universal AI Auto-Retry
 - **Active Branch**: `task/multitab-and-platform-fixes`
-- **Latest Commit**: `1861459` (`feat(vecteezy): integrate per-card draft saving in automation loop`)
+- **Latest Commit**: `c27e5af` (`feat(orchestrator): add universal AI generation auto-retry fallback`)
 - **Working Tree**: Clean
-- **Build / Test State**: Verified healthy (160+ passing: test_vecteezy_per_card_saving, 9/9 multi-tab isolation, 30/30 Dreamstime limits, 66/66 AI prompt, 88/88 sanitizer, 87/87 multilingual, 116/116 Tier 3 adapters)
+- **Build / Test State**: Verified healthy (160+ passing: test_ai_retry, test_vecteezy_per_card_saving, 9/9 multi-tab isolation, 30/30 Dreamstime limits, 66/66 AI prompt, 88/88 sanitizer, 87/87 multilingual, 116/116 Tier 3 adapters)
 
 ---
 
 ## 2. Active In-Flight Context
+
+0000. **Universal AI Generation Auto-Retry (`AutomationOrchestrator.js`)**:
+   - **Root Cause & Rationale**:
+     - Transient Vision API failures (HTTP 429 rate limits, socket timeouts, 502/503/504 provider gateway errors) caused entire assets to be silently skipped in `AutomationOrchestrator` when processing batches.
+     - User requested a single-retry fallback across all platforms, displaying `"Retrying AI..."` without count numbers on the HUD badge, while leaving the completion summary unchanged.
+   - **Fix Applied**:
+     1. Implemented `async _generateMetadataWithRetry(params, signal, setStatusBadge)` on `AutomationOrchestrator`:
+        - Catches initial failure, logs warning, displays `Retrying AI...` on HUD badge.
+        - Waits 1500ms backoff before retrying `generateMetadata(params)` once.
+        - If retry succeeds, execution proceeds seamlessly; if retry fails, propagates error to outer handler.
+     2. Integrated `this._generateMetadataWithRetry()` into both `runDreamstimeLoop` and `processLoop`.
+   - **Verification**: Verified with `scratch/test_ai_retry.mjs` (100% passed) and regression suites.
 
 000. **Vecteezy Per-Card Save Draft Integration (`VecteezyAdapter.js`, `AutomationOrchestrator.js`)**:
    - **Root Cause & Rationale**:
